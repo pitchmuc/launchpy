@@ -157,6 +157,18 @@ def getProperties(companyID:str)->object:
 
 
 class Property: 
+    """
+        Data object that is pass on is coming from the property return by getProperties.
+        Attributes : 
+          dict : the data that has been passed to the class for the instance creation
+          name : name of the property 
+          id : id of the property 
+          platform : platform of the property 
+          development : boolean, if the property is a dev environment or not. 
+          domains : domain(s) associated with the property
+          libraries : the different libraries associated with the property (rules, data elements, etc...)
+          rules : dictionnary to extract ruleComponents from rules. Filled when running getRules
+        """
     
     header = {"Accept": "application/vnd.api+json;revision=1",
            "Content-Type": "application/vnd.api+json",
@@ -188,12 +200,13 @@ class Property:
         self._Extensions = data['links']['extensions']
         self._Rules = data['links']['rules']
         self._RuleComponents = 'https://reactor.adobe.io/properties/'+data['id']+'/rule_components'
+        self._Host = 'https://reactor.adobe.io//properties/'+data['id']+'/hosts'
         self._Environments = data['links']['environments']
-        self.libraries = data['relationships']['libraries']['links']['related']
+        self._Libraries = data['relationships']['libraries']['links']['related']
         self.ruleComponents = {}
         
     def __repr__(self)-> dict:
-        return self.dict
+        return _json.dumps(self.dict,indent=4)
     
     def __str__(self)-> str:
         return str(_json.dumps(self.dict,indent=4))
@@ -202,6 +215,18 @@ class Property:
         """
         Takes the list of rules and create a dictionary to assign each rule to a name 
         """
+    
+    @_checkToken
+    def getEnvironment(self)->object:
+        env = _requests.get(self._Environments,headers=_header)
+        data = env.json()['data'] ## skip meta for now
+        return data 
+    
+    @_checkToken
+    def getHost(self)->object:
+        host = _requests.get(self._Host,headers=_header)
+        data = host.json()['data'] ## skip meta for now
+        return data 
     
     @_checkToken
     def getExtensions(self)-> object:
@@ -254,15 +279,25 @@ class Property:
     
     @_checkToken
     def getDataElements(self)->object:
+        """
+        Retrieve data elements of that property.
+        Returns a list.
+        """
+        
         dataElements = _requests.get(self._DataElement,headers=_header)
         data = dataElements.json()['data'] ## skip meta for now
         return data 
     
     @_checkToken
-    def getEnvironment(self)->object:
-        env = _requests.get(self._Environments,headers=_header)
-        data = env.json()['data'] ## skip meta for now
+    def getLibraries(self)->object:
+        """
+        Retrieve libraries of the property.
+        Returns a list.
+        """
+        libs = _requests.get(self._Libraries,headers=_header)
+        data = libs.json() ## skip meta for now
         return data 
+    
     
     @_checkToken
     def createExtensions(self,extension_id:str,**kwargs)-> object:
@@ -313,6 +348,7 @@ class Property:
                            'url': data['links']['rule_components']}
         return data
     
+    @_checkToken
     def createRuleComponents(self,name:str,descriptor:str,settings:str=None,extension_id:dict=None,rule_id:dict=None,**kwargs)->object:
         """
         Create a ruleComponent by provided a rule name and descriptor (minimum). It returns an object.
@@ -385,11 +421,95 @@ class Property:
         return data 
     
     @_checkToken
-    def createEnvironment(self,name:str)->object:
-        rules = _requests.post(self._Environments,headers=_header)
-        data = rules.json()
+    def createEnvironment(self,name:str,host_id:str,stage:str='development',**kwargs)->object:
+        """
+        Create an environment. Note that you cannot create more than 1 environment for Staging and Production stage. 
+        Arguments : 
+            name : REQUIRED : name of your environment
+            host_id : REQUIRED : The host id that you would need to connect to the correct host. 
+            stage : OPTIONAL : Default Development. can be staging, production as well. 
+        
+        documentation : https://developer.adobelaunch.com/api/reference/1.0/environments/create/
+        """
+        obj = {
+                "data": {
+                    "attributes": {
+                        "name": name,
+                        "stage": stage
+                    },
+                    "relationships": {
+                        "host": {
+                            "data": {
+                            "id": host_id,
+                             "type": "hosts"
+                            }
+                        }
+                    },
+                "type": "environments"
+                }
+            }
+        env = _requests.post(self._Environments,headers=_header,data=_json.dumps(obj))
+        data = env.json()
         return data 
     
+    
+    @_checkToken
+    def createHost(self,name:str,host_type:str='akamai',**kwargs):
+        """
+        Create a host in that property. By default Akamai host. 
+        Argument : 
+            name : REQUIRED : name of the host
+            host_type : OPTIONAL : type of host. 'akamai' or 'sftp'. Default 'akamai'
+        
+        If the host type is sftp, additional info can be enter as kwargs:
+            username : REQUIRED : str : username of the sftp
+            encrypted_private_key : REQUIRED : str : private key for the sftp as string
+            server : REQUIRED : str : server for the sftp.
+            path : REQUIRED : str : path of the sftp
+            port : REQUIRED : int : port to use
+        documentation : https://developer.adobelaunch.com/api/reference/1.0/hosts/create/
+        """
+        obj = {
+            "data": {
+                "attributes": {
+                    "name": name,
+                    "type_of":host_type
+                    },
+                "type": "hosts"
+                }
+            }
+        if host_type == 'sftp':
+            if 'encrypted_private_key' not in kwargs: 
+                raise KeyError('missing the encrypted_private_key key')
+            else:
+                obj['data']['attributes']['username'] = kwargs.get('username')
+                obj['data']['attributes']['encrypted_private_key'] = kwargs.get('encrypted_private_key')
+                obj['data']['attributes']['server'] = kwargs.get('server')
+                obj['data']['attributes']['path'] = kwargs.get('path','/')
+                obj['data']['attributes']['port'] = kwargs.get('port',22)
+        host = _requests.post(self._Host,headers=_header,data=_json.dumps(obj))
+        data = host.json()
+        return data
+    
+    @_checkToken
+    def createLibrary(self,name:str)->object:
+        """
+        Create a library with the name provided. Returns an object.
+        Arguments:
+            name : REQUIRED : name of the library
+        """
+        obj={
+          "data": {
+            "attributes": {
+              "name": name
+            },
+            "type": "libraries"
+          }
+        }
+        lib = _requests.post(self._Libraries,headers=_header,data=_json.dumps(obj))
+        data = lib.json()
+        return data
+                
     @_checkToken
     def updateExtensions(self,extension_id,extension_dict:dict)-> object:
         """
@@ -425,15 +545,42 @@ class Property:
     
     
     @_checkToken
-    def updateDataElements(self)->object:
-        dataElements = _requests.patch(self._DataElement,headers=_header)
+    def updateDataElements(self,dataElement_id:str,**kwargs)->object:
+        """
+        Update the data element information based on the information provided.
+        """
+        obj = {
+              "data": {
+                "attributes": {},
+                "type": "data_elements",
+                "id": dataElement_id
+              }
+            }
+        dataElements = _requests.patch(_endpoint+'/data_elements/'+dataElement_id,headers=_header,data=_json.dumps(obj))
         data = dataElements.json()['data']
         return data 
     
     @_checkToken
-    def updateEnvironment(self)->object:
-        rules = _requests.patch(self._Environments,headers=_header)
-        data = rules.json()['data']
+    def updateEnvironment(self,name:str,env_id:str,**kwargs)->object:
+        """
+        Update an environment. Note :only support name change
+            name : REQUIRED : name of your environment
+            env_id : REQUIRED : The environement id.
+            stage : OPTIONAL : Default Development. can be staging, production as well. 
+        
+        documentation : https://developer.adobelaunch.com/api/reference/1.0/environments/create/
+        """
+        obj = {
+                "data": {
+                    "attributes": {
+                        "name": name
+                    },
+                'id':env_id,
+                "type": "environments"
+                }
+            }
+        env = _requests.patch(_endpoint+'/environments/'+env_id,headers=_header,data=_json.dumps(obj))
+        data = env.json()
         return data 
     
 
@@ -676,5 +823,59 @@ def createProperty(companyId:str,name:str,platform:str='web',**kwargs):
     new_property = _requests.post(_endpoint+_getProperties.format(_company_id=companyId),headers=_header,data=_json.dumps(obj))
     return new_property.json()
 
+
+class Library:
+    
+    def __init__(self,data:dict):
+        self.id = data['id']
+        self.name = data['attributes']['name']
+        self.state = data['attributes']['state']
+        self.build_required = data['attributes']['build_required']
+        self.builds = data['relationships']['builds']['links']['related']
+        self._DataElements = _endpoint+'/libraries/'+data['id']+'/data_elements'
+        self._Extensions = _endpoint+'/libraries/'+data['id']+'/extensions'
+        self._Environment = _endpoint+'/libraries/'+data['id']+'/envrionment'
+        self._Rules = _endpoint+'/libraries/'+data['id']+'/rules'
+        self.builds = data['relationships']['builds']['links']['related']
+        self.build_status = data['meta']['build_status']
+        self.relationships = {}
+        
+    @_checkToken    
+    def getDataElements(self):
+        """
+        retrieve the list of data elements attached to this library
+        """
+        dataElements = _requests.get(self._DataElements,headers=_header)
+        data = dataElements.json()
+        self.relationships['data_elements'] = data
+        return data
+        
+    @_checkToken    
+    def getExtensions(self):
+        """
+        retrieve the list of data elements attached to this library
+        """
+        extensions = _requests.get(self._Extensions,headers=_header)
+        data = extensions.json()
+        self.relationships['extensions'] = data
+        return data
+    
+    @_checkToken    
+    def getRules(self):
+        """
+        retrieve the list of data elements attached to this library
+        """
+        rules = _requests.get(self._Rules,headers=_header)
+        data = rules.json()
+        self.relationships['rules'] = data
+        return data
+    
+    def getFullLibrary(self):
+        self.getDataElements()
+        self.getRules()
+        self.getExtensions()
+        return self.relationships
+    
+    
     
 ### https://reactor.adobe.io/rules/RL2a1ddbebffbd47d9973d395e77eb98e9/rule_components        
