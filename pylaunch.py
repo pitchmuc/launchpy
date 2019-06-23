@@ -133,6 +133,30 @@ _getCompanies ='/companies'
 _getProfile = '/profile'
 _getProperties = '/companies/{_company_id}/properties'## string format
 
+
+@_checkToken
+def _getData(url:str,*args:str)->object:
+    try:## try to set pagination if exists
+        url = url + args[0]
+    except:
+        url = url
+    res = _requests.get(url,headers=_header)
+    return res.json()
+
+@_checkToken
+def _postData(url:str,obj:dict,**kwargs)->object:
+    res = _requests.post(url,headers=_header,data=_json.dumps(obj))
+    return res.json()
+
+@_checkToken
+def _patchData(url:str,obj:dict,**kwargs)->object:
+    res = _requests.patch(url,headers=_header,data=_json.dumps(obj))
+    return res.json()
+
+def _deleteData(url:str,**kwargs)->object:
+    res = _requests.delete(url,headers=_header)
+    return res.json()
+
 #profile_response = _requests.get(_endpoint+getProfile,headers=header)
 #json_profile = profile_response.json()
 #
@@ -169,13 +193,6 @@ class Property:
           libraries : the different libraries associated with the property (rules, data elements, etc...)
           rules : dictionnary to extract ruleComponents from rules. Filled when running getRules
         """
-    
-    header = {"Accept": "application/vnd.api+json;revision=1",
-           "Content-Type": "application/vnd.api+json",
-           "Authorization": "Bearer "+_token,
-           "X-Api-Key": _api_key,
-           "X-Gw-Ims-Org-Id": _org_id
-           }
     
     def __init__(self,data:object) -> None:
         """
@@ -216,35 +233,53 @@ class Property:
         Takes the list of rules and create a dictionary to assign each rule to a name 
         """
     
-    @_checkToken
-    def getEnvironment(self)->object:
-        env = _requests.get(self._Environments,headers=_header)
-        data = env.json()['data'] ## skip meta for now
+    def getEnvironments(self)->object:
+        env = _getData(self._Environments)
+        data = env['data'] ## skip meta for now
         return data 
     
-    @_checkToken
     def getHost(self)->object:
-        host = _requests.get(self._Host,headers=_header)
-        data = host.json()['data'] ## skip meta for now
+        host = _getData(self._Host)
+        data = host['data'] ## skip meta for now
         return data 
     
-    @_checkToken
     def getExtensions(self)-> object:
         """
         retrieve the different information from url retrieve in the properties
         """
-        extensions = _requests.get(self._Extensions,headers=_header)
-        data = extensions.json()['data'] ## skip meta for now
+        extensions = _getData(self._Extensions)
+        pagination = extensions['meta']['pagination']
+        data = extensions['data'] ## keep only information on extensions
+        if pagination['current_page'] != pagination['total_pages'] and pagination['total_pages'] != 0:## requesting all the pages
+            pages_left = pagination['total_pages'] - pagination['current_page'] ## calculate how many page to download
+            workers = min(pages_left,5)## max 5 threads
+            list_page_number = ['?page%5Bnumber%5D='+str(x) for x in range(2,pages_left+2)]
+            urls = [ self._Extensions for x in range(2,pages_left+2)]
+            with _futures.ThreadPoolExecutor(workers) as executor:
+                res = executor.map(_getData,urls,list_page_number)
+            res = list(res)
+            append_data = [val for sublist in [data['data'] for data in res] for val in sublist] ##flatten list of list
+            data = data + append_data
         return data
     
-    @_checkToken
     def getRules(self)->object:
         """
         Return the list of the rules data.
         On top, it fills the ruleComponents attribute with a dictionnary based on rule id and their rule name and the ruleComponent of each.
         """
-        rules = _requests.get(self._Rules,headers=_header)
-        data = rules.json()['data'] ## skip meta for now
+        rules = _getData(self._Rules)
+        data = rules['data'] ## skip meta for now
+        pagination = rules['meta']['pagination']
+        if pagination['current_page'] != pagination['total_pages'] and pagination['total_pages'] != 0:## requesting all the pages
+            pages_left = pagination['total_pages'] - pagination['current_page'] ## calculate how many page to download
+            workers = min(pages_left,5)## max 5 threads
+            list_page_number = ['?page%5Bnumber%5D='+str(x) for x in range(2,pages_left+2)]
+            urls = [self._Rules for x in range(2,pages_left+2)]
+            with _futures.ThreadPoolExecutor(workers) as executor:
+                res = executor.map(_getData,urls,list_page_number)
+            res = list(res)
+            append_data = [val for sublist in [data['data'] for data in res] for val in sublist]
+            data = data + append_data
         for rule in data:
             self.ruleComponents[rule['id']] = {
             'name' : rule['attributes']['name'],
@@ -255,6 +290,8 @@ class Property:
     @_checkToken
     def getRuleComponents(self)->dict:
         ruleComponents = self.ruleComponents
+        if len(ruleComponents) == 0:
+            raise AttributeError('Rules should have been retrieved in order to retrieve Rule Component.\n {}.ruleComponent is empty'.format(self.name))
         list_urls = [ruleComponents[_id]['url'] for _id in ruleComponents]
         names = [ruleComponents[_id]['name'] for _id in ruleComponents]
         headers = [_header  for nb in range(len(list_urls))]
@@ -277,34 +314,58 @@ class Property:
                 expanded_list.append(element)
         return expanded_list
     
-    @_checkToken
     def getDataElements(self)->object:
         """
         Retrieve data elements of that property.
         Returns a list.
         """
-        
-        dataElements = _requests.get(self._DataElement,headers=_header)
-        data = dataElements.json()['data'] ## skip meta for now
+        dataElements = _getData(self._DataElement)
+        data = dataElements['data'] ## data for page 1
+        pagination = dataElements['meta']['pagination']
+        if pagination['current_page'] != pagination['total_pages'] and pagination['total_pages'] != 0:## requesting all the pages
+            pages_left = pagination['total_pages'] - pagination['current_page'] ## calculate how many page to download
+            workers = min(pages_left,5)## max 5 threads
+            list_page_number = ['?page%5Bnumber%5D='+str(x) for x in range(2,pages_left+2)]
+            urls = [self._DataElement for x in range(2,pages_left+2)]
+            with _futures.ThreadPoolExecutor(workers) as executor:
+                res = executor.map(_getData,urls,list_page_number)
+            res = list(res)
+            append_data = [val for sublist in [data['data'] for data in res] for val in sublist]
+            data = data + append_data
         return data 
     
-    @_checkToken
     def getLibraries(self)->object:
         """
         Retrieve libraries of the property.
         Returns a list.
         """
-        libs = _requests.get(self._Libraries,headers=_header)
-        data = libs.json() ## skip meta for now
+        libs = _getData(self._Libraries)
+        data = libs['data'] ## dat for page 1
+        pagination = libs['meta']['pagination']
+        if pagination['current_page'] != pagination['total_pages'] and pagination['total_pages'] != 0:## requesting all the pages
+            print(pagination['current_page'])
+            print(pagination['total_pages'])
+            pages_left = pagination['total_pages'] - pagination['current_page'] ## calculate how many page to download
+            workers = min(pages_left,5)## max 5 threads
+            list_page_number = ['?page%5Bnumber%5D='+str(x) for x in range(2,pages_left+2)]
+            urls = [self._Rules for x in range(2,pages_left+2)]
+            with _futures.ThreadPoolExecutor(workers) as executor:
+                res = executor.map(_getData,urls,list_page_number)
+            res = list(res)
+            append_data = [val for sublist in [data['data'] for data in res] for val in sublist]
+            data = data + append_data
         return data 
     
     
-    @_checkToken
     def createExtensions(self,extension_id:str,**kwargs)-> object:
         """
-        retrieve the different information from url retrieve in the properties
+        Create an extension in your property. Your extension_id argument should be the latest one extension id available.
         argument : 
             - extension_id : REQUIRED : ID for the extension to be created
+        possible kwargs: 
+            - settings : OPTIONAL : dict. If you want to create Extension with specific settings, you require a dict with additional info:
+                - settings : REQUIRED: setting to set in the extension
+                - delegate_descriptor_id : OPTIONAL : delegate descriptor id
         """
         obj={
               "data": {
@@ -324,14 +385,13 @@ class Property:
         if kwargs.get('settings') is not None:
             obj['data']['attributes']['settings'] = str(kwargs.get('settings')['settings'])
             obj['data']['attributes']['delegate_descriptor_id'] = kwargs.get('settings')['delegate_descriptor_id']
-        extensions = _requests.post(self._Extensions,headers=_header,data=_json.dumps(obj))
-        data = extensions.json() ## skip meta for now
+        extensions = _postData(self._Extensions,obj)
+        data = extensions['data']
         return data
     
-    @_checkToken
     def createRules(self,name:str)->object:
         """
-        Create a rule by provided a rule name
+        Create a rule by provided a rule name. 
         """
         
         obj = {
@@ -342,17 +402,16 @@ class Property:
             "type": "rules"
           }
         }
-        rules = _requests.post(self._Rules,headers=_header,data=_json.dumps(obj))
-        data = rules.json()['data'] ## skip meta for now
+        rules = _postData(self._Rules,obj)
+        data = rules['data']
         self.ruleComponents[data['id']]= {'name' :data['attributes']['name'],
                            'url': data['links']['rule_components']}
         return data
     
-    @_checkToken
     def createRuleComponents(self,name:str,descriptor:str,settings:str=None,extension_id:dict=None,rule_id:dict=None,**kwargs)->object:
         """
         Create a ruleComponent by provided a rule name and descriptor (minimum). It returns an object.
-        It can takes additional information in order to link the ruleCompoment to a rule and with an Extension
+        It takes additional information in order to link the ruleCompoment to a rule and with an Extension.
         Arguments : 
             name : REQUIRED : name of the rule component
             descriptor : REQUIRED : delegate_descriptor_id for the rule component
@@ -380,13 +439,10 @@ class Property:
             obj['data']['attributes']['settings'] = settings
         if 'order' in kwargs:
             obj['data']['attributes']['order'] = kwargs.get('order')
-        rc = _requests.post(self._RuleComponents,headers=_header,data=_json.dumps(obj))
-        data = rc.json()
+        rc = _postData(self._RuleComponents,obj)
+        data = rc['data']
         return data
             
-        
-    
-    @_checkToken
     def createDataElements(self,name:str,descriptor:str,settings:str,extension:dict,**kwargs:dict)->object:
         """
         Create Data Elements following the usage of required arguments. 
@@ -416,11 +472,10 @@ class Property:
                 obj['data']['attributes']['settings'] = kwargs.get['settings']
         except:
             pass
-        dataElements = _requests.post(self._DataElement,headers=_header,data=_json.dumps(obj))
-        data = dataElements.json()
+        dataElements = _postData(self._DataElement,obj)
+        data = dataElements['data']
         return data 
     
-    @_checkToken
     def createEnvironment(self,name:str,host_id:str,stage:str='development',**kwargs)->object:
         """
         Create an environment. Note that you cannot create more than 1 environment for Staging and Production stage. 
@@ -448,12 +503,10 @@ class Property:
                 "type": "environments"
                 }
             }
-        env = _requests.post(self._Environments,headers=_header,data=_json.dumps(obj))
-        data = env.json()
+        env = _postData(self._Environments,obj)
+        data = env['data']
         return data 
     
-    
-    @_checkToken
     def createHost(self,name:str,host_type:str='akamai',**kwargs):
         """
         Create a host in that property. By default Akamai host. 
@@ -487,11 +540,10 @@ class Property:
                 obj['data']['attributes']['server'] = kwargs.get('server')
                 obj['data']['attributes']['path'] = kwargs.get('path','/')
                 obj['data']['attributes']['port'] = kwargs.get('port',22)
-        host = _requests.post(self._Host,headers=_header,data=_json.dumps(obj))
-        data = host.json()
+        host = _postData(self._Host,obj)
+        data = host['data']
         return data
     
-    @_checkToken
     def createLibrary(self,name:str)->object:
         """
         Create a library with the name provided. Returns an object.
@@ -506,61 +558,131 @@ class Property:
             "type": "libraries"
           }
         }
-        lib = _requests.post(self._Libraries,headers=_header,data=_json.dumps(obj))
-        data = lib.json()
+        lib = _postData(self._Libraries,obj)
+        data = lib['data']
         return data
-                
-    @_checkToken
-    def updateExtensions(self,extension_id,extension_dict:dict)-> object:
+    
+    
+    def reviseExtensions(self,extension_id,attr_dict:dict,**kwargs)-> object:
         """
         update the extension with the information provided in the argument.
         argument: 
-            extension_dict : REQUIRED : object that will be passed to Launch for update
-        
+            attr_dict : REQUIRED : dictionary that will be passed to Launch for update
         """
-        obj=extension_dict
-        extensions = _requests.patch(self._Extensions,headers=_header,data=_json.dumps(obj))
+        obj={
+            "data": {
+                "attributes": attr_dict,
+            "meta": {
+              "action": "revise"
+            },
+            "id": extension_id,
+            "type": "extensions"
+          }
+        }
+        extensions = _patchData(_endpoint+'/extensions/'+extension_id,obj)
         data = extensions.json()['data']
         return data
     
-    @_checkToken
-    def updateRules(self,data:object)->object:
+    def reviseRules(self,rule_id:str,attr_dict:object)->object:
         """
-        Update the rule 
+        Update the rule.
+        arguments: 
+            rule_id : REQUIRED : Rule ID
+            attr_dict : REQUIRED : dictionary that will be passed to Launch for update
         """
-        obj = data
-        rules = _requests.patch(self._Rules,headers=_header,data=_json.dumps(obj))
-        data = rules.json()['data']
+        obj = {
+              "data": {
+                "attributes": {},
+                "meta": {
+                  "action": "revise"
+                },
+                "id": rule_id,
+                "type": "rules"
+              }
+            }
+        rules = _patchData(_endpoint+'/rules/'+rule_id,obj)
+        data = rules
         return data
     
-    @_checkToken
-    def updateRuleComponents(self,data:object)->object:
-        """
-        Update the ruleComponents based on the information provided
-        """
-        obj = data
-        rules = _requests.patch(self.something,headers=_header,data=_json.dumps(obj))
-        data = rules.json()['data']
-        return data
-    
-    
-    @_checkToken
-    def updateDataElements(self,dataElement_id:str,**kwargs)->object:
+    def reviseDataElements(self,dataElement_id:str,attr_dict:object,**kwargs)->object:
         """
         Update the data element information based on the information provided.
+        arguments: 
+            dataElement_id : REQUIRED : Data Element ID
+            attr_dict : REQUIRED : dictionary that will be passed to Launch for update
         """
         obj = {
               "data": {
                 "attributes": {},
                 "type": "data_elements",
-                "id": dataElement_id
+                "id": dataElement_id,
+                "meta": {
+                  "action": "revise"
+                }
               }
             }
-        dataElements = _requests.patch(_endpoint+'/data_elements/'+dataElement_id,headers=_header,data=_json.dumps(obj))
+        dataElements = _patchData(_endpoint+'/data_elements/'+dataElement_id,obj)
         data = dataElements.json()['data']
         return data 
     
-    @_checkToken
+    def updateRules(self,rule_id:str,attr_dict:object)->object:
+        """
+        Update the rule.
+        arguments: 
+            rule_id : REQUIRED : Rule ID
+            attr_dict : REQUIRED : dictionary that will be passed to Launch for update
+        """
+        obj = {
+              "data": {
+                "attributes": attr_dict,
+                "meta": {
+                  "action": "revise"
+                },
+                "id": rule_id,
+                "type": "rules"
+              }
+            }
+        rules = _patchData(_endpoint+'/rules/'+rule_id,obj)
+        data = rules
+        return data
+    
+    def updateRuleComponents(self,rc_id:str,attr_dict:object,**kwargs)->object:
+        """
+        Update the ruleComponents based on the information provided
+        arguments: 
+            rc_id : REQUIRED : Rule Component ID
+            attr_dict : REQUIRED : dictionary that will be passed to Launch for update
+        """
+        obj = {
+              "data": {
+                "attributes": attr_dict,
+                "type": "rule_components",
+                "id": rc_id
+              }
+            }
+        rules = _patchData(_endpoint+'/rule_components/'+rc_id,obj)
+        data = rules
+        return data
+    
+    
+    def updateDataElements(self,dataElement_id:str,attr_dict:object,**kwargs)->object:
+        """
+        Update the data element information based on the information provided.
+        arguments: 
+            dataElement_id : REQUIRED : Data Element ID
+            attr_dict : REQUIRED : dictionary that will be passed to Launch for update
+        """
+        obj = {
+              "data": {
+                "attributes": attr_dict,
+                "type": "data_elements",
+                "id": dataElement_id
+              }
+            }
+        dataElements = _patchData(_endpoint+'/data_elements/'+dataElement_id,obj)
+        data = dataElements.json()['data']
+        return data 
+    
     def updateEnvironment(self,name:str,env_id:str,**kwargs)->object:
         """
         Update an environment. Note :only support name change
@@ -579,11 +701,8 @@ class Property:
                 "type": "environments"
                 }
             }
-        env = _requests.patch(_endpoint+'/environments/'+env_id,headers=_header,data=_json.dumps(obj))
-        data = env.json()
-        return data 
-    
-
+        env = _patchData(_endpoint+'/environments/'+env_id,obj)
+        return env
 
 def extensionsInfo(data:list)->dict:
     """
@@ -619,8 +738,10 @@ def rulesInfo(data:list)-> dict:
     rules = _defaultdict(None)
     for rule in data:
         rules[rule['attributes']['name']] = {
+                'created_at':rule['attributes']['created_at'],
                 'published':rule['attributes']['published'],
                 'dirty':rule['attributes']['dirty'],
+                'enabled':rule['attributes']['enabled'],
                 'review_status':rule['attributes']['review_status'],
                 'revision_number':rule['attributes']['revision_number'],
                 'updated_at': rule['attributes']['updated_at'],
@@ -650,6 +771,7 @@ def ruleComponentInfo(data:list)->dict:
                 'revision_number' : component['attributes']['revision_number'],
                 'settings':component['attributes']['settings']
                 }
+    return components
 
 def dataElementInfos(data:list)->dict:
     """
@@ -661,6 +783,7 @@ def dataElementInfos(data:list)->dict:
     for element in data:
         elements[element['attributes']['name']] = {
                 'id' : element['id'],
+                'created_at' : element['attributes']['created_at'],
                 'updated_at' : element['attributes']['updated_at'],
                 'dirty' : element['attributes']['dirty'],
                 'enabled' : element['attributes']['enabled'],
@@ -673,6 +796,7 @@ def dataElementInfos(data:list)->dict:
                 'storage_duration' : element['attributes']['storage_duration'],
                 'settings' : element['attributes']['settings']
                 }
+    return elements
 
 def _defineSearchType(_name:str=None,_id:str=None)->tuple:
     if _name is not None:
@@ -787,13 +911,10 @@ class Translator:
         self.rules[new_prop_name] = df
         return self.rules
 
-    
-    
-@_checkToken    
-def createProperty(companyId:str,name:str,platform:str='web',**kwargs):
+def createProperty(companyId:str,name:str,platform:str='web',**kwargs)->dict:
     """
     Create a property with default information. Will return empty value as default value. 
-    Returns the response.
+    Returns a property instance.
     Arguments : 
         - companyId : REQUIRED : id of the company
         - name : REQUIRED : name of the property
@@ -819,9 +940,9 @@ def createProperty(companyId:str,name:str,platform:str='web',**kwargs):
     obj['data']['attributes']['development']=development
     obj['data']['attributes']['undefined_vars_return_empty']=undefined_vars_return_empty
     obj['data']['type']='properties'
-    print(_json.dumps(obj))
-    new_property = _requests.post(_endpoint+_getProperties.format(_company_id=companyId),headers=_header,data=_json.dumps(obj))
-    return new_property.json()
+    new_property = _postData(_endpoint+_getProperties.format(_company_id=companyId),obj)
+    property_class = Property(new_property)
+    return property_class
 
 
 class Library:
@@ -836,46 +957,201 @@ class Library:
         self._Extensions = _endpoint+'/libraries/'+data['id']+'/extensions'
         self._Environment = _endpoint+'/libraries/'+data['id']+'/envrionment'
         self._Rules = _endpoint+'/libraries/'+data['id']+'/rules'
+        self._Builds = _endpoint+'/libraries/'+data['id']+'/builds'
         self.builds = data['relationships']['builds']['links']['related']
         self.build_status = data['meta']['build_status']
         self.relationships = {}
-        
-    @_checkToken    
-    def getDataElements(self):
+        self._environments = {}
+        self._dev_env = ''
+          
+    def getDataElements(self)->list:
         """
-        retrieve the list of data elements attached to this library
+        retrieve the list of Data Elements attached to this library
         """
-        dataElements = _requests.get(self._DataElements,headers=_header)
+        dataElements = _getData(self._DataElements)
         data = dataElements.json()
-        self.relationships['data_elements'] = data
+        self.relationships['data_elements'] = data ## assign the list to its dict value
         return data
-        
-    @_checkToken    
-    def getExtensions(self):
+           
+    def getExtensions(self)->list:
         """
-        retrieve the list of data elements attached to this library
+        retrieve the list of Extensions attached to this library
         """
-        extensions = _requests.get(self._Extensions,headers=_header)
+        extensions = _getData(self._Extensions)
         data = extensions.json()
         self.relationships['extensions'] = data
         return data
-    
-    @_checkToken    
-    def getRules(self):
+      
+    def getRules(self)->list:
         """
-        retrieve the list of data elements attached to this library
+        retrieve the list of rules attached to this library
         """
-        rules = _requests.get(self._Rules,headers=_header)
+        rules = _getData(self._Rules)
         data = rules.json()
         self.relationships['rules'] = data
         return data
     
-    def getFullLibrary(self):
+    def getFullLibrary(self)->dict:
         self.getDataElements()
         self.getRules()
         self.getExtensions()
         return self.relationships
     
+    def addDataElements(self,data_element_ids:list)->object:
+        obj = {'data':[]}
+        if type(data_element_ids) == str:
+            data_element_ids = data_element_ids.split(' ')
+        for ids in data_element_ids:
+            obj['data'].append({"id": ids,"type": "data_elements","meta": {"action": "revise"}})
+        url = _endpoint+'/libraries/'+self.id+'/relationships/data_elements'
+        res = _postData(url,obj)
+        return res
     
+    def addRules(self,rules_ids:list)->object:
+        obj = {'data':[]}
+        if type(rules_ids) == str:
+            rules_ids = rules_ids.split(' ')
+        for ids in rules_ids:
+            obj['data'].append({"id": ids,"type": "rules","meta": {"action": "revise"}})
+        url = _endpoint+'/libraries/'+self.id+'/relationships/rules'
+        res = _postData(url,obj)
+        return res
     
-### https://reactor.adobe.io/rules/RL2a1ddbebffbd47d9973d395e77eb98e9/rule_components        
+    def addExtensions(self,extensions_ids:list)->object:
+        obj = {'data':[]}
+        if type(extensions_ids) == str:
+            extensions_ids = extensions_ids.split(' ')
+        for ids in extensions_ids:
+            obj['data'].append({"id": ids,"type": "extensions","meta": {"action": "revise"}})
+        url = _endpoint+'/libraries/'+self.id+'/relationships/extensions'
+        res = _postData(url,obj)
+        return res
+    
+    def setEnvironments(self,environments_list:list,dev_name:str=None)->None:
+        """
+        Save the different environments ids available. 
+        It is required to use the library class.
+        Arguments : 
+            environments_list : REQUIRED : list of environment retrieved by the getEnvironment method
+            dev_name : OPTIONAL : Name of your dev environment. If not defined, will take the first dev environment
+        """
+        for env in environments_list:
+            if env['attributes']['stage'] == 'production':
+                self._environments['production'] = env['id']
+            elif env['attributes']['stage'] == 'staging':
+                self._environments['staging'] = env['id']
+            elif env['attributes']['stage'] == 'development':
+                devs = self._environments.get('developments',{})
+                devs[env['attributes']['name']] = env['id']
+                self._environments['developments'] = devs
+        if dev_name != None: 
+            self._dev_env = self._environments['developments'][dev_name]
+        else:
+            key1 = list(self._environments['developments'].keys())[0]
+            self._dev_env = self._environments['developments'][key1]
+            
+    @_checkToken      
+    def _setEnvironment(self,obj:dict)->None:
+        new_env = _requests.patch(_endpoint+'/libraries/'+self.id+'/relationships/environment',headers=_header,data=_json.dumps(obj))
+        res = new_env.json()
+        return res
+    
+    @_checkToken
+    def _removeEnvironment(self)->None:
+        """
+        Remove environment
+        """
+        new_env = _requests.get(_endpoint+'/libraries/'+self.id+'/relationships/environment',headers=_header)
+        res = new_env.json()
+        return res
+    
+    def build(self)->dict:
+        """
+        Build the library. 
+        Part of the code takes care of assigning the right environement before building the library.
+        Returns the build when it is completed (succeed or not).
+        It will check every 15 seconds for the build status, making sure it is not "pending".
+        """
+        if self.build_required == False and self.state != 'approved':
+            return 'build is not required'
+        
+        if self.state == 'development':
+            env_id = self._dev_env
+            obj={
+              "data": {
+                "id": env_id,
+                "type": "environments"
+              }
+            }
+            self._removeEnvironment()
+            status = self._setEnvironment(obj)
+        elif self.state == 'submitted':
+            env = 'staging'
+            obj={
+              "data": {
+                "id": self._environments[env],
+                "type": "environments"
+              }
+            }
+            self._removeEnvironment()
+            status = self._setEnvironment(obj)
+        elif self.state == 'approved':
+            env = 'production'
+            obj={
+              "data": {
+                "id": self._environments[env],
+                "type": "environments"
+              }
+            }
+            self._removeEnvironment()
+            status = self._setEnvironment(obj)
+        if 'error' in status.keys() :
+            raise SystemExit('Issue setting environment')
+        build = _requests.post(self._Builds,headers=_header)
+        build_json = build.json()
+        build_id = build_json['data']['id']
+        build_status = build_json['data']['attributes']['status']
+        while build_status == 'pending':
+            print('pending...')
+            _time.sleep(20)
+            build = _getData(_endpoint+'/builds/'+str(build_id)) ## return the json directly
+            build_status = build['data']['attributes']['status']
+        if build['data']['attributes']['status']=='succeeded':
+            self.build_required = False
+            self.build_status = 'succeeded'
+        else:
+            self.build_required = True
+            self.build_status = build['data']['attributes']['status']
+        return build
+        
+    
+    def transition(self,action:str=None,**kwargs)->object:
+        """
+        Move the library along the publishing funnel.
+        If no action are provided, it would automatically go to the next state. 
+        Arguments : 
+            action : OPTIONAL : action to do on the library. Possible values: 
+                - 'submit' : if state == development
+                - 'approve' : if state == submitted
+                - 'reject' : if state == submitted
+        """
+        if action== None: 
+            if self.state == 'development':
+                action = 'submit'
+            elif self.state == 'submitted':
+                action = 'approve'
+        obj={"data": {
+            "id": self.id,
+            "type": "libraries",
+            "meta": {
+              "action": action
+                  }
+                }
+            }
+        transition = _patchData(_endpoint+'/libraries/'+self.id,obj)
+        data = transition
+        self.state = data['data']['attributes']['state']
+        self.build_required = data['data']['attributes']['build_required']
+        return data
+            
+    
