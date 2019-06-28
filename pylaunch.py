@@ -7,6 +7,7 @@ import time as _time
 import json as _json
 from collections import defaultdict as _defaultdict
 from concurrent import futures as _futures
+from copy import deepcopy as _deepcopy
 ## Non standard libraries
 import pandas as _pd
 import requests as _requests
@@ -146,16 +147,23 @@ def _getData(url:str,*args:str)->object:
 @_checkToken
 def _postData(url:str,obj:dict,**kwargs)->object:
     res = _requests.post(url,headers=_header,data=_json.dumps(obj))
+    if kwargs.get('print') == True:
+        print(res.text)
     return res.json()
 
 @_checkToken
 def _patchData(url:str,obj:dict,**kwargs)->object:
     res = _requests.patch(url,headers=_header,data=_json.dumps(obj))
+    if kwargs.get('print') == True:
+        print(res.text)
     return res.json()
 
+@_checkToken
 def _deleteData(url:str,**kwargs)->object:
     res = _requests.delete(url,headers=_header)
-    return res.json()
+    if kwargs.get('print') == True:
+        print(res.text)
+    return res.status_code
 
 #profile_response = _requests.get(_endpoint+getProfile,headers=header)
 #json_profile = profile_response.json()
@@ -163,20 +171,33 @@ def _deleteData(url:str,**kwargs)->object:
 #
 @_checkToken
 def getCompanyId()->object:
+    """
+    Retrieve the company id for later call for the properties
+    """
     companies = _requests.get(_endpoint+_getCompanies,headers=_header)
     companyID = companies.json()['data'][0]['id']
     return companyID
 
-@_checkToken
 def getProperties(companyID:str)->object:
     """
     Retrieve the different properties available for a specific company.
     Parameter :
         companyID : REQUIRED : Company from where you want the properties
     """
-    req_properties = _requests.get(_endpoint+_getProperties.format(_company_id=companyID),headers=_header)
-    properties = req_properties.json()
-    data = properties['data'] ## will fetch the list of properties, not using the "meta" key
+    req_properties = _getData(_endpoint+_getProperties.format(_company_id=companyID))
+    properties = req_properties
+    data = properties['data'] ## properties information for page 1
+    pagination = properties['meta']['pagination'] ##searching if page 1 is enough
+    if pagination['current_page'] != pagination['total_pages'] and pagination['total_pages'] != 0:## requesting all the pages
+            pages_left = pagination['total_pages'] - pagination['current_page'] ## calculate how many page to download
+            workers = min(pages_left,5)## max 5 threads
+            list_page_number = ['?page%5Bnumber%5D='+str(x) for x in range(2,pages_left+2)] ##starting page 2
+            urls = [_endpoint+_getProperties.format(_company_id=companyID) for x in range(2,pages_left+2)]
+            with _futures.ThreadPoolExecutor(workers) as executor:
+                res = executor.map(_getData,urls,list_page_number)
+            res = list(res)
+            append_data = [val for sublist in [data['data'] for data in res] for val in sublist] ##flatten list of list
+            data = data + append_data
     return data
 
 
@@ -234,11 +255,17 @@ class Property:
         """
     
     def getEnvironments(self)->object:
+        """
+        Retrieve the environment sets for this property
+        """
         env = _getData(self._Environments)
         data = env['data'] ## skip meta for now
         return data 
     
     def getHost(self)->object:
+        """
+        Retrieve the hosts sets for this property
+        """
         host = _getData(self._Host)
         data = host['data'] ## skip meta for now
         return data 
@@ -287,8 +314,54 @@ class Property:
             }
         return data
     
+    def searchRules(self,name:str=None,enabled:bool=None,published:bool=None,dirty:bool=None,**kwargs)->object:
+        """
+        Returns the rules searched through the different operator. One argument is required in order to return a result. 
+        Arguments: 
+            name : OPTIONAL : string of what is searched (used as "contains")
+            enabled : OPTIONAL : boolean if search for enabled rules or not
+            published : OPTIONAL : boolean if search for published rules or not
+            dirty : OPTIONAL : boolean if search for dirty rules or not
+        """
+        filters = []
+        if name != None:
+            filters.append('filter%5Bname%5D=CONTAINS%20'+name)
+        if dirty != None:
+            filters.append('filter%5Bdirty%5D=EQ%20'+str(dirty).lower())
+        if enabled != None:
+            filters.append('filter%5Benabled%5D=EQ%20'+str(enabled).lower())
+        if published != None:
+            filters.append('filter%5Bpublished%5D=EQ%20'+str(published).lower())
+        if 'created_at' in kwargs:
+            pass ## documentation unclear on how to handle it
+        parameters = '?'+'&'.join(filters)
+        rules = _getData(self._Rules,parameters)
+        data = rules['data'] ## skip meta for now
+        pagination = rules['meta']['pagination']
+        if pagination['current_page'] != pagination['total_pages'] and pagination['total_pages'] != 0:## requesting all the pages
+            pages_left = pagination['total_pages'] - pagination['current_page'] ## calculate how many page to download
+            workers = min(pages_left,5)## max 5 threads
+            list_parameters = [parameters+'&page%5Bnumber%5D='+str(x) for x in range(2,pages_left+2)]
+            urls = [self._Rules for x in range(2,pages_left+2)]
+            with _futures.ThreadPoolExecutor(workers) as executor:
+                res = executor.map(_getData,urls,list_parameters)
+            res = list(res)
+            append_data = [val for sublist in [data['data'] for data in res] for val in sublist]
+            data = data + append_data
+        for rule in data:
+            self.ruleComponents[rule['id']] = {
+            'name' : rule['attributes']['name'],
+            'url' : rule['links']['rule_components']
+            }
+        return data
+        
+    
     @_checkToken
     def getRuleComponents(self)->dict:
+        """
+        Returns a list of all the ruleComponents gathered in the ruleComponents attributes. 
+        It will also enrich the RuleCompoment JSON data with the rule_name attached to it. 
+        """        
         ruleComponents = self.ruleComponents
         if len(ruleComponents) == 0:
             raise AttributeError('Rules should have been retrieved in order to retrieve Rule Component.\n {}.ruleComponent is empty'.format(self.name))
@@ -357,15 +430,13 @@ class Property:
         return data 
     
     
-    def createExtensions(self,extension_id:str,**kwargs)-> object:
+    def createExtensions(self,extension_id:str,settings:str=None,descriptor:str=None,**kwargs)-> object:
         """
         Create an extension in your property. Your extension_id argument should be the latest one extension id available.
-        argument : 
-            - extension_id : REQUIRED : ID for the extension to be created
-        possible kwargs: 
-            - settings : OPTIONAL : dict. If you want to create Extension with specific settings, you require a dict with additional info:
-                - settings : REQUIRED: setting to set in the extension
-                - delegate_descriptor_id : OPTIONAL : delegate descriptor id
+        Arguments : 
+            extension_id : REQUIRED : ID for the extension to be created
+            settings : OPTIONAL: setting to set in the extension
+            delegate_descriptor_id : OPTIONAL : delegate descriptor id
         """
         obj={
               "data": {
@@ -382,9 +453,9 @@ class Property:
                 "type": "extensions"
               }
             }
-        if kwargs.get('settings') is not None:
-            obj['data']['attributes']['settings'] = str(kwargs.get('settings')['settings'])
-            obj['data']['attributes']['delegate_descriptor_id'] = kwargs.get('settings')['delegate_descriptor_id']
+        if settings is not None and descriptor is not None :
+            obj['data']['attributes']['settings'] = str(settings)
+            obj['data']['attributes']['delegate_descriptor_id'] = descriptor
         extensions = _postData(self._Extensions,obj)
         data = extensions['data']
         return data
@@ -443,7 +514,7 @@ class Property:
         data = rc['data']
         return data
             
-    def createDataElements(self,name:str,descriptor:str,settings:str,extension:dict,**kwargs:dict)->object:
+    def createDataElements(self,name:str,descriptor:str,extension:dict,settings:str=None,**kwargs:dict)->object:
         """
         Create Data Elements following the usage of required arguments. 
         Arguments : 
@@ -468,8 +539,8 @@ class Property:
           }
         }
         try:
-            if kwargs.get['settings'] is not None:
-                obj['data']['attributes']['settings'] = kwargs.get['settings']
+            if settings is not None:
+                obj['data']['attributes']['settings'] = settings
         except:
             pass
         dataElements = _postData(self._DataElement,obj)
@@ -544,7 +615,7 @@ class Property:
         data = host['data']
         return data
     
-    def createLibrary(self,name:str)->object:
+    def createLibrary(self,name:str,return_class:bool=True)->object:
         """
         Create a library with the name provided. Returns an object.
         Arguments:
@@ -560,7 +631,11 @@ class Property:
         }
         lib = _postData(self._Libraries,obj)
         data = lib['data']
-        return data
+        if return_class:
+            new_instance = Library(data)
+            return new_instance
+        else:
+            return data
     
     
     def reviseExtensions(self,extension_id,attr_dict:dict,**kwargs)-> object:
@@ -703,6 +778,25 @@ class Property:
             }
         env = _patchData(_endpoint+'/environments/'+env_id,obj)
         return env
+    
+    def deleteRule(self,rule_id:str)->object:
+        """
+        Delete the rule 
+        Arguments : 
+            rule_id : REQUIRED : Rule ID that needs to be deleted
+        """
+        data = _deleteData('https://reactor.adobe.io/rules/'+rule_id)
+        return data
+    
+    def deleteDataElement(self,dataElement_id:str)->object:
+        """
+        Delete the rule 
+        Arguments : 
+            dataElement_id : REQUIRED : Data Element ID that needs to be deleted
+        """
+        data = _deleteData('https://reactor.adobe.io/data_elements/'+dataElement_id)
+        return data
+        
 
 def extensionsInfo(data:list)->dict:
     """
@@ -815,8 +909,10 @@ def copySettings(data:object)->object:
     """
     obj={}
     if data['type'] == 'extensions':
+        obj['name'] = data['attributes']['name']
         obj['settings'] = data['attributes']['settings']
         obj['delegate_descriptor_id'] = data['attributes']['delegate_descriptor_id']
+        obj['extension_id'] = data['relationships']['extension_package']['data']['id'] 
     elif data['type'] == 'data_elements':
         obj['name'] = data['attributes']['name']
         obj['settings'] = data['attributes']['settings']
@@ -872,16 +968,20 @@ class Translator:
         """
         change the id from the base element to the new property. 
         Pre checked should be done beforehands (updating Extension & Rules elements)
+        Arguments: 
+            target_property : REQUIRED : property that is targeted to translate the element to
+            data_element : OPTIONAL : if the elements passed are data elements
+            rule_component : OPTIONAL : if the elements passed are rule components
         """
         if data_element is not None:
-            new_de = data_element
+            new_de = _deepcopy(data_element)
             base_id = new_de['extension']['id']
             row = self.extensions[self.extensions.iloc[:,0] == base_id].index.values[0]
             new_value = self.extensions.loc[row,target_property]
-            data_element['extension']['id'] = new_value
+            new_de['extension']['id'] = new_value
             return new_de
         elif rule_component is not None:
-            new_rc = rule_component
+            new_rc = _deepcopy(rule_component)
             base_id = new_rc['extension']['id']
             row = self.extensions[self.extensions.eq(base_id).any(1)].index.values[0]
             new_value = self.extensions.loc[row,target_property]
@@ -911,7 +1011,7 @@ class Translator:
         self.rules[new_prop_name] = df
         return self.rules
 
-def createProperty(companyId:str,name:str,platform:str='web',**kwargs)->dict:
+def createProperty(companyId:str,name:str,platform:str='web',return_class:bool=True,**kwargs)->dict:
     """
     Create a property with default information. Will return empty value as default value. 
     Returns a property instance.
@@ -919,6 +1019,8 @@ def createProperty(companyId:str,name:str,platform:str='web',**kwargs)->dict:
         - companyId : REQUIRED : id of the company
         - name : REQUIRED : name of the property
         - platform : REQUIRED : default 'web', can be 'app'
+        - return_class : REQUIRED : default True, will return an instance of property class. 
+        If set to false, will just return the object created. 
         **kwargs : can use the different parameter reference here : https://developer.adobelaunch.com/api/reference/1.0/properties/create/
         
     """
@@ -932,7 +1034,7 @@ def createProperty(companyId:str,name:str,platform:str='web',**kwargs)->dict:
     if type(domains) == str:## change the domains to list as required
         if ',' in domains : 
            domains = domains.split(',') 
-        else:
+        else:##if a string but only 1 domain
             domains = list(domains)
     obj['data']['attributes']['name'] = name
     obj['data']['attributes']['domains']=domains
@@ -941,8 +1043,11 @@ def createProperty(companyId:str,name:str,platform:str='web',**kwargs)->dict:
     obj['data']['attributes']['undefined_vars_return_empty']=undefined_vars_return_empty
     obj['data']['type']='properties'
     new_property = _postData(_endpoint+_getProperties.format(_company_id=companyId),obj)
-    property_class = Property(new_property)
-    return property_class
+    if return_class:
+        property_class = Property(new_property['data'])
+        return property_class
+    else:
+        return new_property['data']
 
 
 class Library:
@@ -998,6 +1103,14 @@ class Library:
         return self.relationships
     
     def addDataElements(self,data_element_ids:list)->object:
+        """
+        Take a list of data elements id and attach them to the library. 
+        Arguments:
+            data_element_ids: REQUIRED : list of data elements id
+        """
+        if self.state != 'development':
+            print('State is not development, cannot add relationships')
+            return None
         obj = {'data':[]}
         if type(data_element_ids) == str:
             data_element_ids = data_element_ids.split(' ')
@@ -1008,6 +1121,14 @@ class Library:
         return res
     
     def addRules(self,rules_ids:list)->object:
+        """
+        Take a list of rules id and attach them to the library. 
+        Arguments:
+            rules_ids: REQUIRED : list of rules id
+        """
+        if self.state != 'development':
+            print('State is not development, cannot add relationships')
+            return None
         obj = {'data':[]}
         if type(rules_ids) == str:
             rules_ids = rules_ids.split(' ')
@@ -1018,6 +1139,14 @@ class Library:
         return res
     
     def addExtensions(self,extensions_ids:list)->object:
+        """
+        Take a list of extension id and attach them to the library. 
+        Arguments:
+            extensions_ids: REQUIRED : list of extension id
+        """
+        if self.state != 'development':
+            print('State is not development, cannot add relationships')
+            return None
         obj = {'data':[]}
         if type(extensions_ids) == str:
             extensions_ids = extensions_ids.split(' ')
