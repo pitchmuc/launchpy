@@ -63,7 +63,7 @@ def importConfigFile(file : str)-> None:
 _endpoint = 'https://reactor.adobe.io/'
 
     
-def retrieveToken(verbose: bool = False)->str:
+def retrieveToken(verbose: bool = False,save:bool=False)->str:
     """ Retrieve the token by using the information provided by the user during the import importConfigFile function. 
     
     Argument : 
@@ -93,8 +93,9 @@ def retrieveToken(verbose: bool = False)->str:
     expire = json_response['expires_in']
     global _date_limit ## getting the scope right
     _date_limit= _time.time()+ expire/1000 -500 ## end of time for the token
-    with open('token.txt','w') as f: ##save the token
-        f.write(token)
+    if save:
+        with open('token.txt','w') as f: ##save the token
+            f.write(token)
     if verbose == True:
         print('token valid till : ' + _time.ctime(_time.time()+ expire/1000))
         print('token has been saved here : ' + Path.as_posix(Path.cwd()))
@@ -405,7 +406,43 @@ class Property:
             res = list(res)
             append_data = [val for sublist in [data['data'] for data in res] for val in sublist]
             data = data + append_data
-        return data 
+        return data
+    
+    def searchDataElements(self,name:str=None,enabled:bool=None,published:bool=None,dirty:bool=None,**kwargs)->object:
+        """
+        Returns the rules searched through the different operator. One argument is required in order to return a result. 
+        Arguments: 
+            name : OPTIONAL : string of what is searched (used as "contains")
+            enabled : OPTIONAL : boolean if search for enabled rules or not
+            published : OPTIONAL : boolean if search for published rules or not
+            dirty : OPTIONAL : boolean if search for dirty rules or not
+        """
+        filters = []
+        if name != None:
+            filters.append('filter%5Bname%5D=CONTAINS%20'+name)
+        if dirty != None:
+            filters.append('filter%5Bdirty%5D=EQ%20'+str(dirty).lower())
+        if enabled != None:
+            filters.append('filter%5Benabled%5D=EQ%20'+str(enabled).lower())
+        if published != None:
+            filters.append('filter%5Bpublished%5D=EQ%20'+str(published).lower())
+        if 'created_at' in kwargs:
+            pass ## documentation unclear on how to handle it
+        parameters = '?'+'&'.join(filters)
+        dataElements = _getData(self._DataElement,parameters)
+        data = dataElements['data'] ## skip meta for now
+        pagination = dataElements['meta']['pagination']
+        if pagination['current_page'] != pagination['total_pages'] and pagination['total_pages'] != 0:## requesting all the pages
+            pages_left = pagination['total_pages'] - pagination['current_page'] ## calculate how many page to download
+            workers = min(pages_left,5)## max 5 threads
+            list_parameters = [parameters+'&page%5Bnumber%5D='+str(x) for x in range(2,pages_left+2)]
+            urls = [self._Rules for x in range(2,pages_left+2)]
+            with _futures.ThreadPoolExecutor(workers) as executor:
+                res = executor.map(_getData,urls,list_parameters)
+            res = list(res)
+            append_data = [val for sublist in [data['data'] for data in res] for val in sublist]
+            data = data + append_data
+        return data
     
     def getLibraries(self)->object:
         """
@@ -902,6 +939,41 @@ def _defineSearchType(_name:str=None,_id:str=None)->tuple:
     else:
         raise SyntaxError('The ruleName or ruleId should be provided') 
     return condition, value
+
+def extractSettings(element:dict,save:bool=False)->dict:
+    element_type = element['type']
+    if element_type == 'data_elements':
+        if element['attributes']['delegate_descriptor_id'] == 'core::dataElements::custom-code':
+            settings = element['attributes']['settings']
+            code = _json.loads(settings)['source']
+            if save is True:
+                name = 'DE - '+ str(element['attributes']['name'])
+                with open(f'{name}.js','w') as f:
+                    f.write(code)        
+            return code
+        else:
+            settings=element['attributes']['settings']
+            if save:
+                name = 'DE - '+ str(element['attributes']['name']) + ' - settings.json'
+                with open(name,'w') as f:
+                    f.write(settings)
+            return settings
+    elif element_type == 'extensions':
+        if element['attributes']['delegate_descriptor_id'] == "adobe-analytics::extensionConfiguration::config":
+            settings = _json.loads(element['attributes']['settings'])
+            code = settings['source']
+            if save is True:
+                name = 'EXT - '+ str(element['attributes']['name'])
+                with open(f'{name}.js','w') as f:
+                    f.write(code)        
+            return code
+        else:
+            settings=element['attributes']['settings']
+            if save:
+                name = 'EXT - '+ str(element['attributes']['name']) + ' - settings.json'
+                with open(name,'w') as f:
+                    f.write(settings)
+            return settings
 
 def copySettings(data:object)->object:
     """
