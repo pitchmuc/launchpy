@@ -844,13 +844,14 @@ def extensionsInfo(data:list)->dict:
     extensions = {}
     for extension in data:
         extensions[extension['attributes']['name']] = {
+                'created_at':extension['attributes']['created_at'],
+                'updated_at': extension['attributes']['updated_at'],
                 'published':extension['attributes']['published'],
                 'dirty':extension['attributes']['dirty'],
                 'review_status':extension['attributes']['review_status'],
                 'revision_number':extension['attributes']['revision_number'],
                 'version':extension['attributes']['version'],
                 'settings':extension['attributes']['settings'],
-                'updated_at': extension['attributes']['updated_at'],
                 'id':extension['id'],
                 'extension_id':extension['relationships']['extension_package']['data']['id']               
                        }
@@ -870,12 +871,12 @@ def rulesInfo(data:list)-> dict:
     for rule in data:
         rules[rule['attributes']['name']] = {
                 'created_at':rule['attributes']['created_at'],
+                'updated_at': rule['attributes']['updated_at'],
                 'published':rule['attributes']['published'],
                 'dirty':rule['attributes']['dirty'],
                 'enabled':rule['attributes']['enabled'],
                 'review_status':rule['attributes']['review_status'],
                 'revision_number':rule['attributes']['revision_number'],
-                'updated_at': rule['attributes']['updated_at'],
                 'id':rule['id'],
                 'latest_revision_number':rule['meta']['latest_revision_number'],
                 'rule_components':rule['links'].get('rule_components')
@@ -892,6 +893,7 @@ def ruleComponentInfo(data:list)->dict:
     for component in data:
         components[component['attributes']['name']] = {
                 'id': component['id'],
+                'created_at' : component['attributes']['created_at'],
                 'updated_at': component['attributes']['updated_at'],
                 'delegate_descriptor_id' : component['attributes']['delegate_descriptor_id'],
                 'name' : component['attributes']['name'],
@@ -904,7 +906,7 @@ def ruleComponentInfo(data:list)->dict:
                 }
     return components
 
-def dataElementInfos(data:list)->dict:
+def dataElementInfo(data:list)->dict:
     """
     return information about data elements as dictionary.
     arguments : 
@@ -947,14 +949,14 @@ def extractSettings(element:dict,save:bool=False)->dict:
             settings = element['attributes']['settings']
             code = _json.loads(settings)['source']
             if save is True:
-                name = 'DE - '+ str(element['attributes']['name'])
-                with open(f'{name}.js','w') as f:
+                name = f'DE - {str(element["attributes"]["name"])}.js'
+                with open(name,'w') as f:
                     f.write(code)        
             return code
         else:
             settings=element['attributes']['settings']
             if save:
-                name = 'DE - '+ str(element['attributes']['name']) + ' - settings.json'
+                name = f'DE - {str(element["attributes"]["name"])} - settings.json'
                 with open(name,'w') as f:
                     f.write(settings)
             return settings
@@ -963,14 +965,48 @@ def extractSettings(element:dict,save:bool=False)->dict:
             settings = _json.loads(element['attributes']['settings'])
             code = settings['source']
             if save is True:
-                name = 'EXT - '+ str(element['attributes']['name'])
+                name = f'EXT - {str(element["attributes"]["name"])}.js'
+                with open(name,'w') as f:
+                    f.write(code)        
+            return code
+        else:
+            settings=element['attributes']['settings']
+            if save:
+                name = f'EXT - {str(element["attributes"]["name"])} - settings.json'
+                with open(name,'w') as f:
+                    f.write(settings)
+            return settings
+    elif element_type == 'rule_components':
+        rule_name = element_type['rule_name']
+        element_place = element['attributes']['delegate_descriptor_id'].split('::')[1]
+        if element['attributes']['delegate_descriptor_id'] == "core::conditions::custom-code":
+            settings = element['attributes']['settings']
+            code = _json.loads(settings)['source']
+            if save is True:
+                name = f'RC - {rule_name} - {element_place} - {element["attributes"]["name"]}.js'
+                with open(f'{name}.js','w') as f:
+                    f.write(code)        
+            return code
+        elif element['attributes']['delegate_descriptor_id'] == "core::events::custom-code":
+            settings = element['attributes']['settings']
+            code = _json.loads(settings)['source']
+            if save is True:
+                name = f'RC - {rule_name} - {element_place} - {element["attributes"]["name"]}.js'
+                with open(f'{name}.js','w') as f:
+                    f.write(code)        
+            return code
+        elif element['attributes']['delegate_descriptor_id'] == "core::actions::custom-code":
+            settings = element['attributes']['settings']
+            code = _json.loads(settings)['source']
+            if save is True:
+                name = f'RC - {rule_name} - {element_place} - {element["attributes"]["name"]}.js'
                 with open(f'{name}.js','w') as f:
                     f.write(code)        
             return code
         else:
             settings=element['attributes']['settings']
             if save:
-                name = 'EXT - '+ str(element['attributes']['name']) + ' - settings.json'
+                name = f'RC - {rule_name} - {element_place} - {element["attributes"]["name"]} - settings.json'
                 with open(name,'w') as f:
                     f.write(settings)
             return settings
