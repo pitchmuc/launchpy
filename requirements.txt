@@ -1,0 +1,5 @@
+requests
+pyjwt
+jwt
+pandas
+pathlib
