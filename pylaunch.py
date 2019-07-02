@@ -742,7 +742,9 @@ class Property:
         Update the rule.
         arguments: 
             rule_id : REQUIRED : Rule ID
-            attr_dict : REQUIRED : dictionary that will be passed to Launch for update
+            attr_dict : REQUIRED : dictionary that will be passed to Launch for 
+        
+        documentation : https://developer.adobelaunch.com/api/reference/1.0/rules/update/
         """
         obj = {
               "data": {
@@ -816,6 +818,16 @@ class Property:
         env = _patchData(_endpoint+'/environments/'+env_id,obj)
         return env
     
+    def deleteExtension(self,extension_id:str)->object:
+        """
+        Delete the rule 
+        Arguments : 
+            extension_id : REQUIRED : Rule ID that needs to be deleted
+        """
+        data = _deleteData('https://reactor.adobe.io/extensions/'+extension_id)
+        return data
+    
+    
     def deleteRule(self,rule_id:str)->object:
         """
         Delete the rule 
@@ -832,6 +844,15 @@ class Property:
             dataElement_id : REQUIRED : Data Element ID that needs to be deleted
         """
         data = _deleteData('https://reactor.adobe.io/data_elements/'+dataElement_id)
+        return data
+    
+    def deleteRuleComponent(self,rc_id:str)->object:
+        """
+        Delete the rule 
+        Arguments : 
+            rc_id : REQUIRED : Rule Component ID that needs to be deleted
+        """
+        data = _deleteData('https://reactor.adobe.io/rule_components/'+rc_id)
         return data
         
 
