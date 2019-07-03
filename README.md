@@ -10,3 +10,4 @@ This module is built around 4 main parts:
 
 You can find a more detail description functionalities at datanalyst.info
 A Jupyter notebook is also available in the github for demo. 
+Youtube tutorial (~40mn) : https://youtu.be/NY6E9cpJVco
