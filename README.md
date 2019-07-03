@@ -9,3 +9,4 @@ This module is built around 4 main parts:
 - Tranlsator functionationality (Translator Class)
 
 You can find a more detail description functionalities at datanalyst.info
+A Jupyter notebook is also available in the github for demo. 
