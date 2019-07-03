@@ -360,7 +360,8 @@ class Property:
     @_checkToken
     def getRuleComponents(self)->dict:
         """
-        Returns a list of all the ruleComponents gathered in the ruleComponents attributes. 
+        Returns a list of all the ruleComponents gathered in the ruleComponents attributes.
+        You must have retrieved the rules before using this method (getRules()).
         It will also enrich the RuleCompoment JSON data with the rule_name attached to it. 
         """        
         ruleComponents = self.ruleComponents
@@ -1035,6 +1036,9 @@ def extractSettings(element:dict,save:bool=False)->dict:
 def copySettings(data:object)->object:
     """
     copy the settings from an element and returns an object with required information
+    Returns an object with the information required to create copy this element.  
+    Arguments:
+        data : REQUIRED : Single Element Object that you want to copy (not a list of elements)
     """
     obj={}
     if data['type'] == 'extensions':
@@ -1068,8 +1072,13 @@ def copySettings(data:object)->object:
 class Translator:
     """
     A class to store the translator dataframe for extensions ids. 
-    
-    It will return dataframe
+    It has multiple methods, you should set the Extensions and the Rules. 
+    1. setBaseExtensions
+    2. extendExtensions
+    --> You can use the translate method to translate Data Element settings 
+    3. setBaseRules
+    4. extendRules
+    --> You can use the translate method to translate Rule Components settings 
     """
     
     def __init__(self):
