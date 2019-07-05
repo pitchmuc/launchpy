@@ -160,6 +160,13 @@ def _patchData(url:str,obj:dict,**kwargs)->object:
     return res.json()
 
 @_checkToken
+def _putData(url:str,obj:dict,**kwargs)->object:
+    res = _requests.put(url,headers=_header,data=_json.dumps(obj))
+    if kwargs.get('print') == True:
+        print(res.text)
+    return res.json()
+
+@_checkToken
 def _deleteData(url:str,**kwargs)->object:
     res = _requests.delete(url,headers=_header)
     if kwargs.get('print') == True:
@@ -249,11 +256,6 @@ class Property:
     
     def __str__(self)-> str:
         return str(_json.dumps(self.dict,indent=4))
-    
-    def importRuleComponents(self,rules:list)->dict:
-        """
-        Takes the list of rules and create a dictionary to assign each rule to a name 
-        """
     
     def getEnvironments(self)->object:
         """
@@ -500,7 +502,9 @@ class Property:
     
     def createRules(self,name:str)->object:
         """
-        Create a rule by provided a rule name. 
+        Create a rule by provided a rule name.
+        Arguments:
+            name : REQUIRED : name of your rule. 
         """
         
         obj = {
@@ -521,7 +525,7 @@ class Property:
         """
         Create a ruleComponent by provided a rule name and descriptor (minimum). It returns an object.
         It takes additional information in order to link the ruleCompoment to a rule and with an Extension.
-        Arguments : 
+        Arguments: 
             name : REQUIRED : name of the rule component
             descriptor : REQUIRED : delegate_descriptor_id for the rule component
             extension_id : REQUIRED : Extension used for that rule component (dictionary)
@@ -555,7 +559,7 @@ class Property:
     def createDataElements(self,name:str,descriptor:str,extension:dict,settings:str=None,**kwargs:dict)->object:
         """
         Create Data Elements following the usage of required arguments. 
-        Arguments : 
+        Arguments: 
             name : REQUIRED : name of the data element
             descriptor : REQUIRED : delegate_descriptor_id for the data element
             extension : REQUIRED : extension id used for the data element. (dictionary)
@@ -588,7 +592,7 @@ class Property:
     def createEnvironment(self,name:str,host_id:str,stage:str='development',**kwargs)->object:
         """
         Create an environment. Note that you cannot create more than 1 environment for Staging and Production stage. 
-        Arguments : 
+        Arguments: 
             name : REQUIRED : name of your environment
             host_id : REQUIRED : The host id that you would need to connect to the correct host. 
             stage : OPTIONAL : Default Development. can be staging, production as well. 
@@ -619,7 +623,7 @@ class Property:
     def createHost(self,name:str,host_type:str='akamai',**kwargs):
         """
         Create a host in that property. By default Akamai host. 
-        Argument : 
+        Arguments: 
             name : REQUIRED : name of the host
             host_type : OPTIONAL : type of host. 'akamai' or 'sftp'. Default 'akamai'
         
@@ -655,9 +659,10 @@ class Property:
     
     def createLibrary(self,name:str,return_class:bool=True)->object:
         """
-        Create a library with the name provided. Returns an object.
+        Create a library with the name provided. Returns an instance of the Library class or the response from the API (object).
         Arguments:
             name : REQUIRED : name of the library
+            return_class : OPTIONAL : Bool. will return a instance of the Library class if True.
         """
         obj={
           "data": {
@@ -693,10 +698,10 @@ class Property:
           }
         }
         extensions = _patchData(_endpoint+'/extensions/'+extension_id,obj)
-        data = extensions.json()['data']
+        data = extensions['data']
         return data
     
-    def reviseRules(self,rule_id:str,attr_dict:object)->object:
+    def reviseRules(self,rule_id:str)->object:
         """
         Update the rule.
         arguments: 
@@ -705,7 +710,6 @@ class Property:
         """
         obj = {
               "data": {
-                "attributes": {},
                 "meta": {
                   "action": "revise"
                 },
@@ -717,7 +721,7 @@ class Property:
         data = rules
         return data
     
-    def reviseDataElements(self,dataElement_id:str,attr_dict:object,**kwargs)->object:
+    def reviseDataElements(self,dataElement_id:str)->object:
         """
         Update the data element information based on the information provided.
         arguments: 
@@ -726,7 +730,6 @@ class Property:
         """
         obj = {
               "data": {
-                "attributes": {},
                 "type": "data_elements",
                 "id": dataElement_id,
                 "meta": {
@@ -735,15 +738,15 @@ class Property:
               }
             }
         dataElements = _patchData(_endpoint+'/data_elements/'+dataElement_id,obj)
-        data = dataElements.json()['data']
+        data = dataElements
         return data 
     
     def updateRules(self,rule_id:str,attr_dict:object)->object:
         """
-        Update the rule.
+        Update the rule based on elements passed in attr_dict. 
         arguments: 
             rule_id : REQUIRED : Rule ID
-            attr_dict : REQUIRED : dictionary that will be passed to Launch for 
+            attr_dict : REQUIRED : dictionary that will be passed to Launch for update
         
         documentation : https://developer.adobelaunch.com/api/reference/1.0/rules/update/
         """
@@ -758,12 +761,15 @@ class Property:
               }
             }
         rules = _patchData(_endpoint+'/rules/'+rule_id,obj)
-        data = rules
+        try:
+            data = rules['data']
+        except:
+            data = rules
         return data
     
     def updateRuleComponents(self,rc_id:str,attr_dict:object,**kwargs)->object:
         """
-        Update the ruleComponents based on the information provided
+        Update the ruleComponents based on the information provided.
         arguments: 
             rc_id : REQUIRED : Rule Component ID
             attr_dict : REQUIRED : dictionary that will be passed to Launch for update
@@ -775,8 +781,11 @@ class Property:
                 "id": rc_id
               }
             }
-        rules = _patchData(_endpoint+'/rule_components/'+rc_id,obj)
-        data = rules
+        rc = _patchData(_endpoint+'/rule_components/'+rc_id,obj)
+        try:
+            data = rc['data']
+        except:
+            data = rc
         return data
     
     
@@ -795,15 +804,18 @@ class Property:
               }
             }
         dataElements = _patchData(_endpoint+'/data_elements/'+dataElement_id,obj)
-        data = dataElements.json()['data']
+        try:
+            data = dataElements['data']
+        except:
+            data = dataElements
         return data 
     
     def updateEnvironment(self,name:str,env_id:str,**kwargs)->object:
         """
-        Update an environment. Note :only support name change
+        Update an environment. Note :only support name change.
+        Arguments:
             name : REQUIRED : name of your environment
             env_id : REQUIRED : The environement id.
-            stage : OPTIONAL : Default Development. can be staging, production as well. 
         
         documentation : https://developer.adobelaunch.com/api/reference/1.0/environments/create/
         """
@@ -817,50 +829,122 @@ class Property:
                 }
             }
         env = _patchData(_endpoint+'/environments/'+env_id,obj)
-        return env
+        try:
+            data = env['data']
+        except:
+            data = env
+        return data
     
-    def deleteExtension(self,extension_id:str)->object:
+    def updateExtensions(self,extension_id,attr_dict:dict,**kwargs)-> object:
         """
-        Delete the rule 
-        Arguments : 
+        update the extension with the information provided in the argument.
+        argument: 
+            extension_id : REQUIRED : the extension id
+            attr_dict : REQUIRED : dictionary that will be passed to Launch for update
+        """
+        obj={
+            "data": {
+                "attributes": attr_dict,
+                "id": extension_id,
+                "type": "extensions"
+          }
+        }
+        extensions = _patchData(_endpoint+'/extensions/'+extension_id,obj)
+        try:
+            data = extensions['data']
+        except:
+            data = extensions
+        return data
+    
+    def deleteExtension(self,extension_id:str)->str:
+        """
+        Delete the extension that you want.  
+        Arguments: 
             extension_id : REQUIRED : Rule ID that needs to be deleted
         """
         data = _deleteData('https://reactor.adobe.io/extensions/'+extension_id)
         return data
     
     
-    def deleteRule(self,rule_id:str)->object:
+    def deleteRule(self,rule_id:str)->str:
         """
-        Delete the rule 
-        Arguments : 
+        Delete the rule that you want. 
+        Arguments: 
             rule_id : REQUIRED : Rule ID that needs to be deleted
         """
         data = _deleteData('https://reactor.adobe.io/rules/'+rule_id)
         return data
     
-    def deleteDataElement(self,dataElement_id:str)->object:
+    def deleteDataElement(self,dataElement_id:str)->str:
         """
-        Delete the rule 
-        Arguments : 
+        Delete a data element.  
+        Arguments: 
             dataElement_id : REQUIRED : Data Element ID that needs to be deleted
         """
         data = _deleteData('https://reactor.adobe.io/data_elements/'+dataElement_id)
         return data
     
-    def deleteRuleComponent(self,rc_id:str)->object:
+    def deleteRuleComponent(self,rc_id:str)->str:
         """
-        Delete the rule 
-        Arguments : 
+        Delete the rule component that you have selected.  
+        Arguments: 
             rc_id : REQUIRED : Rule Component ID that needs to be deleted
         """
         data = _deleteData('https://reactor.adobe.io/rule_components/'+rc_id)
         return data
+    
+    def deleteEnvironments(self,env_id:str)->str:
+        """
+        Delete the environment based on the id.  
+        Arguments: 
+            env_id : REQUIRED : Environment ID that needs to be deleted
+        """
+        data = _deleteData('https://reactor.adobe.io/environments/'+env_id)
+        return data
         
+def createProperty(companyId:str,name:str,platform:str='web',return_class:bool=True,**kwargs)->dict:
+    """
+    Create a property with default information. Will return empty value as default value. 
+    Returns a property instance.
+    Arguments : 
+        - companyId : REQUIRED : id of the company
+        - name : REQUIRED : name of the property
+        - platform : REQUIRED : default 'web', can be 'app'
+        - return_class : REQUIRED : default True, will return an instance of property class. 
+        If set to false, will just return the object created. 
+        **kwargs : can use the different parameter reference here : https://developer.adobelaunch.com/api/reference/1.0/properties/create/
+        
+    """
+    obj = {}
+    obj['data']={}
+    obj['data']['attributes']={}
+    ### in case some optional value are filled in
+    undefined_vars_return_empty = kwargs.get('undefined_vars_return_empty',True)
+    development = kwargs.get('development',False)
+    domains = kwargs.get('domains',['example.com'])
+    if type(domains) == str:## change the domains to list as required
+        if ',' in domains : 
+           domains = domains.split(',') 
+        else:##if a string but only 1 domain
+            domains = list(domains)
+    obj['data']['attributes']['name'] = name
+    obj['data']['attributes']['domains']=domains
+    obj['data']['attributes']['platform']=platform
+    obj['data']['attributes']['development']=development
+    obj['data']['attributes']['undefined_vars_return_empty']=undefined_vars_return_empty
+    obj['data']['type']='properties'
+    new_property = _postData(_endpoint+_getProperties.format(_company_id=companyId),obj)
+    if return_class:
+        property_class = Property(new_property['data'])
+        return property_class
+    else:
+        return new_property['data']
+
 
 def extensionsInfo(data:list)->dict:
     """
     Return a dictionary from the list provided from the extensions request.
-    Arguments : 
+    Arguments: 
         - data : REQUIRED : list information returned by the getExtension method. 
     """
     extensions = {}
@@ -985,12 +1069,11 @@ def extractSettings(element:dict,save:bool=False)->dict:
     elif element_type == 'extensions':
         if element['attributes']['delegate_descriptor_id'] == "adobe-analytics::extensionConfiguration::config":
             settings = _json.loads(element['attributes']['settings'])
-            code = settings['source']
             if save is True:
-                name = f'EXT - {str(element["attributes"]["name"])}.js'
+                name = f'EXT - {str(element["attributes"]["name"])}.json'
                 with open(name,'w') as f:
-                    f.write(code)        
-            return code
+                    f.write(_json.dumps(settings,indent=4))
+            return settings
         else:
             settings=element['attributes']['settings']
             if save:
@@ -1030,8 +1113,57 @@ def extractSettings(element:dict,save:bool=False)->dict:
             if save:
                 name = f'RC - {rule_name} - {element_place} - {element["attributes"]["name"]} - settings.json'
                 with open(name,'w') as f:
-                    f.write(settings)
+                    f.write(_json.dumps(settings,indent=4))
             return settings
+    
+def extractAttributes(element:dict,save:bool=False)->dict:
+    """
+    Extract the attributes of your element. You can save it in a file as well. 
+    Arguments:
+        element : REQUIRED : element you want to get the attributes from 
+        save : OPTIONAL : do you want to save it in a JSON file.
+    """
+    attributes = element['attributes']
+    element_type = element['type']
+    if save: 
+        name = f'{element_type} - attributes.json'
+        with open(name,'w') as f:
+            f.write(_json.dumps(attributes,indent=4))
+    return attributes
+
+def duplicate_attr(base_elements:list=None,target_elements:list=None,**kwargs)->list:
+    """
+    Take a list of element and copy their settings (default) to another list of element.
+    returns a new list of the elements attributes. 
+    Arguments:
+        base_elements : REQUIRED : list of elements you want to copy
+        target_elements : REQUIRED : list of elements you want to change
+        
+    Possible kwargs : 
+        key : OPTIONAL : the type of element you want to copy paste (settings, name,enabled ,etc...)
+        default value for the key are settings.
+        name_filter : OPTIONAL : Filter the elements to copy to only the ones containing the string in the filter.
+        example : name_filter='analytics' will only copy the element that has analytics in their name
+    """
+    if base_elements == None or target_elements == None: 
+        raise AttributeError('expecting base_element and target elements to be filled')
+    if type(base_elements) != list or type(target_elements) != list:
+        raise AttributeError('expecting base_element and target elements to be list')
+    key = kwargs.get('key','settings')
+    if kwargs.get('name_filter') != None:
+        base_elements = [element for element in base_elements if element['attributes']['name'].find(kwargs.get('name_filter'))]
+    index = {ext['attributes']['name'] : i for i,ext in enumerate(target_elements)}
+    new_list = []
+    for element in base_elements:
+        check_name = element['attributes']['name']
+        if check_name in index.keys():
+            base_setting = element['attributes'][key]
+            copy_target = _deepcopy(target_elements[index[check_name]])
+            copy_target_attr = copy_target['attributes']
+            copy_target_attr[key] = base_setting
+            new_list.append(copy_target_attr)
+    return new_list
+
 
 def copySettings(data:object)->object:
     """
@@ -1148,45 +1280,6 @@ class Translator:
         df = _pd.DataFrame(df['id'])
         self.rules[new_prop_name] = df
         return self.rules
-
-def createProperty(companyId:str,name:str,platform:str='web',return_class:bool=True,**kwargs)->dict:
-    """
-    Create a property with default information. Will return empty value as default value. 
-    Returns a property instance.
-    Arguments : 
-        - companyId : REQUIRED : id of the company
-        - name : REQUIRED : name of the property
-        - platform : REQUIRED : default 'web', can be 'app'
-        - return_class : REQUIRED : default True, will return an instance of property class. 
-        If set to false, will just return the object created. 
-        **kwargs : can use the different parameter reference here : https://developer.adobelaunch.com/api/reference/1.0/properties/create/
-        
-    """
-    obj = {}
-    obj['data']={}
-    obj['data']['attributes']={}
-    ### in case some optional value are filled in
-    undefined_vars_return_empty = kwargs.get('undefined_vars_return_empty',True)
-    development = kwargs.get('development',False)
-    domains = kwargs.get('domains',['example.com'])
-    if type(domains) == str:## change the domains to list as required
-        if ',' in domains : 
-           domains = domains.split(',') 
-        else:##if a string but only 1 domain
-            domains = list(domains)
-    obj['data']['attributes']['name'] = name
-    obj['data']['attributes']['domains']=domains
-    obj['data']['attributes']['platform']=platform
-    obj['data']['attributes']['development']=development
-    obj['data']['attributes']['undefined_vars_return_empty']=undefined_vars_return_empty
-    obj['data']['type']='properties'
-    new_property = _postData(_endpoint+_getProperties.format(_company_id=companyId),obj)
-    if return_class:
-        property_class = Property(new_property['data'])
-        return property_class
-    else:
-        return new_property['data']
-
 
 class Library:
     
