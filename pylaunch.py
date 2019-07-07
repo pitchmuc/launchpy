@@ -1049,6 +1049,12 @@ def _defineSearchType(_name:str=None,_id:str=None)->tuple:
     return condition, value
 
 def extractSettings(element:dict,save:bool=False)->dict:
+    """
+    Extract the settings from your element. For your custom code, it will extract the javaScript. 
+    Arguments: 
+        element : REQUIRED : element from which you would like to extract the setting from. 
+        save : OPTIONAL : bool, if you want to save the setting in a JS or JSON file, set it to true. (default False)
+    """
     element_type = element['type']
     if element_type == 'data_elements':
         if element['attributes']['delegate_descriptor_id'] == 'core::dataElements::custom-code':
@@ -1141,7 +1147,7 @@ def duplicateAttributes(base_elements:list=None,target_elements:list=None,**kwar
         
     Possible kwargs : 
         key : OPTIONAL : the type of element you want to copy paste (settings, name,enabled ,etc...)
-        default value for the key are settings.
+        default value for the key is "settings".
         name_filter : OPTIONAL : Filter the elements to copy to only the ones containing the string in the filter.
         example : name_filter='analytics' will only copy the element that has analytics in their name
     """
@@ -1219,22 +1225,28 @@ class Translator:
     def setBaseExtensions(self,base_property_extensions:object,property_name:str):
         """
         Pass all the extensions from the base property to start building the table. 
-        arguments : 
-            - base_property : REQUIRED : list of all extensions retrieve through getExtensions method
-            - property_name : REQUIRED : name of your base property.
+        Arguments: 
+            base_property : REQUIRED : list of all extensions retrieve through getExtensions method
+            property_name : REQUIRED : name of your base property.
         """
         df = _pd.DataFrame(extensionsInfo(base_property_extensions)).T
         df = _pd.DataFrame(df['id'])
         df.columns = [property_name]
         self.extensions = df
     
-    def extendExtensions(self,new_property_extensions:object,new_prop_name:str):
+    def extendExtensions(self,new_property_extensions:object,new_prop_name:str)-> None:
+        """
+        Add the extensions id from a target property.
+        Arguments: 
+            new_property_extensions: REQUIRED : the extension list from your target property. 
+            new_prop_name : REQUIRED : target property name. 
+        """
         df = _pd.DataFrame(extensionsInfo(new_property_extensions)).T
         df = _pd.DataFrame(df['id'])
         self.extensions[new_prop_name] = df
         return self.extensions
     
-    def translate(self,target_property:str,data_element:dict=None, rule_component:dict=None):
+    def translate(self,target_property:str,data_element:dict=None, rule_component:dict=None)->dict:
         """
         change the id from the base element to the new property. 
         Pre checked should be done beforehands (updating Extension & Rules elements)
@@ -1265,10 +1277,10 @@ class Translator:
     
     def setBaseRules(self,base_property_rules:object,property_name:str):
         """
-        Pass all the extensions from the base property to start building the table. 
-        arguments : 
-            - base_property : REQUIRED : list of all rules retrieve through getExtensions method
-            - property_name : REQUIRED : name of your base property.
+        Pass all the rules from the base property to start building the table. 
+        Arguments: 
+            base_property : REQUIRED : list of all rules retrieve through getExtensions method
+            property_name : REQUIRED : name of your base property.
         """
         df = _pd.DataFrame(rulesInfo(base_property_rules)).T
         df = _pd.DataFrame(df['id'])
@@ -1276,6 +1288,12 @@ class Translator:
         self.rules = df
 
     def extendRules(self,new_property_rules:object,new_prop_name:str):
+        """
+        Add the extensions id from a target property.
+        Arguments: 
+            new_property_rules: REQUIRED : the rules list from your target property. 
+            new_prop_name : REQUIRED : target property name. 
+        """
         df = _pd.DataFrame(rulesInfo(new_property_rules)).T
         df = _pd.DataFrame(df['id'])
         self.rules[new_prop_name] = df
@@ -1294,7 +1312,6 @@ class Library:
         self._Environment = _endpoint+'/libraries/'+data['id']+'/envrionment'
         self._Rules = _endpoint+'/libraries/'+data['id']+'/rules'
         self._Builds = _endpoint+'/libraries/'+data['id']+'/builds'
-        self.builds = data['relationships']['builds']['links']['related']
         self.build_status = data['meta']['build_status']
         self.relationships = {}
         self._environments = {}
@@ -1393,7 +1410,7 @@ class Library:
         It is required to use the library class.
         Arguments : 
             environments_list : REQUIRED : list of environment retrieved by the getEnvironment method
-            dev_name : OPTIONAL : Name of your dev environment. If not defined, will take the first dev environment
+            dev_name : OPTIONAL : Name of your dev environment. If not defined, will take the first dev environment.
         """
         for env in environments_list:
             if env['attributes']['stage'] == 'production':
@@ -1488,7 +1505,7 @@ class Library:
     def transition(self,action:str=None,**kwargs)->object:
         """
         Move the library along the publishing funnel.
-        If no action are provided, it would automatically go to the next state. 
+        If no action is provided, it would automatically go to the next state. 
         Arguments : 
             action : OPTIONAL : action to do on the library. Possible values: 
                 - 'submit' : if state == development
