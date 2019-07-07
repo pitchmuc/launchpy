@@ -1131,7 +1131,7 @@ def extractAttributes(element:dict,save:bool=False)->dict:
             f.write(_json.dumps(attributes,indent=4))
     return attributes
 
-def duplicate_attr(base_elements:list=None,target_elements:list=None,**kwargs)->list:
+def duplicateAttributes(base_elements:list=None,target_elements:list=None,**kwargs)->list:
     """
     Take a list of element and copy their settings (default) to another list of element.
     returns a new list of the elements attributes. 
