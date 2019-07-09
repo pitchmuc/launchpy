@@ -143,28 +143,44 @@ def _getData(url:str,*args:str)->object:
     except:
         url = url
     res = _requests.get(url,headers=_header)
-    return res.json()
+    try:
+       infos = res.json()
+    except:
+        infos = res.text
+    return infos
 
 @_checkToken
 def _postData(url:str,obj:dict,**kwargs)->object:
     res = _requests.post(url,headers=_header,data=_json.dumps(obj))
     if kwargs.get('print') == True:
         print(res.text)
-    return res.json()
+    try:
+       infos = res.json()
+    except:
+        infos = res.text
+    return infos
 
 @_checkToken
 def _patchData(url:str,obj:dict,**kwargs)->object:
     res = _requests.patch(url,headers=_header,data=_json.dumps(obj))
     if kwargs.get('print') == True:
         print(res.text)
-    return res.json()
+    try:
+       infos = res.json()
+    except:
+        infos = res.text
+    return infos
 
 @_checkToken
 def _putData(url:str,obj:dict,**kwargs)->object:
     res = _requests.put(url,headers=_header,data=_json.dumps(obj))
     if kwargs.get('print') == True:
         print(res.text)
-    return res.json()
+    try:
+       infos = res.json()
+    except:
+        infos = res.text
+    return infos
 
 @_checkToken
 def _deleteData(url:str,**kwargs)->object:
@@ -371,16 +387,18 @@ class Property:
             raise AttributeError('Rules should have been retrieved in order to retrieve Rule Component.\n {}.ruleComponent is empty'.format(self.name))
         list_urls = [ruleComponents[_id]['url'] for _id in ruleComponents]
         names = [ruleComponents[_id]['name'] for _id in ruleComponents]
+        ids = list(ruleComponents.keys())
         headers = [_header  for nb in range(len(list_urls))]
         workers = min((len(list_urls),5))
-        def request_data(url, header,name):
+        def request_data(url, header,name,ids):
             rule_component = _requests.get(url,headers=_header)
             data = rule_component.json()['data']
             for element in data:
                 element['rule_name'] = name
+                element['rule_id'] = ids
             return data
         with _futures.ThreadPoolExecutor(workers) as executor:
-            res = executor.map(request_data,list_urls,headers,names)
+            res = executor.map(request_data,list_urls,headers,names,ids)
         list_data = list(res)
         expanded_list = []
         for element in list_data: 
@@ -521,7 +539,7 @@ class Property:
                            'url': data['links']['rule_components']}
         return data
     
-    def createRuleComponents(self,name:str,descriptor:str,settings:str=None,extension_id:dict=None,rule_id:dict=None,**kwargs)->object:
+    def createRuleComponents(self,name:str,settings:str=None,descriptor:str=None,extension_id:dict=None,rule_id:dict=None,**kwargs)->object:
         """
         Create a ruleComponent by provided a rule name and descriptor (minimum). It returns an object.
         It takes additional information in order to link the ruleCompoment to a rule and with an Extension.
@@ -553,10 +571,10 @@ class Property:
         if 'order' in kwargs:
             obj['data']['attributes']['order'] = kwargs.get('order')
         rc = _postData(self._RuleComponents,obj)
-        data = rc['data']
+        data = rc
         return data
             
-    def createDataElements(self,name:str,descriptor:str,extension:dict,settings:str=None,**kwargs:dict)->object:
+    def createDataElements(self,name:str,settings:str=None,descriptor:str=None,extension:dict=None,**kwargs:dict)->object:
         """
         Create Data Elements following the usage of required arguments. 
         Arguments: 
@@ -1183,12 +1201,12 @@ def copySettings(data:object)->object:
     if data['type'] == 'extensions':
         obj['name'] = data['attributes']['name']
         obj['settings'] = data['attributes']['settings']
-        obj['delegate_descriptor_id'] = data['attributes']['delegate_descriptor_id']
+        obj['descriptor'] = data['attributes']['delegate_descriptor_id']
         obj['extension_id'] = data['relationships']['extension_package']['data']['id'] 
     elif data['type'] == 'data_elements':
         obj['name'] = data['attributes']['name']
         obj['settings'] = data['attributes']['settings']
-        obj['delegate_descriptor_id'] = data['attributes']['delegate_descriptor_id']
+        obj['descriptor'] = data['attributes']['delegate_descriptor_id']
         obj['storage_duration']=  data['attributes']['storage_duration']
         obj['force_lower_case']=  data['attributes']['force_lower_case']
         obj['default_value']=  data['attributes']['default_value']
@@ -1199,12 +1217,13 @@ def copySettings(data:object)->object:
     elif data['type'] == 'rule_components':
         obj['name'] = data['attributes']['name']
         obj['order'] = data['attributes']['order']
-        obj['delegate_descriptor_id'] = data['attributes']['delegate_descriptor_id']
+        obj['descriptor'] = data['attributes']['delegate_descriptor_id']
         obj['negate'] = data['attributes']['negate']
         obj['rule_order'] = data['attributes']['rule_order']
         obj['settings'] = data['attributes']['settings']
         obj['extension'] = data['relationships']['extension']['data']
         obj['rule_name'] = data['rule_name']
+        obj['rule_id'] = data['rule_id']
     return obj
 
 
