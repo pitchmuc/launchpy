@@ -273,6 +273,22 @@ class Property:
     def __str__(self)-> str:
         return str(_json.dumps(self.dict,indent=4))
     
+    def _getExtensionPackage(self,ext_name:str,verbose:bool=False)->dict:
+        """
+        Retrieve extension id of the catalog from an extension name.
+        It will be used later on to check for available updates. 
+        """
+        uri = '/extension_packages'
+        params = {'filter[name]':'EQ '+str(ext_name)}
+        res_ext = _requests.get(_endpoint+uri,params=params,headers=_header)
+        data = res_ext.json()['data'][0]
+        extension_id = data['id']
+        if verbose:
+            print('extension name : ' + str(data['attributes']['name']))
+            print('extension id : ' + str(data['id']))
+        return extension_id
+        
+        
     def getEnvironments(self)->object:
         """
         Retrieve the environment sets for this property
@@ -310,6 +326,31 @@ class Property:
         except:
             data = extensions
         return data
+    
+    def checkExtensionUpdate(self,verbose:bool=False):
+        """
+        Returns a dictionary of extensions with their names, ids and if there is an update. 
+        If there is an update available, the id returned is the latest id (to be used for installation). 
+        It can be re-use for installation and for checking for update. 
+        Arguments:
+            verbose: OPTIONAL : if set to True, will print the different name and id of the extensions checked.
+        
+        Dictionary example: 
+        {'adobe-mcid':
+            {'id':'XXXXX',
+            'update':False
+            }
+        }
+        
+        """
+        extensions = self.getExtensions()
+        dict_extensions = {ext['attributes']['name']:{'id':ext['relationships']['extension_package']['data']['id'],'update':False} for ext in extensions}
+        for name in dict_extensions:
+            new_id = self._getExtensionPackage(name,verbose)
+            if new_id != dict_extensions[name]['id']:
+                dict_extensions[name]['id']= new_id
+                dict_extensions[name]['update'] = True
+        return dict_extensions
     
     def getRules(self)->object:
         """
