@@ -344,13 +344,46 @@ class Property:
         
         """
         extensions = self.getExtensions()
-        dict_extensions = {ext['attributes']['name']:{'id':ext['relationships']['extension_package']['data']['id'],'update':False} for ext in extensions}
+        dict_extensions = {ext['attributes']['name']:{'package_id':ext['relationships']['extension_package']['data']['id'],
+                           'update':False,
+                           'internal_id':ext['id']
+                           } for ext in extensions}
         for name in dict_extensions:
             new_id = self._getExtensionPackage(name,verbose)
-            if new_id != dict_extensions[name]['id']:
-                dict_extensions[name]['id']= new_id
+            if new_id != dict_extensions[name]['package_id']:
+                dict_extensions[name]['package_id']= new_id
                 dict_extensions[name]['update'] = True
         return dict_extensions
+    
+    def upgradeExtension(self,extension_id:str,package_id:str,**kwargs)-> object:
+        """
+        Upgrade the extension with the new package id (EP...). 
+        Returns the extension data. 
+        Arguments:
+            extension_id : REQUIRED : Your internal ID for this extension in your property (EX....)
+            package_id : REQUIRED : new extension id for the extension (EP...)
+        """
+        data={'data':{
+                'id':extension_id,
+                "type": "extensions",
+                "relationships": {"extension_package": {
+                      "links": {
+                        "related": "https://reactor.adobe.io/extensions/"+extension_id+"/extension_package"
+                      },
+                      "data": {
+                        "id": package_id,
+                        "type": "extension_packages"
+                      }
+                    }
+                },
+                'meta':{
+                    'upgrade_extension_package_id':package_id
+                    }
+                }
+            }
+        res = _requests.patch(_endpoint+'/extensions/'+str(extension_id),headers=_header,data=_json.dumps(data))
+        upgrade = res.json()
+        return upgrade
     
     def getRules(self)->object:
         """
