@@ -1207,7 +1207,7 @@ def extractSettings(element:dict,save:bool=False)->dict:
                     f.write(settings)
             return settings
     elif element_type == 'rule_components':
-        rule_name = element_type['rule_name']
+        rule_name = element['rule_name']
         element_place = element['attributes']['delegate_descriptor_id'].split('::')[1]
         if element['attributes']['delegate_descriptor_id'] == "core::conditions::custom-code":
             settings = element['attributes']['settings']
@@ -1325,6 +1325,11 @@ def copySettings(data:object)->object:
         obj['extension'] = data['relationships']['extension']['data']
         obj['rule_name'] = data['rule_name']
         obj['rule_id'] = data['rule_id']
+        obj['rule_setting'] = { 
+            'data' : [{
+            'id' : data['rule_id'],
+            'type':'rules'}
+            ]}
     return obj
 
 
