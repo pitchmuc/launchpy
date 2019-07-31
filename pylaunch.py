@@ -1181,6 +1181,7 @@ def extractSettings(element:dict,save:bool=False)->dict:
             code = _json.loads(settings)['source']
             if save is True:
                 name = f'DE - {str(element["attributes"]["name"])}.js'
+                name = name.replace('"',"'").replace('|','').replace('>','').replace('<','').replace('/','').replace('\\','').replace(':',';').replace('?','')
                 with open(name,'w') as f:
                     f.write(code)        
             return code
@@ -1188,6 +1189,7 @@ def extractSettings(element:dict,save:bool=False)->dict:
             settings=element['attributes']['settings']
             if save:
                 name = f'DE - {str(element["attributes"]["name"])} - settings.json'
+                name = name.replace('"',"'").replace('|','').replace('>','').replace('<','').replace('/','').replace('\\','').replace(':',';').replace('?','')
                 with open(name,'w') as f:
                     f.write(settings)
             return settings
@@ -1196,6 +1198,7 @@ def extractSettings(element:dict,save:bool=False)->dict:
             settings = _json.loads(element['attributes']['settings'])
             if save is True:
                 name = f'EXT - {str(element["attributes"]["name"])}.json'
+                name = name.replace('"',"'").replace('|','').replace('>','').replace('<','').replace('/','').replace('\\','').replace(':',';').replace('?','')
                 with open(name,'w') as f:
                     f.write(_json.dumps(settings,indent=4))
             return settings
@@ -1203,6 +1206,7 @@ def extractSettings(element:dict,save:bool=False)->dict:
             settings=element['attributes']['settings']
             if save:
                 name = f'EXT - {str(element["attributes"]["name"])} - settings.json'
+                name = name.replace('"',"'").replace('|','').replace('>','').replace('<','').replace('/','').replace('\\','').replace(':',';').replace('?','')
                 with open(name,'w') as f:
                     f.write(settings)
             return settings
@@ -1214,6 +1218,7 @@ def extractSettings(element:dict,save:bool=False)->dict:
             code = _json.loads(settings)['source']
             if save is True:
                 name = f'RC - {rule_name} - {element_place} - {element["attributes"]["name"]}.js'
+                name = name.replace('"',"'").replace('|','').replace('>','').replace('<','').replace('/','').replace('\\','').replace(':',';').replace('?','')
                 with open(f'{name}.js','w') as f:
                     f.write(code)        
             return code
@@ -1222,6 +1227,7 @@ def extractSettings(element:dict,save:bool=False)->dict:
             code = _json.loads(settings)['source']
             if save is True:
                 name = f'RC - {rule_name} - {element_place} - {element["attributes"]["name"]}.js'
+                name = name.replace('"',"'").replace('|','').replace('>','').replace('<','').replace('/','').replace('\\','').replace(':',';').replace('?','')
                 with open(f'{name}.js','w') as f:
                     f.write(code)        
             return code
@@ -1230,6 +1236,7 @@ def extractSettings(element:dict,save:bool=False)->dict:
             code = _json.loads(settings)['source']
             if save is True:
                 name = f'RC - {rule_name} - {element_place} - {element["attributes"]["name"]}.js'
+                name = name.replace('"',"'").replace('|','').replace('>','').replace('<','').replace('/','').replace('\\','').replace(':',';').replace('?','')                
                 with open(f'{name}.js','w') as f:
                     f.write(code)        
             return code
@@ -1237,6 +1244,7 @@ def extractSettings(element:dict,save:bool=False)->dict:
             settings=element['attributes']['settings']
             if save:
                 name = f'RC - {rule_name} - {element_place} - {element["attributes"]["name"]} - settings.json'
+                name = name.replace('"',"'").replace('|','').replace('>','').replace('<','').replace('/','').replace('\\','').replace(':',';').replace('?','')
                 with open(name,'w') as f:
                     f.write(_json.dumps(settings,indent=4))
             return settings
@@ -1253,6 +1261,7 @@ def extractAttributes(element:dict,save:bool=False)->dict:
     element_type = element['type']
     if save: 
         name = f'{element_type} - {el_name} - attributes.json'
+        name = name.replace('"',"'").replace('|','').replace('>','').replace('<','').replace('/','').replace('\\','').replace(':',';').replace('?','')
         with open(name,'w') as f:
             f.write(_json.dumps(attributes,indent=4))
     return attributes
