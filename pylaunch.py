@@ -1426,7 +1426,7 @@ class Translator:
                 return new_de
             elif rule_component is not None:
                 if self.rules == '':
-                    print("The rules have not been imported, the rule dictionary won't be returned")
+                    print("The rules have not been imported, the rule id needs to be changed")
                 new_rc = _deepcopy(rule_component)
                 base_id = new_rc['extension']['id']
                 row = self.extensions[self.extensions.eq(base_id).any(1)].index.values[0]
@@ -1438,6 +1438,8 @@ class Translator:
                         'id' : self.rules.loc[rule_component['rule_name'],target_property],
                         'type':'rules'}
                     ]}
+                else:
+                    new_rc['rules'] = rule_component['rule_setting']
                 return new_rc
     
 
