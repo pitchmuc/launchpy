@@ -1406,41 +1406,41 @@ class Translator:
         self.rules[new_prop_name] = df
         return self.rules
     
-        def translate(self,target_property:str,data_element:dict=None, rule_component:dict=None)->dict:
-            """
-            change the id from the base element to the new property. 
-            Pre checked should be done beforehands (updating Extension & Rules elements)
-            Arguments: 
-                target_property : REQUIRED : property that is targeted to translate the element to
-                data_element : OPTIONAL : if the elements passed are data elements
-                rule_component : OPTIONAL : if the elements passed are rule components
-            """
-            if self.extension =='':
-                raise AttributeError("You didn't impor the base extensions or the target extensions")
-            if data_element is not None:
-                new_de = _deepcopy(data_element)
-                base_id = new_de['extension']['id']
-                row = self.extensions[self.extensions.iloc[:,0] == base_id].index.values[0]
-                new_value = self.extensions.loc[row,target_property]
-                new_de['extension']['id'] = new_value
-                return new_de
-            elif rule_component is not None:
-                if self.rules == '':
-                    print("The rules have not been imported, the rule id needs to be changed")
-                new_rc = _deepcopy(rule_component)
-                base_id = new_rc['extension']['id']
-                row = self.extensions[self.extensions.eq(base_id).any(1)].index.values[0]
-                new_value = self.extensions.loc[row,target_property]
-                new_rc['extension']['id'] = new_value
-                if self.rules != '':
-                    new_rc['rules'] = { 
-                        'data' : [{
-                        'id' : self.rules.loc[rule_component['rule_name'],target_property],
-                        'type':'rules'}
-                    ]}
-                else:
-                    new_rc['rules'] = rule_component['rule_setting']
-                return new_rc
+    def translate(self,target_property:str,data_element:dict=None, rule_component:dict=None)->dict:
+        """
+        change the id from the base element to the new property. 
+        Pre checked should be done beforehands (updating Extension & Rules elements)
+        Arguments: 
+            target_property : REQUIRED : property that is targeted to translate the element to
+            data_element : OPTIONAL : if the elements passed are data elements
+            rule_component : OPTIONAL : if the elements passed are rule components
+        """
+        if self.extension =='':
+            raise AttributeError("You didn't impor the base extensions or the target extensions")
+        if data_element is not None:
+            new_de = _deepcopy(data_element)
+            base_id = new_de['extension']['id']
+            row = self.extensions[self.extensions.iloc[:,0] == base_id].index.values[0]
+            new_value = self.extensions.loc[row,target_property]
+            new_de['extension']['id'] = new_value
+            return new_de
+        elif rule_component is not None:
+            if self.rules == '':
+                print("The rules have not been imported, the rule id needs to be changed")
+            new_rc = _deepcopy(rule_component)
+            base_id = new_rc['extension']['id']
+            row = self.extensions[self.extensions.eq(base_id).any(1)].index.values[0]
+            new_value = self.extensions.loc[row,target_property]
+            new_rc['extension']['id'] = new_value
+            if self.rules != '':
+                new_rc['rules'] = { 
+                    'data' : [{
+                    'id' : self.rules.loc[rule_component['rule_name'],target_property],
+                    'type':'rules'}
+                ]}
+            else:
+                new_rc['rules'] = rule_component['rule_setting']
+            return new_rc
     
 
 class Library:
