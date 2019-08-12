@@ -8,6 +8,7 @@ import json as _json
 from collections import defaultdict as _defaultdict
 from concurrent import futures as _futures
 from copy import deepcopy as _deepcopy
+import re
 ## Non standard libraries
 import pandas as _pd
 import requests as _requests
@@ -1020,6 +1021,86 @@ class Property:
         """
         data = _deleteData('https://reactor.adobe.io/environments/'+env_id)
         return data
+    
+    def extractAnalyticsConfig(self)->object:
+        """
+        Extract the analytics configuration that has been done in the Analytics Extensions and Rules.
+        Return a dictionary of the different element in a dataframe
+        """
+        dict_eVars=_defaultdict(list)
+        dict_props=_defaultdict(list)
+        dict_events=_defaultdict(list)
+        dict_value_eVars = _defaultdict(list)
+        dict_value_props = _defaultdict(list)
+        p_rules = self.getRules()
+        p_ext = self.getExtensions()
+        p_rcs = self.getRuleComponents()
+        analytics = [ext for ext in p_ext if ext['attributes']['name'] == 'adobe-analytics'][0]
+        analytics_rcs = [rc for rc in p_rcs if rc['attributes']['delegate_descriptor_id'].find('adobe-analytics::actions::set-variables') -1]
+        def searchSetupAnalytics(element:object,verbose:bool=False):
+            """
+            fills the different dictionaries with where informations are held. 
+            """
+#            global dict_eVars
+#            global dict_props
+#            global dict_events
+#            global dict_value_eVars
+#            global dict_value_props
+            if element['type'] == "rule_components":
+                name = element['rule_name']
+            elif element['type'] == "extensions":
+                name = 'Analytics Extension'
+            settings = _json.loads(element['attributes']['settings'])
+            if 'trackerProperties' in settings.keys():
+                tracker_properties = settings['trackerProperties']
+            else:
+                tracker_properties = {}
+            if verbose:
+                print(name)
+            if len(tracker_properties)>0:
+                if 'eVars' in tracker_properties.keys():
+                    for v in tracker_properties['eVars']:
+                        dict_eVars[v['name']].append(f'{name} - Interface')
+                        dict_value_eVars[v['name']].append(v['value'])
+                if 'props' in tracker_properties.keys():
+                    for p in tracker_properties['props']:
+                        dict_props[p['name']].append(f'{name} - Interface')
+                        dict_value_props[p['name']].append(p['value'])
+                if 'events' in tracker_properties.keys():
+                    for e in tracker_properties['events']:
+                        dict_events[e['name']].append(f'{name} - Interface')
+            if 'customSetup' in settings.keys():
+                code = settings['customSetup']['source']
+                if len(code)>0:
+                    matchevents = re.findall('(event[0-9]+)',code)
+                    matcheVars = re.findall('(eVar[0-9]+)\s*=',code)
+                    matchprops = re.findall('(prop[0-9]+?)\s*=',code)
+                    if matcheVars is not None:
+                        for v in set(matcheVars):
+                            value = f'{name} - Custom Code'
+                            if value not in dict_eVars[v]:
+                                dict_eVars[v].append(f'{name} - Custom Code')
+                    if matchprops is not None:
+                        for p in set(matchprops):
+                            value = f'{name} - Custom Code'
+                            if value not in dict_props[p]:
+                                dict_props[p].append(f'{name} - Custom Code')
+                    if matchevents is not None:
+                        for e in set(matchevents):
+                            value = f'{name} - Custom Code'
+                            if value not in dict_events[e]:
+                                dict_events[e].append(f'{name} - Custom Code')
+        searchSetupAnalytics(analytics)
+        for rc in analytics_rcs:
+            searchSetupAnalytics(rc)
+        df_eVars = _pd.DataFrame(dict([ (k,_pd.Series(v)) for k,v in dict_eVars.items()])).T.fillna('')
+        df_eVars.columns = ['location ' +str(i) for i in range(1,len(df_eVars.columns)+1)]
+        df_props = _pd.DataFrame(dict([ (k,_pd.Series(v)) for k,v in dict_props.items()])).T.fillna('')
+        df_props.columns = ['location ' +str(i) for i in range(1,len(df_props.columns)+1)]
+        df_events = _pd.DataFrame(dict([ (k,_pd.Series(v)) for k,v in dict_events.items()])).T.fillna('')
+        df_events.columns = ['location ' +str(i) for i in range(1,len(df_events.columns)+1)]
+        data = {'eVars':df_eVars,'props':df_props,'events':df_events}
+        return data
         
 def createProperty(companyId:str,name:str,platform:str='web',return_class:bool=True,**kwargs)->dict:
     """
@@ -1355,8 +1436,8 @@ class Translator:
     """
     
     def __init__(self):
-        self.rules = ''
-        self.extensions = ''
+        self.rules = _pd.DataFrame()
+        self.extensions = _pd.DataFrame()
     
     def setBaseExtensions(self,base_property_extensions:object,property_name:str):
         """
@@ -1415,8 +1496,8 @@ class Translator:
             data_element : OPTIONAL : if the elements passed are data elements
             rule_component : OPTIONAL : if the elements passed are rule components
         """
-        if self.extension =='':
-            raise AttributeError("You didn't impor the base extensions or the target extensions")
+        if self.extensions.empty == True:
+            raise AttributeError("You didn't import the base extensions or the target extensions")
         if data_element is not None:
             new_de = _deepcopy(data_element)
             base_id = new_de['extension']['id']
@@ -1425,21 +1506,21 @@ class Translator:
             new_de['extension']['id'] = new_value
             return new_de
         elif rule_component is not None:
-            if self.rules == '':
+            if self.rules.empty == True:
                 print("The rules have not been imported, the rule id needs to be changed")
             new_rc = _deepcopy(rule_component)
             base_id = new_rc['extension']['id']
             row = self.extensions[self.extensions.eq(base_id).any(1)].index.values[0]
             new_value = self.extensions.loc[row,target_property]
             new_rc['extension']['id'] = new_value
-            if self.rules != '':
-                new_rc['rules'] = { 
+            if self.rules.empty == False:
+                new_rc['rule_setting'] = { 
                     'data' : [{
                     'id' : self.rules.loc[rule_component['rule_name'],target_property],
                     'type':'rules'}
                 ]}
             else:
-                new_rc['rules'] = rule_component['rule_setting']
+                del new_rc['rules']
             return new_rc
     
 
