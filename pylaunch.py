@@ -1300,7 +1300,7 @@ def extractSettings(element:dict,save:bool=False)->dict:
             if save is True:
                 name = f'RC - {rule_name} - {element_place} - {element["attributes"]["name"]}.js'
                 name = name.replace('"',"'").replace('|','').replace('>','').replace('<','').replace('/','').replace('\\','').replace(':',';').replace('?','')
-                with open(f'{name}.js','w') as f:
+                with open(f'{name}','w') as f:
                     f.write(code)        
             return code
         elif element['attributes']['delegate_descriptor_id'] == "core::events::custom-code":
@@ -1309,7 +1309,7 @@ def extractSettings(element:dict,save:bool=False)->dict:
             if save is True:
                 name = f'RC - {rule_name} - {element_place} - {element["attributes"]["name"]}.js'
                 name = name.replace('"',"'").replace('|','').replace('>','').replace('<','').replace('/','').replace('\\','').replace(':',';').replace('?','')
-                with open(f'{name}.js','w') as f:
+                with open(f'{name}','w') as f:
                     f.write(code)        
             return code
         elif element['attributes']['delegate_descriptor_id'] == "core::actions::custom-code":
@@ -1318,7 +1318,7 @@ def extractSettings(element:dict,save:bool=False)->dict:
             if save is True:
                 name = f'RC - {rule_name} - {element_place} - {element["attributes"]["name"]}.js'
                 name = name.replace('"',"'").replace('|','').replace('>','').replace('<','').replace('/','').replace('\\','').replace(':',';').replace('?','')                
-                with open(f'{name}.js','w') as f:
+                with open(f'{name}','w') as f:
                     f.write(code)        
             return code
         else:
