@@ -1532,14 +1532,15 @@ def extractAnalyticsCode(rcSettings:str,save:bool=False,filename:str=None)->None
         filename : OPTIONAL : name of the file you want to use to save the code. 
     """
     json_data = _json.loads(rcSettings)
-    json_code = json_data['customSetup']['source']
-    if filename is None: 
-        filename = 'code'
-    filename = filename.replace('/','_').replace('|','_')
-    if save:
-        with open(f'{filename}.js','w') as f:
-            f.write(json_code)
-    return json_code
+    if 'customSetup' in json_data.keys():
+        json_code = json_data['customSetup']['source']
+        if filename is None:
+            filename = 'code'
+        filename = filename.replace('/','_').replace('|','_')
+        if save:
+            with open(f'{filename}.js','w') as f:
+                f.write(json_code)
+        return json_code
 
 class Library:
     
