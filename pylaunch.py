@@ -242,28 +242,26 @@ class Property:
     
     def __init__(self,data:object) -> None:
         """
-        Data object that is pass on is coming from the property return by getProperties.
+        Instanciate the class with the object retrieved by getProperties.
         Attributes : 
-          dict : the data that has been passed to the class for the instance creation
-          name : name of the property 
-          id : id of the property 
-          platform : platform of the property 
-          development : boolean, if the property is a dev environment or not. 
-          domains : domain(s) associated with the property
-          libraries : the different libraries associated with the property (rules, data elements, etc...)
-          rules : dictionnary to extract ruleComponents from rules. Filled when running getRules
+          data : Object that has been retrieved on getProperties. Single property. 
         """
         self.dict = data
         self.name = data['attributes']['name']
         self.id = data['id']
         self.platform = data['attributes']['platform']
         self.development = data['attributes']['development']
-        self.domains = data['attributes']['domains']
+        if data['attributes']['platform'] == "web":
+            self.domains = data['attributes']['domains']
+        if data['attributes']['platform'] == "mobile":
+            self.ssl_enabled = data['attributes']['ssl_enabled']
+            self.privacy = data['attributes']['privacy']
         self._DataElement = data['links']['data_elements']
         self._Extensions = data['links']['extensions']
         self._Rules = data['links']['rules']
         self._RuleComponents = 'https://reactor.adobe.io/properties/'+data['id']+'/rule_components'
         self._Host = 'https://reactor.adobe.io//properties/'+data['id']+'/hosts'
+        self._Note = 'https://reactor.adobe.io/notes/'
         self._Environments = data['links']['environments']
         self._Libraries = data['relationships']['libraries']['links']['related']
         self.ruleComponents = {}
@@ -558,8 +556,6 @@ class Property:
         data = libs['data'] ## dat for page 1
         pagination = libs['meta']['pagination']
         if pagination['current_page'] != pagination['total_pages'] and pagination['total_pages'] != 0:## requesting all the pages
-            print(pagination['current_page'])
-            print(pagination['total_pages'])
             pages_left = pagination['total_pages'] - pagination['current_page'] ## calculate how many page to download
             workers = min(pages_left,5)## max 5 threads
             list_page_number = ['?page%5Bnumber%5D='+str(x) for x in range(2,pages_left+2)]
@@ -571,6 +567,37 @@ class Property:
             data = data + append_data
         return data 
     
+    def getNotes(self,data:object)->list:
+        """
+        Retrieve the note associated with the object pass to the method. Returns list.
+        Arguments:
+            data: OPTIONAL : object that is associated with a Note (rule, data element, etc...)
+        """
+        supported_objects = "libraries data_elements rules rule_components extensions"
+        if data is not None and data['type'] not in supported_objects.split():
+            raise ReferenceError('Data passed are not supported for notes.')
+
+        if data is None:
+            url = self.dict['relationships']['notes']['links']['related']
+        else:
+            url = data['relationships']['notes']['links']['related']
+        notes = _getData(url)
+        data = notes['data']  # data for page 1
+        pagination = notes['meta']['pagination']
+        # requesting all the pages
+        if pagination['current_page'] != pagination['total_pages'] and pagination['total_pages'] != 0:
+            # calculate how many page to download
+            pages_left = pagination['total_pages'] - pagination['current_page']
+            workers = min(pages_left, 5)  # max 5 threads
+            list_page_number = ['?page%5Bnumber%5D=' +
+                                str(x) for x in range(2, pages_left+2)]
+            urls = [url for x in range(2, pages_left+2)]
+            with _futures.ThreadPoolExecutor(workers) as executor:
+                res = executor.map(_getData, urls, list_page_number)
+            res = list(res)
+            append_data = [val for sublist in [data['data'] for data in res] for val in sublist]
+            data = data + append_data
+        return data
     
     def createExtensions(self,extension_id:str,settings:str=None,descriptor:str=None,**kwargs)-> object:
         """
