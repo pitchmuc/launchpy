@@ -6,7 +6,7 @@ authors = ["Julien <you@example.com>"]
 license = "GPL-3.0-or-later"
 
 [tool.poetry.dependencies]
-python = "3.7"
+python = "^3.7"
 requests = "^2.23.0"
 pyjwt = "^1.7.1"
 jwt = "^0.6.1"
