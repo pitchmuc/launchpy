@@ -108,7 +108,7 @@ def retrieveToken(verbose: bool = False, save: bool = False)->str:
             f.write(token)
     if verbose == True:
         print('token valid till : ' + _time.ctime(_time.time() + expire/1000))
-        print('token has been saved here : ' + Path.as_posix(Path.cwd()))
+        print(f"token has been saved here : {os.getcwd()}{os.sep}token.txt")
     return token
 
 
