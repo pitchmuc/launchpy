@@ -9,6 +9,7 @@ from collections import defaultdict as _defaultdict
 from concurrent import futures as _futures
 from copy import deepcopy as _deepcopy
 import re
+import os
 # Non standard libraries
 import pandas as _pd
 import requests as _requests
@@ -20,7 +21,6 @@ from pathlib import Path
 _org_id, _api_key, _tech_id, _pathToKey, _secret = "", "", "", "", "",
 _TokenEndpoint = "https://ims-na1.adobelogin.com/ims/exchange/jwt"
 _orga_admin = {'_org_admin', '_deployment_admin', '_support_admin'}
-_cwd = Path.as_posix(Path.cwd())
 _date_limit = 0
 _token = ''
 _header = {}
@@ -40,7 +40,8 @@ def createConfigFile(verbose: object = False)->None:
     with open('config_admin.json', 'w') as cf:
         cf.write(_json.dumps(json_data, indent=4))
     if verbose:
-        print(' file created at this location : '+_cwd + '/config_admin.json')
+        print(
+            f" file created at this location : {os.getcwd()}{os.sep}config_admin.json")
 
 
 def importConfigFile(file: str)-> None:
@@ -73,7 +74,10 @@ def retrieveToken(verbose: bool = False, save: bool = False)->str:
         verbose : OPTIONAL : Default False. If set to True, print information.
     """
     global _token
-    with open(_pathToKey, 'r') as f:
+    global _pathToKey
+    if _pathToKey.startswith('/'):
+        _pathToKey = "."+_pathToKey
+    with open(Path(_pathToKey), 'r') as f:
         private_key_unencrypted = f.read()
         header_jwt = {'cache-control': 'no-cache',
                       'content-type': 'application/x-www-form-urlencoded'}
