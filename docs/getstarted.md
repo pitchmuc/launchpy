@@ -19,8 +19,8 @@ or by doing the following command line: pip install launchpy
 Starting with the wrapper, you can import it and create a template for the JSON file that will store your credential to your Adobe IO account.
 
 ```python
-import launchpy as pl
-pl.createConfigFile()
+import launchpy as lp
+lp.createConfigFile()
 ```
 
 This will create a JSON and you will need to fill it with the information available in your adobe io account.
@@ -31,7 +31,7 @@ Once this is done, you can import the configuration file.
 I would recommend to store the config file and the key in the folder that you are using, however, the element will work if you are using correct path.
 
 ```python
-pl.importConfigFile('myconfig.json')
+lp.importConfigFile('myconfig.json')
 ```
 
 ## 5. Get Company ID(s) & retrieve properties
