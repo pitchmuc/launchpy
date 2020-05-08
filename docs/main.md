@@ -1,12 +1,12 @@
-# Pylaunch documentation
+# launchpy documentation
 
-This documentation will give you a view on the main different methods available on the pylaunch module.
-You can have more detail on the [datanalyst.info website](https://www.datanalyst.info/category/python/launch-api/?camp=referral~github~pylaunch-doc)
-The pylaunch wrapper is hosting several classes that helps you to manage Adobe Launch instances through API calls.
+This documentation will give you a view on the main different methods available on the launchpy module.
+You can have more detail on the [datanalyst.info website](https://www.datanalyst.info/category/python/launch-api/?camp=referral~github~launchpy-doc)
+The launchpy wrapper is hosting several classes that helps you to manage Adobe Launch instances through API calls.
 
 Here are the main ones:
 
-* [Core compoment](##1.-Core-library-methods) : directly available through the pylaunch module.
+* [Core compoment](##1.-Core-library-methods) : directly available through the launchpy module.
 * [Property](##2.-Property-class) : methods available for a Launch property.
 * [Library](##3.-Library-class) : methods to publish the changes
 * [Translator](##4.-Translator-class) : methods that helps you to copy paste elements from one property to another. This has become less useful as the UI is not reflecting this possibility.
@@ -15,7 +15,7 @@ if you want to have quick view on how to get started: [Get Started documentation
 
 ## 1. Core library methods
 
-The pylaunch module comes with some methods directly available from the core library of that module.
+The launchpy module comes with some methods directly available from the core library of that module.
 
 ### createConfigFile
 

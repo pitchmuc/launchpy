@@ -1,9 +1,9 @@
-# The pylaunch property class
+# The launchpy property class
 
-The pylaunch property class helds most of the methods that are being display in the Launch API documentation ().
+The launchpy property class helds most of the methods that are being display in the Launch API documentation ().
 The name of the class and instanciation method implies that these methods works on one property at a time.
 You can have several insances of property to apply changes to multiple properties.
-As usual more information can be found here : [datanalyst.info website](https://www.datanalyst.info/category/python/launch-api/?camp=referral~github~pylaunch-doc)
+As usual more information can be found here : [datanalyst.info website](https://www.datanalyst.info/category/python/launch-api/?camp=referral~github~launchpy-doc)
 
 The class is divided 4 types of methods:
 

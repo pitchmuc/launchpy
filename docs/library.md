@@ -9,13 +9,13 @@ The Library instance has several attributes that should help you understand at w
 
 There are 2 methods to create a library instance :
 
-1. You can create a library instance by using the Library class method from pylaunch, this method requires that you take one of the element returned by the getLibraries method.
+1. You can create a library instance by using the Library class method from launchpy, this method requires that you take one of the element returned by the getLibraries method.
 2. You can just create a library from scratch and, by default, the createLibrary method will return you an instance of the Library method.
 
 Code example:
 
 ```python
-import pylaunch
+import launchpy
 ### get a property instance as myProperty
 
 ## 1st method - from createLibrary method.
@@ -23,7 +23,7 @@ myLib = myProperty.createLibrary('myLib') ## will return a Library instance
 
 ## 2nd method
 all_libs = myProperty.getLibraries() ## will return a list
-myLib2 = pylaunch.Library(all_libs[0]) ## take the first one as example.
+myLib2 = launchpy.Library(all_libs[0]) ## take the first one as example.
 ```
 
 ## Library attributes

@@ -1,7 +1,7 @@
-# Pylaunch
+# Launchpy
 
 Python wrapper for the Adobe Launch API.
-This module is name pylaunch. You can actually copy it into your python3X/Lib folder so you can import it from anywhere in your module.
+This module is name launchpy. You can actually copy it into your python3X/Lib folder so you can import it from anywhere in your module.
 
 This module is built around 4 main parts:
 

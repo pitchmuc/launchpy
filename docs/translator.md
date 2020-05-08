@@ -1,6 +1,6 @@
-# The Translator class in plaunch
+# The Translator class in launchpy
 
-The translator class is not a required class or group of methods for the plaunch module to work. You may want to rewrite some of the functionalities for your own use. However, as I was developing and using this wrapper, it became obvious that a method which will help me to translate the id of the extension or the rule from each individual property into other property extension id or rule id would be very helpful.
+The translator class is not a required class or group of methods for the launchpy module to work. You may want to rewrite some of the functionalities for your own use. However, as I was developing and using this wrapper, it became obvious that a method which will help me to translate the id of the extension or the rule from each individual property into other property extension id or rule id would be very helpful.
 Nowadays the copy paste of element from one property is something that can be done in the UI so it doesn't require to go through all of this.
 
 However, we can clearly imaigne that this methods can help you automate some copy paste.
@@ -59,7 +59,7 @@ target_extensions = target_prop.getExtensions()
 base_rules = base_prop.getRules()
 target_rules = target_prop.getRules()
 
-translator = plaunch.Translator()
+translator = launchpy.Translator()
 translator.setBaseExtensions(base_extensions,'base')
 translator.extendExtensions(target_extensions,target_prop.name)
 
@@ -71,7 +71,7 @@ base_de = base_prop.getDataElements() ## get data elements
 ## trying to copy the setting from the base extension data element
 new_de = []
 for data_element in base_de:
-    new_de.append(plaunch.copySettings(data_element))
+    new_de.append(launchpy.copySettings(data_element))
 
 ## problem is that the id are having relationship to wrong extension id.
 
