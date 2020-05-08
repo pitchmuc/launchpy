@@ -9,7 +9,7 @@ Here are the main ones:
 * [Core compoment](##1.-Core-library-methods) : directly available through the launchpy module.
 * [Property](##2.-Property-class) : methods available for a Launch property.
 * [Library](##3.-Library-class) : methods to publish the changes
-* [Translator](##4.-Translator-class) : methods that helps you to copy paste elements from one property to another. This has become less useful as the UI is not reflecting this possibility.
+* [Translator](##4.-Translator-class) : methods that helps you to copy paste elements from one property to another. This has become less useful as the UI is now reflecting this possibility.
 
 if you want to have quick view on how to get started: [Get Started documentation](./getstarted.md)
 
