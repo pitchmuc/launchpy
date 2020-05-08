@@ -49,9 +49,20 @@ The delete methods delete the resources from the Launch instance.
 You can delete only one element at a time.
 The different delete methods are:
 
-* deleteEnvironment
+* deleteEnvironments
 * deleteExtension
 * deleteRule
-* getRuleComponents
-* getDataElements
-* getLibraries
+* deleteRuleComponent
+* deleteDataElement
+
+## Update methods
+
+As you can imagine the update methods enable you to update the different elements.
+Here is the list of the update methods available.
+
+* updateRuleComponents
+* updateDataElements
+* updateEnvironment
+* updateExtension
+
+[main documentation](./main.md)

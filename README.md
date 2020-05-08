@@ -10,13 +10,13 @@ This module is built around 4 main parts:
 - Managing Publishing Cycle (Library Class)
 - Tranlsator functionationality (Translator Class)
 
-# Get Stated
+## Get Stated
 
 A [get started guide](./docs/getting-started) has been created to explain the different functionality.
 You can find a more detail description functionalities at [datanalyst.info](https://datanalyst.info).
 A Jupyter notebook is also available in the github for demo.
 [Youtube tutorial](https://youtu.be/NY6E9cpJVco) (~40mn).
 
-# Main documentation
+## Main documentation
 
 Some documentation have been imported from the datanalyst website [here](./docs/main.md).

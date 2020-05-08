@@ -11,7 +11,7 @@ You can follow this [tutorial](https://www.datanalyst.info/python/adobe-io-user-
 
 ## 2. Download the library
 
-You can download the library from here: https://github.com/pitchmuc/pylaunch.git and install it directly in your python3X/Lib.
+You can download the library from [here](https://github.com/pitchmuc/pylaunch.git) and install it directly in your python3X/Lib.
 or by doing the following command line: pip install pylaunch
 
 ## 3. Setup a JSON with your information
@@ -38,7 +38,7 @@ pl.importConfigFile('myconfig.json')
 
 Once all of these setup steps are completed, you can start using the methods attached to pylaunch module.
 The first method is the _getCompanyId_, that will return you the company ID that is attached to your Adobe IO account.
-you will use the *company* to retrieve the different properties. 
+you will use the *company* to retrieve the different properties.
 
 ```python
 import pylaunch as pl
@@ -71,3 +71,5 @@ dataelements = mypropertyName.getDataElements()
 You can have a more complete view of the methods on the [property documentation](./property.md)
 
 you can also use the libray class to publish the changes, more details on the [library class](./library.md)
+
+Global documentation link [pylaunch starting page](./main.md).

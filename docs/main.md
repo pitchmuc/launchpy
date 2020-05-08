@@ -11,6 +11,8 @@ Here are the main ones:
 * [Library](##3.-Library-class) : methods to publish the changes
 * [Translator](##4.-Translator-class) : methods that helps you to copy paste elements from one property to another. This has become less useful as the UI is not reflecting this possibility.
 
+if you want to have quick view on how to get started: [Get Started documentation](./getstarted.md)
+
 ## 1. Core library methods
 
 The pylaunch module comes with some methods directly available from the core library of that module.
@@ -109,10 +111,9 @@ It takes 2 arguments:
 * element : REQUIRED : element you want to get the attributes from
 * save : OPTIONAL : bool, if you want to save the setting in a JS or JSON file, set it to true. (default False)
 
-
 ### duplicateAttributes
 
-This method is copy pasting the setting of one element to another one. You need to provide the elements as a list (for the base element and the target elements). 
+This method is copy pasting the setting of one element to another one. You need to provide the elements as a list (for the base element and the target elements).
 However it can be a list of one element.
 It will copy the base element setting and paste it to the target element. It can also do that for other attributes than settings. It is set through a kwargs.
 It tales 2 arguments:
@@ -134,6 +135,11 @@ The property methods can be found on the linked documentation [here](./property.
 ## 3. Library class
 
 The library methods helps you to publish the different changes that you have made on your Launch instances.
-
+You need to instanciate a class for managing the different state of your library process (Approve / Build / Reject).
+Documentation can be found [here](./library.md)
 
 ## 4. Translator class
+
+The translator class is helping to translate extension or rule ID from one property to another.
+However, due to the possibility of Launch to realize this copy paste directly in the UI now, this class is less relevant.
+You can still access documentation of this class methods [here](./translator.md).
