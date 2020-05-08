@@ -12,7 +12,7 @@ This module is built around 4 main parts:
 
 ## Get Stated
 
-A [get started guide](./docs/getstarted) has been created to explain the different functionality.
+A [get started guide](./docs/getstarted.md) has been created to explain the different functionality.
 You can find a more detail description functionalities at [datanalyst.info](https://datanalyst.info).
 A Jupyter notebook is also available in the github for demo.
 [Youtube tutorial](https://youtu.be/NY6E9cpJVco) (~40mn).
