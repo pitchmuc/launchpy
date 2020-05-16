@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="launchpy",  # Replace with your own username
-    version="0.0.7",
+    version="0.1.0",
     author="Julien Piccini",
     author_email="piccini.julien@gmail.com",
     description="Python wrapper around the Adobe Experience Launch API.",
@@ -13,7 +13,9 @@ setuptools.setup(
     long_description_content_type="text/markdown",
     url="https://github.com/pitchmuc/pylaunch",
     packages=setuptools.find_packages(),
+    keywords=['adobe', 'Launch', 'API', 'python', 'Tag Manager'],
     classifiers=[
+        "Intended Audience :: Developers",
         "Programming Language :: Python :: 3",
         "Operating System :: OS Independent",
         "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
@@ -24,5 +26,5 @@ setuptools.setup(
     ],
     python_requires='>=3.6',
     install_requires=['pandas', "requests",
-                      "PyJWT", "pathlib2", "PyJWT[crypto]"],
+                      "PyJWT", "pathlib2", "pathlib", "PyJWT[crypto]"],
 )
