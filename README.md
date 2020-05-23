@@ -14,9 +14,9 @@ This module is built around 4 main parts:
 
 A [get started guide](./docs/getstarted.md) has been created to explain the different functionality.
 You can find a more detail description functionalities at [datanalyst.info](https://datanalyst.info).
-A Jupyter notebook is also available in the github for demo.
-[Youtube tutorial](https://youtu.be/NY6E9cpJVco) (~40mn).
+
+~~A Jupyter notebook is also available in the github for demo.~~ To be updated.
 
 ## Main documentation
 
-Some documentation have been imported from the datanalyst website [here](./docs/main.md).
+Most of the documentation has been imported from the datanalyst website [here](./docs/main.md).

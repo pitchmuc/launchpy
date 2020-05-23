@@ -120,8 +120,6 @@ def _checkToken(func):
             return func(*args, **kwargs)
     return checking  # return the function as object
 
-###
-
 
 def _updateHeader(token: str)->None:
     """ update the header when new token is generated"""
@@ -147,11 +145,8 @@ _getAuditEvents = '/audit_events'
 
 @_checkToken
 def _getData(url: str, params: dict = None, *args: str)->object:
-    try:  # try to set pagination if exists
-        url = url + args[0]
-    except:
-        url = url
     res = _requests.get(url, headers=_header, params=params)
+    # print(res.request.url)
     try:
         infos = res.json()
     except:
@@ -162,7 +157,7 @@ def _getData(url: str, params: dict = None, *args: str)->object:
 @_checkToken
 def _postData(url: str, obj: dict, **kwargs)->object:
     res = _requests.post(url, headers=_header, data=_json.dumps(obj))
-    if kwargs.get('print') == True:
+    if kwargs.get('verbose') == True:
         print(res.text)
     try:
         infos = res.json()
@@ -174,7 +169,7 @@ def _postData(url: str, obj: dict, **kwargs)->object:
 @_checkToken
 def _patchData(url: str, obj: dict, **kwargs)->object:
     res = _requests.patch(url, headers=_header, data=_json.dumps(obj))
-    if kwargs.get('print') == True:
+    if kwargs.get('verbose') == True:
         print(res.text)
     try:
         infos = res.json()
@@ -186,7 +181,7 @@ def _patchData(url: str, obj: dict, **kwargs)->object:
 @_checkToken
 def _putData(url: str, obj: dict, **kwargs)->object:
     res = _requests.put(url, headers=_header, data=_json.dumps(obj))
-    if kwargs.get('print') == True:
+    if kwargs.get('verbose') == True:
         print(res.text)
     try:
         infos = res.json()
@@ -198,7 +193,7 @@ def _putData(url: str, obj: dict, **kwargs)->object:
 @_checkToken
 def _deleteData(url: str, **kwargs)->object:
     res = _requests.delete(url, headers=_header)
-    if kwargs.get('print') == True:
+    if kwargs.get('verbose') == True:
         print(res.text)
     return res.status_code
 
@@ -235,12 +230,13 @@ def getProperties(companyID: str)->object:
         # calculate how many page to download
         pages_left = pagination['total_pages'] - pagination['current_page']
         workers = min(pages_left, 5)  # max 5 threads
-        list_page_number = [
-            '?page%5Bnumber%5D='+str(x) for x in range(2, pages_left+2)]  # starting page 2
+        list_page_number = [{
+            'page[number]': str(x)} for x in range(2, pages_left+2)]  # starting page 2
         urls = [_endpoint+_getProperties.format(_company_id=companyID)
                 for x in range(2, pages_left+2)]
         with _futures.ThreadPoolExecutor(workers) as executor:
-            res = executor.map(_getData, urls, list_page_number)
+            res = executor.map(lambda x, y: _getData(
+                x, params=y), urls, list_page_number)
         res = list(res)
         append_data = [val for sublist in [data['data'] for data in res]
                        for val in sublist]  # flatten list of list
@@ -370,8 +366,8 @@ class Property:
                 pages_left = pagination['total_pages'] - \
                     pagination['current_page']
                 workers = min(pages_left, 5)  # max 5 threads
-                list_page_number = ['?page%5Bnumber%5D=' +
-                                    str(x) for x in range(2, pages_left+2)]
+                list_page_number = [
+                    {'page[number]': str(x)} for x in range(2, pages_left+2)]
                 urls = [self._Extensions for x in range(2, pages_left+2)]
                 with _futures.ThreadPoolExecutor(workers) as executor:
                     res = executor.map(_getData, urls, list_page_number)
@@ -457,11 +453,12 @@ class Property:
                 pages_left = pagination['total_pages'] - \
                     pagination['current_page']
                 workers = min(pages_left, 5)  # max 5 threads
-                list_page_number = ['?page%5Bnumber%5D=' +
-                                    str(x) for x in range(2, pages_left+2)]
+                list_page_number = [
+                    {'page[number]': str(x)} for x in range(2, pages_left+2)]
                 urls = [self._Rules for x in range(2, pages_left+2)]
                 with _futures.ThreadPoolExecutor(workers) as executor:
-                    res = executor.map(_getData, urls, list_page_number)
+                    res = executor.map(lambda x, y: _getData(
+                        x, params=y), urls, list_page_number)
                 res = list(res)
                 append_data = [val for sublist in [data['data']
                                                    for data in res] for val in sublist]
@@ -484,20 +481,18 @@ class Property:
             published : OPTIONAL : boolean if search for published rules or not
             dirty : OPTIONAL : boolean if search for dirty rules or not
         """
-        filters = []
+        filters = {}
         if name != None:
-            filters.append('filter%5Bname%5D=CONTAINS%20'+name)
+            filters['filter[name]=CONTAINS '] = f"CONTAINS {name}"
         if dirty != None:
-            filters.append('filter%5Bdirty%5D=EQ%20'+str(dirty).lower())
+            filters['filter[dirty]'] = f"EQ {str(dirty).lower()}"
         if enabled != None:
-            filters.append('filter%5Benabled%5D=EQ%20'+str(enabled).lower())
+            filters['filter[enabled]'] = f"EQ {str(enabled).lower()}"
         if published != None:
-            filters.append('filter%5Bpublished%5D=EQ%20' +
-                           str(published).lower())
+            filters['filter[published]'] = f"EQ {str(published).lower()}"
         if 'created_at' in kwargs:
             pass  # documentation unclear on how to handle it
-        parameters = '?'+'&'.join(filters)
-        rules = _getData(self._Rules, parameters)
+        rules = _getData(self._Rules, params=filters)
         data = rules['data']  # skip meta for now
         pagination = rules['meta']['pagination']
         # requesting all the pages
@@ -505,11 +500,12 @@ class Property:
             # calculate how many page to download
             pages_left = pagination['total_pages'] - pagination['current_page']
             workers = min(pages_left, 5)  # max 5 threads
-            list_parameters = [parameters+'&page%5Bnumber%5D=' +
-                               str(x) for x in range(2, pages_left+2)]
+            list_parameters = [{'&page[number]':
+                                str(x), **filters} for x in range(2, pages_left+2)]
             urls = [self._Rules for x in range(2, pages_left+2)]
             with _futures.ThreadPoolExecutor(workers) as executor:
-                res = executor.map(_getData, urls, list_parameters)
+                res = executor.map(lambda x, y: _getData(
+                    x, params=y), urls, list_parameters)
             res = list(res)
             append_data = [val for sublist in [data['data']
                                                for data in res] for val in sublist]
@@ -521,17 +517,16 @@ class Property:
             }
         return data
 
-    @_checkToken
     def getRuleComponents(self)->dict:
         """
         Returns a list of all the ruleComponents gathered in the ruleComponents attributes.
-        You must have retrieved the rules before using this method (getRules()).
+        You must have retrieved the rules before using this method (getRules()), otherwise, the method will also realize it and it will take longer, without saving the rules.
         It will also enrich the RuleCompoment JSON data with the rule_name attached to it. 
         """
         ruleComponents = self.ruleComponents
         if len(ruleComponents) == 0:
-            raise AttributeError(
-                'Rules should have been retrieved in order to retrieve Rule Component.\n {}.ruleComponent is empty'.format(self.name))
+            rules = self.getRules()
+            ruleComponents = self.ruleComponents
         list_urls = [ruleComponents[_id]['url'] for _id in ruleComponents]
         names = [ruleComponents[_id]['name'] for _id in ruleComponents]
         ids = list(ruleComponents.keys())
@@ -540,13 +535,15 @@ class Property:
 
         def request_data(url, header, name, ids):
             rule_component = _requests.get(url, headers=_header)
+            # print(rule_component.request.url)
             data = rule_component.json()['data']
             for element in data:
                 element['rule_name'] = name
                 element['rule_id'] = ids
             return data
         with _futures.ThreadPoolExecutor(workers) as executor:
-            res = executor.map(request_data, list_urls, headers, names, ids)
+            res = executor.map(lambda x, y, z, a: request_data(
+                x, header=y, name=z, ids=a), list_urls, headers, names, ids)
         list_data = list(res)
         expanded_list = []
         for element in list_data:
@@ -572,11 +569,12 @@ class Property:
                 pages_left = pagination['total_pages'] - \
                     pagination['current_page']
                 workers = min(pages_left, 5)  # max 5 threads
-                list_page_number = ['?page%5Bnumber%5D=' +
-                                    str(x) for x in range(2, pages_left+2)]
+                list_page_number = [{'page[number]':
+                                     str(x)} for x in range(2, pages_left+2)]
                 urls = [self._DataElement for x in range(2, pages_left+2)]
                 with _futures.ThreadPoolExecutor(workers) as executor:
-                    res = executor.map(_getData, urls, list_page_number)
+                    res = executor.map(lambda x, y: _getData(
+                        x, params=y), urls, list_page_number)
                 res = list(res)
                 append_data = [val for sublist in [data['data']
                                                    for data in res] for val in sublist]
@@ -594,20 +592,19 @@ class Property:
             published : OPTIONAL : boolean if search for published rules or not
             dirty : OPTIONAL : boolean if search for dirty rules or not
         """
-        filters = []
+        filters = {}
         if name != None:
-            filters.append('filter%5Bname%5D=CONTAINS%20'+name)
+            filters['filter[name]'] = f"CONTAINS {name}"
         if dirty != None:
-            filters.append('filter%5Bdirty%5D=EQ%20'+str(dirty).lower())
+            filters['filter[dirty]'] = f"EQ {str(dirty).lower()}"
         if enabled != None:
-            filters.append('filter%5Benabled%5D=EQ%20'+str(enabled).lower())
+            filters['filter[enabled]'] = f"EQ {str(enabled).lower()}"
         if published != None:
-            filters.append('filter%5Bpublished%5D=EQ%20' +
-                           str(published).lower())
+            filters['filter[published]'] = f"EQ {str(published).lower()}"
         if 'created_at' in kwargs:
             pass  # documentation unclear on how to handle it
-        parameters = '?'+'&'.join(filters)
-        dataElements = _getData(self._DataElement, parameters)
+        parameters = {**filters}
+        dataElements = _getData(self._DataElement, params=parameters)
         data = dataElements['data']  # skip meta for now
         pagination = dataElements['meta']['pagination']
         # requesting all the pages
@@ -615,23 +612,37 @@ class Property:
             # calculate how many page to download
             pages_left = pagination['total_pages'] - pagination['current_page']
             workers = min(pages_left, 5)  # max 5 threads
-            list_parameters = [parameters+'&page%5Bnumber%5D=' +
-                               str(x) for x in range(2, pages_left+2)]
+            list_parameters = [{'page[number]': str(
+                x), **parameters} for x in range(2, pages_left+2)]
             urls = [self._Rules for x in range(2, pages_left+2)]
             with _futures.ThreadPoolExecutor(workers) as executor:
-                res = executor.map(_getData, urls, list_parameters)
+                res = executor.map(lambda x, y: _getData(
+                    x, params=y), urls, list_parameters)
             res = list(res)
             append_data = [val for sublist in [data['data']
                                                for data in res] for val in sublist]
             data = data + append_data
         return data
 
-    def getLibraries(self)->object:
+    def getLibraries(self, state: str = None)->object:
         """
         Retrieve libraries of the property.
         Returns a list.
+        Arguments: 
+            state : OPTIONAL : state of the library.
+            Possible values:
+                - development
+                - submitted
+                - approved
+                - rejected
+                - published
         """
-        libs = _getData(self._Libraries)
+        params = {}
+        if state is not None:
+            if state not in ['development', "submitted", "approved", "rejected", "published"]:
+                raise KeyError("State provided didn't match possible state.")
+            params['filter[state]'] = f"EQ {state}"
+        libs = _getData(self._Libraries, params=params)
         data = libs['data']  # dat for page 1
         pagination = libs['meta']['pagination']
         # requesting all the pages
@@ -639,11 +650,12 @@ class Property:
             # calculate how many page to download
             pages_left = pagination['total_pages'] - pagination['current_page']
             workers = min(pages_left, 5)  # max 5 threads
-            list_page_number = ['?page%5Bnumber%5D=' +
-                                str(x) for x in range(2, pages_left+2)]
-            urls = [self._Rules for x in range(2, pages_left+2)]
+            list_page_number = [
+                {'page[number]': str(x), **params} for x in range(2, pages_left+2)]
+            urls = [self._Libraries for x in range(2, pages_left+2)]
             with _futures.ThreadPoolExecutor(workers) as executor:
-                res = executor.map(_getData, urls, list_page_number)
+                res = executor.map(lambda x, y: _getData(
+                    x, params=y), urls, list_page_number)
             res = list(res)
             append_data = [val for sublist in [data['data']
                                                for data in res] for val in sublist]
@@ -672,11 +684,12 @@ class Property:
             # calculate how many page to download
             pages_left = pagination['total_pages'] - pagination['current_page']
             workers = min(pages_left, 5)  # max 5 threads
-            list_page_number = ['?page%5Bnumber%5D=' +
-                                str(x) for x in range(2, pages_left+2)]
+            list_page_number = [
+                {'page[number]': str(x)} for x in range(2, pages_left+2)]
             urls = [url for x in range(2, pages_left+2)]
             with _futures.ThreadPoolExecutor(workers) as executor:
-                res = executor.map(_getData, urls, list_page_number)
+                res = executor.map(lambda x, y: _getData(
+                    x, params=y), urls, list_page_number)
             res = list(res)
             append_data = [val for sublist in [data['data']
                                                for data in res] for val in sublist]
@@ -1156,11 +1169,6 @@ class Property:
             """
             fills the different dictionaries with where informations are held. 
             """
-#            global dict_eVars
-#            global dict_props
-#            global dict_events
-#            global dict_value_eVars
-#            global dict_value_props
             if element['type'] == "rule_components":
                 name = element['rule_name']
             elif element['type'] == "extensions":

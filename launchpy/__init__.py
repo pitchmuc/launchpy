@@ -3,5 +3,5 @@
 May  15 12:04:49 2019
 @author: Julien Piccini
 """
-__version__ = "0.1.0"
+__version__ = "0.1.1"
 from .launchpy import *
