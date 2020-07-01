@@ -5,6 +5,7 @@ from concurrent import futures as _futures
 from copy import deepcopy as _deepcopy
 import re
 import os
+import datetime
 # Non standard libraries
 import pandas as _pd
 import requests as _requests
@@ -254,7 +255,7 @@ def getAuditEvents(page_size: int = 50, nb_page: int = 10, **kwargs)->list:
         **kwargs option
         data : data being passed from one recursion to another. 
         verbose : if want to follow up the completion (bool)
-
+        updated_at : the past date you want to stop iterating. Date to be in datetime isoformat.
     """
     params = {'include': 'property', 'page[size]': '50'}
     params['page[number]'] = kwargs.get('page_nb', 1)
@@ -262,14 +263,23 @@ def getAuditEvents(page_size: int = 50, nb_page: int = 10, **kwargs)->list:
         params['page[size]'] = page_size
     events = _getData(_endpoint+_getAuditEvents, params=params)
     data = events['data']
+    last_date = datetime.datetime.fromisoformat(
+        data[-1]['attributes']['updated_at'][:-1])
     curr_page = events['meta']['pagination']['current_page']
+    if kwargs.get('updated_at', False):
+        date_check = datetime.datetime.fromisoformat(kwargs.get('updated_at'))
+    else:
+        date_check = last_date  # ensure true in that condition if no date given
     if kwargs.get('verbose', False):
         if curr_page % 10 == 0 or curr_page == 1:
             print(f'current page {curr_page}')
         print(f'% completion : {curr_page / nb_page*100}%')
-    if curr_page < events['meta']['pagination']['total_pages'] and curr_page < nb_page:
+    # checking if we need to pursue iteration related to update date.
+    if curr_page == nb_page and last_date > date_check:
+        nb_page += 1
+    if (curr_page < events['meta']['pagination']['total_pages'] and curr_page < nb_page):
         data += getAuditEvents(page_size=page_size, nb_page=nb_page,
-                               page_nb=curr_page+1, data=data, verbose=kwargs.get('verbose', False))
+                               page_nb=curr_page+1, data=data, verbose=kwargs.get('verbose', False), updated_at=kwargs.get('updated_at', False))
     return data
 
 
@@ -517,16 +527,29 @@ class Property:
             }
         return data
 
-    def getRuleComponents(self)->dict:
+    def getRuleComponents(self, **kwargs)->dict:
         """
         Returns a list of all the ruleComponents gathered in the ruleComponents attributes.
         You must have retrieved the rules before using this method (getRules()), otherwise, the method will also realize it and it will take longer, without saving the rules.
-        It will also enrich the RuleCompoment JSON data with the rule_name attached to it. 
+        It will also enrich the RuleCompoment JSON data with the rule_name attached to it.
+        Possible kwargs:
+            rule_ids : list of rule ids to be used in order to retrieve ruleComponents
+            rule_names : list of rule names to be used in order to retrieve ruleComponents
         """
         ruleComponents = self.ruleComponents
         if len(ruleComponents) == 0:
             rules = self.getRules()
             ruleComponents = self.ruleComponents
+        if kwargs.get('rule_ids', False):
+            if type(kwargs["rule_ids"]) == str:
+                kwargs["rule_ids"] = list(kwargs["rule_ids"])
+            ruleComponents = {rule: {'name': ruleComponents[rule]['name'],
+                                     'url': ruleComponents[rule]['url']} for rule in ruleComponents if rule in kwargs["rule_ids"]}
+        if kwargs.get('rule_names', False):
+            if type(kwargs["rule_names"]) == str:
+                kwargs["rule_names"] = list(kwargs["rule_names"])
+            ruleComponents = {rule: {'name': ruleComponents[rule]['name'],
+                                     'url': ruleComponents[rule]['url']} for rule in ruleComponents if ruleComponents[rule]['name'] in kwargs["rule_names"]}
         list_urls = [ruleComponents[_id]['url'] for _id in ruleComponents]
         names = [ruleComponents[_id]['name'] for _id in ruleComponents]
         ids = list(ruleComponents.keys())
