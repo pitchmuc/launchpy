@@ -18,8 +18,10 @@ _org_id, _api_key, _tech_id, _pathToKey, _secret = "", "", "", "", "",
 _TokenEndpoint = "https://ims-na1.adobelogin.com/ims/exchange/jwt"
 _orga_admin = {'_org_admin', '_deployment_admin', '_support_admin'}
 _date_limit = 0
-_token = ''
-_header = {}
+global token
+token = ''
+global header
+header = {}
 
 
 def createConfigFile(verbose: object = False)->None:
@@ -63,13 +65,13 @@ def importConfigFile(file: str)-> None:
 _endpoint = 'https://reactor.adobe.io/'
 
 
-def retrieveToken(verbose: bool = False, save: bool = False)->str:
+def retrieveToken(verbose: bool = False, save: bool = False, params: dict = None)->str:
     """ Retrieve the token by using the information provided by the user during the import importConfigFile function. 
 
     Argument : 
         verbose : OPTIONAL : Default False. If set to True, print information.
     """
-    global _token
+    global token
     global _pathToKey
     if _pathToKey.startswith('/'):
         _pathToKey = "."+_pathToKey
@@ -114,27 +116,27 @@ def _checkToken(func):
         global _date_limit
         now = _time.time()
         if now > _date_limit - 1000:
-            global _token
-            _token = retrieveToken(*args, **kwargs)
+            global token
+            token = retrieveToken(*args, **kwargs)
             return func(*args, **kwargs)
         else:  # need to return the function for decorator to return something
             return func(*args, **kwargs)
     return checking  # return the function as object
 
 
-def _updateHeader(token: str)->None:
+def _updateHeader(token_str: str)->None:
     """ update the header when new token is generated"""
-    global _header
+    global header
     global _api_key
     global _org_id
-    global _token
-    _token = token
-    _header = {"Accept": "application/vnd.api+json;revision=1",
-               "Content-Type": "application/vnd.api+json",
-               "Authorization": "Bearer "+token,
-               "X-Api-Key": _api_key,
-               "X-Gw-Ims-Org-Id": _org_id
-               }
+    global token
+    token = token_str
+    header = {"Accept": "application/vnd.api+json;revision=1",
+              "Content-Type": "application/vnd.api+json",
+              "Authorization": "Bearer "+token,
+              "X-Api-Key": _api_key,
+              "X-Gw-Ims-Org-Id": _org_id
+              }
 
 
 # Endpoint
@@ -145,11 +147,11 @@ _getAuditEvents = '/audit_events'
 
 
 @_checkToken
-def _getData(url: str, params: dict = None, *args: str)->object:
-    res = _requests.get(url, headers=_header, params=params)
-    # print(res.request.url)
+def _getData(url: str, params: dict = None, *args: str, **kwargs)->object:
+    res = _requests.get(url, headers=header, params=params)
     try:
         infos = res.json()
+        # print(res.status_code)
     except:
         infos = res.text
     return infos
@@ -157,7 +159,7 @@ def _getData(url: str, params: dict = None, *args: str)->object:
 
 @_checkToken
 def _postData(url: str, obj: dict, **kwargs)->object:
-    res = _requests.post(url, headers=_header, data=_json.dumps(obj))
+    res = _requests.post(url, headers=header, data=_json.dumps(obj))
     if kwargs.get('verbose') == True:
         print(res.text)
     try:
@@ -169,7 +171,7 @@ def _postData(url: str, obj: dict, **kwargs)->object:
 
 @_checkToken
 def _patchData(url: str, obj: dict, **kwargs)->object:
-    res = _requests.patch(url, headers=_header, data=_json.dumps(obj))
+    res = _requests.patch(url, headers=header, data=_json.dumps(obj))
     if kwargs.get('verbose') == True:
         print(res.text)
     try:
@@ -181,7 +183,7 @@ def _patchData(url: str, obj: dict, **kwargs)->object:
 
 @_checkToken
 def _putData(url: str, obj: dict, **kwargs)->object:
-    res = _requests.put(url, headers=_header, data=_json.dumps(obj))
+    res = _requests.put(url, headers=header, data=_json.dumps(obj))
     if kwargs.get('verbose') == True:
         print(res.text)
     try:
@@ -193,15 +195,13 @@ def _putData(url: str, obj: dict, **kwargs)->object:
 
 @_checkToken
 def _deleteData(url: str, **kwargs)->object:
-    res = _requests.delete(url, headers=_header)
+    res = _requests.delete(url, headers=header)
     if kwargs.get('verbose') == True:
         print(res.text)
     return res.status_code
 
 #profile_response = _requests.get(_endpoint+getProfile,headers=header)
 #json_profile = profile_response.json()
-#
-#
 
 
 @_checkToken
@@ -209,7 +209,7 @@ def getCompanyId()->object:
     """
     Retrieve the company id for later call for the properties
     """
-    companies = _requests.get(_endpoint+_getCompanies, headers=_header)
+    companies = _requests.get(_endpoint+_getCompanies, headers=header)
     companyID = companies.json()['data'][0]['id']
     return companyID
 
@@ -249,13 +249,13 @@ def getAuditEvents(page_size: int = 50, nb_page: int = 10, **kwargs)->list:
     """
     Retrieve the different events that happened inside a Launch property.
     Arguments :
-        page_size : OPTIONAL : How many result per page. (default 50)
+        page_size : OPTIONAL : How many result per page. (default 50 - max 100)
         nb_page : OPTIONAL : How many page to return. (default 10)
         type_of : OPTIONAL : event to look for.
         **kwargs option
         data : data being passed from one recursion to another. 
         verbose : if want to follow up the completion (bool)
-        updated_at : the past date you want to stop iterating. Date to be in datetime isoformat.
+        end_date : the past date you want to stop iterating. Date to be in datetime isoformat.
     """
     params = {'include': 'property', 'page[size]': '50'}
     params['page[number]'] = kwargs.get('page_nb', 1)
@@ -266,8 +266,8 @@ def getAuditEvents(page_size: int = 50, nb_page: int = 10, **kwargs)->list:
     last_date = datetime.datetime.fromisoformat(
         data[-1]['attributes']['updated_at'][:-1])
     curr_page = events['meta']['pagination']['current_page']
-    if kwargs.get('updated_at', False):
-        date_check = datetime.datetime.fromisoformat(kwargs.get('updated_at'))
+    if kwargs.get('end_date', False):
+        date_check = datetime.datetime.fromisoformat(kwargs.get('end_date'))
     else:
         date_check = last_date  # ensure true in that condition if no date given
     if kwargs.get('verbose', False):
@@ -277,10 +277,27 @@ def getAuditEvents(page_size: int = 50, nb_page: int = 10, **kwargs)->list:
     # checking if we need to pursue iteration related to update date.
     if curr_page == nb_page and last_date > date_check:
         nb_page += 1
-    if (curr_page < events['meta']['pagination']['total_pages'] and curr_page < nb_page):
-        data += getAuditEvents(page_size=page_size, nb_page=nb_page,
-                               page_nb=curr_page+1, data=data, verbose=kwargs.get('verbose', False), updated_at=kwargs.get('updated_at', False))
+    if curr_page == 100:
+        print('You have reach maximum limit of the API (100 pages of 100 results)')
+        return data
+    else:
+        if (curr_page < events['meta']['pagination']['total_pages'] and curr_page < nb_page):
+            data += getAuditEvents(page_size=page_size, nb_page=nb_page,
+                                   page_nb=curr_page+1, verbose=kwargs.get('verbose', False), updated_at=kwargs.get('updated_at', False))
     return data
+
+
+def getRessource(res_url: str = None, params: dict = None):
+    """
+    Enable you to request a specific resource from Launch API.
+    Arguments:
+        res_url : REQUIRED : Resource URL to request
+        params : OPTIONAL : If you want to pass any parameter.
+    """
+    if res_url is None:
+        raise Exception("You must provide a resource url")
+    res = _getData(res_url, header=header, params=params)
+    return res
 
 
 class Property:
@@ -324,6 +341,7 @@ class Property:
         self._Environments = data['links']['environments']
         self._Libraries = data['relationships']['libraries']['links']['related']
         self.ruleComponents = {}
+        self.header = _deepcopy(header)
 
     def __repr__(self)-> dict:
         return _json.dumps(self.dict, indent=4)
@@ -338,7 +356,8 @@ class Property:
         """
         uri = '/extension_packages'
         params = {'filter[name]': 'EQ '+str(ext_name)}
-        res_ext = _requests.get(_endpoint+uri, params=params, headers=_header)
+        res_ext = _requests.get(
+            _endpoint+uri, params=params, headers=header)
         data = res_ext.json()['data'][0]
         extension_id = data['id']
         if verbose:
@@ -444,7 +463,7 @@ class Property:
                 }
                 }
         res = _requests.patch(
-            _endpoint+'/extensions/'+str(extension_id), headers=_header, data=_json.dumps(data))
+            _endpoint+'/extensions/'+str(extension_id), headers=header, data=_json.dumps(data))
         upgrade = res.json()
         return upgrade
 
@@ -553,11 +572,11 @@ class Property:
         list_urls = [ruleComponents[_id]['url'] for _id in ruleComponents]
         names = [ruleComponents[_id]['name'] for _id in ruleComponents]
         ids = list(ruleComponents.keys())
-        headers = [_header for nb in range(len(list_urls))]
+        headers = [header for nb in range(len(list_urls))]
         workers = min((len(list_urls), 5))
 
         def request_data(url, header, name, ids):
-            rule_component = _requests.get(url, headers=_header)
+            rule_component = _requests.get(url, headers=header)
             # print(rule_component.request.url)
             data = rule_component.json()['data']
             for element in data:
@@ -1860,7 +1879,7 @@ class Library:
     @_checkToken
     def _setEnvironment(self, obj: dict)->None:
         new_env = _requests.patch(_endpoint+'/libraries/'+self.id +
-                                  '/relationships/environment', headers=_header, data=_json.dumps(obj))
+                                  '/relationships/environment', headers=header, data=_json.dumps(obj))
         res = new_env.json()
         return res
 
@@ -1870,7 +1889,7 @@ class Library:
         Remove environment
         """
         new_env = _requests.get(
-            _endpoint+'/libraries/'+self.id+'/relationships/environment', headers=_header)
+            _endpoint+'/libraries/'+self.id+'/relationships/environment', headers=header)
         res = new_env.json()
         return res
 
@@ -1916,7 +1935,7 @@ class Library:
             status = self._setEnvironment(obj)
         if 'error' in status.keys():
             raise SystemExit('Issue setting environment')
-        build = _requests.post(self._Builds, headers=_header)
+        build = _requests.post(self._Builds, headers=header)
         build_json = build.json()
         build_id = build_json['data']['id']
         build_status = build_json['data']['attributes']['status']
