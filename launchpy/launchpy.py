@@ -11,17 +11,11 @@ import pandas as _pd
 import requests as _requests
 import jwt as _jwt
 from pathlib import Path
-
+from launchpy import config
 
 # Set up default values
-_org_id, _api_key, _tech_id, _pathToKey, _secret = "", "", "", "", "",
 _TokenEndpoint = "https://ims-na1.adobelogin.com/ims/exchange/jwt"
 _orga_admin = {'_org_admin', '_deployment_admin', '_support_admin'}
-_date_limit = 0
-global token
-token = ''
-global header
-header = {}
 
 
 def createConfigFile(verbose: object = False)->None:
@@ -46,23 +40,13 @@ def importConfigFile(file: str)-> None:
     """
     This function will read the 'config_admin.json' to retrieve the information to be used by this module. 
     """
-    global _org_id
-    global _api_key
-    global _tech_id
-    global _pathToKey
-    global _secret
-    global _endpoint
     with open(file, 'r') as file:
         f = _json.load(file)
-        _org_id = f['org_id']
-        _api_key = f['api_key']
-        _tech_id = f['tech_id']
-        _secret = f['secret']
-        _pathToKey = f['pathToKey']
-
-
-# Launch API Endpoint
-_endpoint = 'https://reactor.adobe.io/'
+        config.config["org_id"] = f['org_id']
+        config.config["api_key"] = f['api_key']
+        config.config["tech_id"] = f['tech_id']
+        config.config["secret"] = f['secret']
+        config.config["pathToKey"] = f['pathToKey']
 
 
 def retrieveToken(verbose: bool = False, save: bool = False, params: dict = None)->str:
@@ -71,27 +55,26 @@ def retrieveToken(verbose: bool = False, save: bool = False, params: dict = None
     Argument : 
         verbose : OPTIONAL : Default False. If set to True, print information.
     """
-    global token
-    global _pathToKey
-    if _pathToKey.startswith('/'):
-        _pathToKey = "."+_pathToKey
-    with open(Path(_pathToKey), 'r') as f:
+
+    if config.config['pathToKey'].startswith('/'):
+        config.config['pathToKey'] = "."+config.config['pathToKey']
+    with open(Path(config.config['pathToKey']), 'r') as f:
         private_key_unencrypted = f.read()
         header_jwt = {'cache-control': 'no-cache',
                       'content-type': 'application/x-www-form-urlencoded'}
     jwtPayload = {
         # Expiration set to 24 hours
         "exp": round(24*60*60 + int(_time.time())),
-        "iss": _org_id,  # org_id
-        "sub": _tech_id,  # technical_account_id
+        "iss": config.config['org_id'],
+        "sub": config.config['tech_id'],
         "https://ims-na1.adobelogin.com/s/ent_reactor_admin_sdk": True,
-        "aud": "https://ims-na1.adobelogin.com/c/"+_api_key
+        "aud": "https://ims-na1.adobelogin.com/c/"+config.config["api_key"]
     }
     encoded_jwt = _jwt.encode(
         jwtPayload, private_key_unencrypted, algorithm='RS256')  # working algorithm
     payload = {
-        "client_id": _api_key,
-        "client_secret": _secret,
+        "client_id": config.config['api_key'],
+        "client_secret": config.config['secret'],
         "jwt_token": encoded_jwt.decode("utf-8")
     }
     response = _requests.post(_TokenEndpoint, headers=header_jwt, data=payload)
@@ -99,8 +82,7 @@ def retrieveToken(verbose: bool = False, save: bool = False, params: dict = None
     token = json_response['access_token']
     _updateHeader(token)
     expire = json_response['expires_in']
-    global _date_limit  # getting the scope right
-    _date_limit = _time.time() + expire/1000 - 500  # end of time for the token
+    config.date_limit = _time.time() + expire/1000 - 500  # end of time for the token
     if save:
         with open('token.txt', 'w') as f:  # save the token
             f.write(token)
@@ -113,11 +95,9 @@ def retrieveToken(verbose: bool = False, save: bool = False, params: dict = None
 def _checkToken(func):
     """    decorator that checks that the token is valid before calling the API    """
     def checking(*args, **kwargs):  # if function is not wrapped, will fire
-        global _date_limit
         now = _time.time()
-        if now > _date_limit - 1000:
-            global token
-            token = retrieveToken(*args, **kwargs)
+        if now > config.date_limit - 1000:
+            config.token = retrieveToken(*args, **kwargs)
             return func(*args, **kwargs)
         else:  # need to return the function for decorator to return something
             return func(*args, **kwargs)
@@ -126,32 +106,22 @@ def _checkToken(func):
 
 def _updateHeader(token_str: str)->None:
     """ update the header when new token is generated"""
-    global header
-    global _api_key
-    global _org_id
-    global token
-    token = token_str
-    header = {"Accept": "application/vnd.api+json;revision=1",
-              "Content-Type": "application/vnd.api+json",
-              "Authorization": "Bearer "+token,
-              "X-Api-Key": _api_key,
-              "X-Gw-Ims-Org-Id": _org_id
-              }
-
-
-# Endpoint
-_getCompanies = '/companies'
-_getProfile = '/profile'
-_getProperties = '/companies/{_company_id}/properties'  # string format
-_getAuditEvents = '/audit_events'
+    config.token = token_str
+    config.header = {"Accept": "application/vnd.api+json;revision=1",
+                     "Content-Type": "application/vnd.api+json",
+                     "Authorization": "Bearer " + config.token,
+                     "X-Api-Key": config.config['api_key'],
+                     "X-Gw-Ims-Org-Id": config.config['org_id']
+                     }
 
 
 @_checkToken
 def _getData(url: str, params: dict = None, *args: str, **kwargs)->object:
-    res = _requests.get(url, headers=header, params=params)
+    res = _requests.get(url, headers=config.header, params=params)
     try:
         infos = res.json()
-        # print(res.status_code)
+        if kwargs.get('verbose') == True:
+            print(res.text)
     except:
         infos = res.text
     return infos
@@ -159,7 +129,7 @@ def _getData(url: str, params: dict = None, *args: str, **kwargs)->object:
 
 @_checkToken
 def _postData(url: str, obj: dict, **kwargs)->object:
-    res = _requests.post(url, headers=header, data=_json.dumps(obj))
+    res = _requests.post(url, headers=config.header, data=_json.dumps(obj))
     if kwargs.get('verbose') == True:
         print(res.text)
     try:
@@ -171,7 +141,7 @@ def _postData(url: str, obj: dict, **kwargs)->object:
 
 @_checkToken
 def _patchData(url: str, obj: dict, **kwargs)->object:
-    res = _requests.patch(url, headers=header, data=_json.dumps(obj))
+    res = _requests.patch(url, headers=config.header, data=_json.dumps(obj))
     if kwargs.get('verbose') == True:
         print(res.text)
     try:
@@ -183,7 +153,7 @@ def _patchData(url: str, obj: dict, **kwargs)->object:
 
 @_checkToken
 def _putData(url: str, obj: dict, **kwargs)->object:
-    res = _requests.put(url, headers=header, data=_json.dumps(obj))
+    res = _requests.put(url, headers=config.header, data=_json.dumps(obj))
     if kwargs.get('verbose') == True:
         print(res.text)
     try:
@@ -195,7 +165,7 @@ def _putData(url: str, obj: dict, **kwargs)->object:
 
 @_checkToken
 def _deleteData(url: str, **kwargs)->object:
-    res = _requests.delete(url, headers=header)
+    res = _requests.delete(url, headers=config.header)
     if kwargs.get('verbose') == True:
         print(res.text)
     return res.status_code
@@ -209,7 +179,8 @@ def getCompanyId()->object:
     """
     Retrieve the company id for later call for the properties
     """
-    companies = _requests.get(_endpoint+_getCompanies, headers=header)
+    path = config.endpoints['global'] + config.endpoints['companies']
+    companies = _requests.get(path, headers=config.header)
     companyID = companies.json()['data'][0]['id']
     return companyID
 
@@ -220,8 +191,9 @@ def getProperties(companyID: str)->object:
     Arguments :
         companyID : REQUIRED : Company from where you want the properties
     """
-    req_properties = _getData(
-        _endpoint+_getProperties.format(_company_id=companyID))
+    path = config.endpoints['global'] + \
+        config.endpoints['properties'].format(_company_id=companyID)
+    req_properties = _getData(path)
     properties = req_properties
     data = properties['data']  # properties information for page 1
     # searching if page 1 is enough
@@ -233,8 +205,7 @@ def getProperties(companyID: str)->object:
         workers = min(pages_left, 5)  # max 5 threads
         list_page_number = [{
             'page[number]': str(x)} for x in range(2, pages_left+2)]  # starting page 2
-        urls = [_endpoint+_getProperties.format(_company_id=companyID)
-                for x in range(2, pages_left+2)]
+        urls = [path for x in range(2, pages_left+2)]
         with _futures.ThreadPoolExecutor(workers) as executor:
             res = executor.map(lambda x, y: _getData(
                 x, params=y), urls, list_page_number)
@@ -261,7 +232,8 @@ def getAuditEvents(page_size: int = 50, nb_page: int = 10, **kwargs)->list:
     params['page[number]'] = kwargs.get('page_nb', 1)
     if page_size is not None:
         params['page[size]'] = page_size
-    events = _getData(_endpoint+_getAuditEvents, params=params)
+    path = config.endpoints['global'] + config.endpoints['auditEvents']
+    events = _getData(path, params=params)
     data = events['data']
     last_date = datetime.datetime.fromisoformat(
         data[-1]['attributes']['updated_at'][:-1])
@@ -283,7 +255,7 @@ def getAuditEvents(page_size: int = 50, nb_page: int = 10, **kwargs)->list:
     else:
         if (curr_page < events['meta']['pagination']['total_pages'] and curr_page < nb_page):
             data += getAuditEvents(page_size=page_size, nb_page=nb_page,
-                                   page_nb=curr_page+1, verbose=kwargs.get('verbose', False), updated_at=kwargs.get('updated_at', False))
+                                   page_nb=curr_page+1, verbose=kwargs.get('verbose', False), end_date=kwargs.get('end_date', False))
     return data
 
 
@@ -296,7 +268,7 @@ def getRessource(res_url: str = None, params: dict = None):
     """
     if res_url is None:
         raise Exception("You must provide a resource url")
-    res = _getData(res_url, header=header, params=params)
+    res = _getData(res_url, header=config.header, params=params)
     return res
 
 
@@ -341,7 +313,7 @@ class Property:
         self._Environments = data['links']['environments']
         self._Libraries = data['relationships']['libraries']['links']['related']
         self.ruleComponents = {}
-        self.header = _deepcopy(header)
+        self.header = _deepcopy(config.header)
 
     def __repr__(self)-> dict:
         return _json.dumps(self.dict, indent=4)
@@ -357,7 +329,7 @@ class Property:
         uri = '/extension_packages'
         params = {'filter[name]': 'EQ '+str(ext_name)}
         res_ext = _requests.get(
-            _endpoint+uri, params=params, headers=header)
+            config.endpoints['global']+uri, params=params, headers=header)
         data = res_ext.json()['data'][0]
         extension_id = data['id']
         if verbose:
@@ -463,7 +435,7 @@ class Property:
                 }
                 }
         res = _requests.patch(
-            _endpoint+'/extensions/'+str(extension_id), headers=header, data=_json.dumps(data))
+            config.endpoints['global']+'/extensions/'+str(extension_id), headers=header, data=_json.dumps(data))
         upgrade = res.json()
         return upgrade
 
@@ -983,7 +955,8 @@ class Property:
                 "type": "extensions"
             }
         }
-        extensions = _patchData(_endpoint+'/extensions/'+extension_id, obj)
+        extensions = _patchData(
+            config.endpoints['global']+'/extensions/'+extension_id, obj)
         data = extensions['data']
         return data
 
@@ -1003,7 +976,7 @@ class Property:
                 "type": "rules"
             }
         }
-        rules = _patchData(_endpoint+'/rules/'+rule_id, obj)
+        rules = _patchData(config.endpoints['global']+'/rules/'+rule_id, obj)
         data = rules
         return data
 
@@ -1024,7 +997,7 @@ class Property:
             }
         }
         dataElements = _patchData(
-            _endpoint+'/data_elements/'+dataElement_id, obj)
+            config.endpoints['global']+'/data_elements/'+dataElement_id, obj)
         data = dataElements
         return data
 
@@ -1047,7 +1020,7 @@ class Property:
                 "type": "rules"
             }
         }
-        rules = _patchData(_endpoint+'/rules/'+rule_id, obj)
+        rules = _patchData(config.endpoints['global']+'/rules/'+rule_id, obj)
         try:
             data = rules['data']
         except:
@@ -1068,7 +1041,8 @@ class Property:
                 "id": rc_id
             }
         }
-        rc = _patchData(_endpoint+'/rule_components/'+rc_id, obj)
+        rc = _patchData(
+            config.endpoints['global']+'/rule_components/'+rc_id, obj)
         try:
             data = rc['data']
         except:
@@ -1090,7 +1064,7 @@ class Property:
             }
         }
         dataElements = _patchData(
-            _endpoint+'/data_elements/'+dataElement_id, obj)
+            config.endpoints['global']+'/data_elements/'+dataElement_id, obj)
         try:
             data = dataElements['data']
         except:
@@ -1115,7 +1089,8 @@ class Property:
                 "type": "environments"
             }
         }
-        env = _patchData(_endpoint+'/environments/'+env_id, obj)
+        env = _patchData(
+            config.endpoints['global']+'/environments/'+env_id, obj)
         try:
             data = env['data']
         except:
@@ -1136,7 +1111,8 @@ class Property:
                 "type": "extensions"
             }
         }
-        extensions = _patchData(_endpoint+'/extensions/'+extension_id, obj)
+        extensions = _patchData(
+            config.endpoints['global']+'/extensions/'+extension_id, obj)
         try:
             data = extensions['data']
         except:
@@ -1306,8 +1282,9 @@ def createProperty(companyId: str, name: str, platform: str = 'web', return_clas
     obj['data']['attributes']['development'] = development
     obj['data']['attributes']['undefined_vars_return_empty'] = undefined_vars_return_empty
     obj['data']['type'] = 'properties'
-    new_property = _postData(
-        _endpoint+_getProperties.format(_company_id=companyId), obj)
+    path = config.endpoints['global'] + \
+        config.endpoints['properties'].format(_company_id=companyId)
+    new_property = _postData(path, obj)
     if return_class:
         property_class = Property(new_property['data'])
         return property_class
@@ -1751,12 +1728,16 @@ class Library:
         self.state = data['attributes']['state']
         self.build_required = data['attributes']['build_required']
         self.builds = data['relationships']['builds']['links']['related']
-        self._DataElements = _endpoint + \
+        self._DataElements = config.endpoints['global'] + \
             '/libraries/'+data['id']+'/data_elements'
-        self._Extensions = _endpoint+'/libraries/'+data['id']+'/extensions'
-        self._Environment = _endpoint+'/libraries/'+data['id']+'/envrionment'
-        self._Rules = _endpoint+'/libraries/'+data['id']+'/rules'
-        self._Builds = _endpoint+'/libraries/'+data['id']+'/builds'
+        self._Extensions = config.endpoints['global'] + \
+            '/libraries/'+data['id']+'/extensions'
+        self._Environment = config.endpoints['global'] + \
+            '/libraries/'+data['id']+'/envrionment'
+        self._Rules = config.endpoints['global'] + \
+            '/libraries/'+data['id']+'/rules'
+        self._Builds = config.endpoints['global'] + \
+            '/libraries/'+data['id']+'/builds'
         self.build_status = data['meta']['build_status']
         self.relationships = {}
         self._environments = {}
@@ -1811,7 +1792,8 @@ class Library:
         for ids in data_element_ids:
             obj['data'].append(
                 {"id": ids, "type": "data_elements", "meta": {"action": "revise"}})
-        url = _endpoint+'/libraries/'+self.id+'/relationships/data_elements'
+        url = config.endpoints['global']+'/libraries/' + \
+            self.id+'/relationships/data_elements'
         res = _postData(url, obj)
         return res
 
@@ -1830,7 +1812,8 @@ class Library:
         for ids in rules_ids:
             obj['data'].append({"id": ids, "type": "rules",
                                 "meta": {"action": "revise"}})
-        url = _endpoint+'/libraries/'+self.id+'/relationships/rules'
+        url = config.endpoints['global'] + \
+            '/libraries/'+self.id+'/relationships/rules'
         res = _postData(url, obj)
         return res
 
@@ -1849,7 +1832,8 @@ class Library:
         for ids in extensions_ids:
             obj['data'].append(
                 {"id": ids, "type": "extensions", "meta": {"action": "revise"}})
-        url = _endpoint+'/libraries/'+self.id+'/relationships/extensions'
+        url = config.endpoints['global']+'/libraries/' + \
+            self.id+'/relationships/extensions'
         res = _postData(url, obj)
         return res
 
@@ -1878,7 +1862,7 @@ class Library:
 
     @_checkToken
     def _setEnvironment(self, obj: dict)->None:
-        new_env = _requests.patch(_endpoint+'/libraries/'+self.id +
+        new_env = _requests.patch(config.endpoints['global']+'/libraries/'+self.id +
                                   '/relationships/environment', headers=header, data=_json.dumps(obj))
         res = new_env.json()
         return res
@@ -1889,7 +1873,7 @@ class Library:
         Remove environment
         """
         new_env = _requests.get(
-            _endpoint+'/libraries/'+self.id+'/relationships/environment', headers=header)
+            config.endpoints['global']+'/libraries/'+self.id+'/relationships/environment', headers=header)
         res = new_env.json()
         return res
 
@@ -1943,7 +1927,8 @@ class Library:
             print('pending...')
             _time.sleep(20)
             # return the json directly
-            build = _getData(_endpoint+'/builds/'+str(build_id))
+            build = _getData(
+                config.endpoints['global']+'/builds/'+str(build_id))
             build_status = build['data']['attributes']['status']
         if build['data']['attributes']['status'] == 'succeeded':
             self.build_required = False
@@ -1976,7 +1961,8 @@ class Library:
             }
         }
         }
-        transition = _patchData(_endpoint+'/libraries/'+self.id, obj)
+        transition = _patchData(
+            config.endpoints['global']+'/libraries/'+self.id, obj)
         data = transition
         self.state = data['data']['attributes']['state']
         self.build_required = data['data']['attributes']['build_required']
