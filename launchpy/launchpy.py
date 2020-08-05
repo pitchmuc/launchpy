@@ -544,7 +544,7 @@ class Property:
         list_urls = [ruleComponents[_id]['url'] for _id in ruleComponents]
         names = [ruleComponents[_id]['name'] for _id in ruleComponents]
         ids = list(ruleComponents.keys())
-        headers = [header for nb in range(len(list_urls))]
+        headers = [self.header for nb in range(len(list_urls))]
         workers = min((len(list_urls), 5))
 
         def request_data(url, header, name, ids):
