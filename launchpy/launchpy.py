@@ -18,9 +18,11 @@ _TokenEndpoint = "https://ims-na1.adobelogin.com/ims/exchange/jwt"
 _orga_admin = {'_org_admin', '_deployment_admin', '_support_admin'}
 
 
-def createConfigFile(verbose: object = False)->None:
+def createConfigFile(scope: bool = False, verbose: object = False)->None:
     """
     This function will create a 'config_admin.json' file where you can store your access data. 
+    Arguments:
+        scope: OPTIONAL : if you have problem with scope during API connection, you may need to update this.
     """
     json_data = {
         'org_id': '<orgID>',
@@ -28,6 +30,7 @@ def createConfigFile(verbose: object = False)->None:
         'tech_id': "<something>@techacct.adobe.com",
         'secret': "<YourSecret>",
         'pathToKey': '<path/to/your/privatekey.key>',
+        'scope': "https://ims-na1.adobelogin.com/s/ent_reactor_admin_sdk"
     }
     with open('config_admin.json', 'w') as cf:
         cf.write(_json.dumps(json_data, indent=4))
@@ -40,13 +43,15 @@ def importConfigFile(file: str)-> None:
     """
     This function will read the 'config_admin.json' to retrieve the information to be used by this module. 
     """
-    with open(file, 'r') as file:
+    with open(Path(file), 'r') as file:
         f = _json.load(file)
         config.config["org_id"] = f['org_id']
         config.config["api_key"] = f['api_key']
         config.config["tech_id"] = f['tech_id']
         config.config["secret"] = f['secret']
         config.config["pathToKey"] = f['pathToKey']
+        config.official_scope = f.get('scope', "")
+    config.date_limit = 0
 
 
 def retrieveToken(verbose: bool = False, save: bool = False, params: dict = None)->str:
@@ -62,25 +67,54 @@ def retrieveToken(verbose: bool = False, save: bool = False, params: dict = None
         private_key_unencrypted = f.read()
         header_jwt = {'cache-control': 'no-cache',
                       'content-type': 'application/x-www-form-urlencoded'}
-    jwtPayload = {
+    jwtPayload_admin = {
         # Expiration set to 24 hours
         "exp": round(24*60*60 + int(_time.time())),
         "iss": config.config['org_id'],
         "sub": config.config['tech_id'],
-        "https://ims-na1.adobelogin.com/s/ent_reactor_admin_sdk": True,
+        config.scope_admin: True,
         "aud": "https://ims-na1.adobelogin.com/c/"+config.config["api_key"]
     }
-    encoded_jwt = _jwt.encode(
-        jwtPayload, private_key_unencrypted, algorithm='RS256')  # working algorithm
-    payload = {
+    jwtPayload_dev = {
+        # Expiration set to 24 hours
+        "exp": round(24*60*60 + int(_time.time())),
+        "iss": config.config['org_id'],
+        "sub": config.config['tech_id'],
+        config.scope_dev: True,
+        "aud": "https://ims-na1.adobelogin.com/c/"+config.config["api_key"]
+    }
+    encoded_jwt_admin = _jwt.encode(
+        jwtPayload_admin, private_key_unencrypted, algorithm='RS256')  # working algorithm
+    encoded_jwt_dev = _jwt.encode(
+        jwtPayload_dev, private_key_unencrypted, algorithm='RS256')  # working algorithm
+    payload_admin = {
         "client_id": config.config['api_key'],
         "client_secret": config.config['secret'],
-        "jwt_token": encoded_jwt.decode("utf-8")
+        "jwt_token": encoded_jwt_admin.decode("utf-8")
     }
-    response = _requests.post(_TokenEndpoint, headers=header_jwt, data=payload)
+    payload_dev = {
+        "client_id": config.config['api_key'],
+        "client_secret": config.config['secret'],
+        "jwt_token": encoded_jwt_dev.decode("utf-8")
+    }
+    response = _requests.post(
+        _TokenEndpoint, headers=header_jwt, data=payload_dev)
     json_response = response.json()
-    token = json_response['access_token']
-    _updateHeader(token)
+    if 'error' in json_response.keys():
+        if json_response['error'] == "invalid_scope":
+            try:
+                response = _requests.post(
+                    _TokenEndpoint, headers=header_jwt, data=payload_admin)
+                json_response = response.json()
+            except Exception as e:
+                print(_json.dumps(json_response, indent=4))
+                raise Exception(e)
+    try:
+        token = json_response['access_token']
+        _updateHeader(token)
+    except Exception as e:
+        print(_json.dumps(json_response, indent=4))
+        raise Exception(e)
     expire = json_response['expires_in']
     config.date_limit = _time.time() + expire/1000 - 500  # end of time for the token
     if save:
@@ -117,7 +151,8 @@ def _updateHeader(token_str: str)->None:
 
 @_checkToken
 def _getData(url: str, params: dict = None, *args: str, **kwargs)->object:
-    res = _requests.get(url, headers=config.header, params=params)
+    header = kwargs.get('header', config.header)
+    res = _requests.get(url, headers=header, params=params)
     try:
         infos = res.json()
         if kwargs.get('verbose') == True:
@@ -129,7 +164,8 @@ def _getData(url: str, params: dict = None, *args: str, **kwargs)->object:
 
 @_checkToken
 def _postData(url: str, obj: dict, **kwargs)->object:
-    res = _requests.post(url, headers=config.header, data=_json.dumps(obj))
+    header = kwargs.get('header', config.header)
+    res = _requests.post(url, headers=header, data=_json.dumps(obj))
     if kwargs.get('verbose') == True:
         print(res.text)
     try:
@@ -141,7 +177,8 @@ def _postData(url: str, obj: dict, **kwargs)->object:
 
 @_checkToken
 def _patchData(url: str, obj: dict, **kwargs)->object:
-    res = _requests.patch(url, headers=config.header, data=_json.dumps(obj))
+    header = kwargs.get('header', config.header)
+    res = _requests.patch(url, headers=header, data=_json.dumps(obj))
     if kwargs.get('verbose') == True:
         print(res.text)
     try:
@@ -153,7 +190,8 @@ def _patchData(url: str, obj: dict, **kwargs)->object:
 
 @_checkToken
 def _putData(url: str, obj: dict, **kwargs)->object:
-    res = _requests.put(url, headers=config.header, data=_json.dumps(obj))
+    header = kwargs.get('header', config.header)
+    res = _requests.put(url, headers=header, data=_json.dumps(obj))
     if kwargs.get('verbose') == True:
         print(res.text)
     try:
@@ -165,7 +203,8 @@ def _putData(url: str, obj: dict, **kwargs)->object:
 
 @_checkToken
 def _deleteData(url: str, **kwargs)->object:
-    res = _requests.delete(url, headers=config.header)
+    header = kwargs.get('header', config.header)
+    res = _requests.delete(url, headers=header)
     if kwargs.get('verbose') == True:
         print(res.text)
     return res.status_code
@@ -306,7 +345,7 @@ class Property:
         self._Extensions = data['links']['extensions']
         self._Rules = data['links']['rules']
         self._RuleComponents = 'https://reactor.adobe.io/properties/' + \
-            data['id']+'/rule_components'
+            self.id + '/rule_components'
         self._Host = 'https://reactor.adobe.io//properties/' + \
             data['id']+'/hosts'
         self._Note = 'https://reactor.adobe.io/notes/'
@@ -321,15 +360,19 @@ class Property:
     def __str__(self)-> str:
         return str(_json.dumps(self.dict, indent=4))
 
-    def _getExtensionPackage(self, ext_name: str, verbose: bool = False)->dict:
+    def _getExtensionPackage(self, ext_name: str, platform: str = "web", verbose: bool = False)->dict:
         """
         Retrieve extension id of the catalog from an extension name.
         It will be used later on to check for available updates. 
+        Arguments: 
+            ext_name : REQUIRED : name of the extension to look for.
+            platform : REQUIRED : if you want to look for specific platform.
+            verbose : OPTIONAL : set to true to print statement along the way (default False)
         """
         uri = '/extension_packages'
-        params = {'filter[name]': 'EQ '+str(ext_name)}
+        params = {'filter[name]': 'EQ '+str(ext_name), 'platform': platform}
         res_ext = _requests.get(
-            config.endpoints['global']+uri, params=params, headers=header)
+            config.endpoints['global']+uri, params=params, headers=self.header)
         data = res_ext.json()['data'][0]
         extension_id = data['id']
         if verbose:
@@ -341,7 +384,7 @@ class Property:
         """
         Retrieve the environment sets for this property
         """
-        env = _getData(self._Environments)
+        env = _getData(self._Environments, header=self.header)
         data = env['data']  # skip meta for now
         return data
 
@@ -349,7 +392,7 @@ class Property:
         """
         Retrieve the hosts sets for this property
         """
-        host = _getData(self._Host)
+        host = _getData(self._Host, header=self.header)
         data = host['data']  # skip meta for now
         return data
 
@@ -371,7 +414,8 @@ class Property:
                     {'page[number]': str(x)} for x in range(2, pages_left+2)]
                 urls = [self._Extensions for x in range(2, pages_left+2)]
                 with _futures.ThreadPoolExecutor(workers) as executor:
-                    res = executor.map(_getData, urls, list_page_number)
+                    res = executor.map(lambda x, y: _getData(
+                        x, params=y, header=self.header), urls, list_page_number)
                 res = list(res)
                 append_data = [val for sublist in [data['data'] for data in res]
                                for val in sublist]  # flatten list of list
@@ -380,12 +424,13 @@ class Property:
             data = extensions
         return data
 
-    def checkExtensionUpdate(self, verbose: bool = False):
+    def checkExtensionUpdate(self, platform: str = "web", verbose: bool = False):
         """
         Returns a dictionary of extensions with their names, ids and if there is an update. 
         If there is an update available, the id returned is the latest id (to be used for installation). 
         It can be re-use for installation and for checking for update. 
         Arguments:
+            platform : REQUIRED : if you need to look for extension on a specific platform (default web).
             verbose: OPTIONAL : if set to True, will print the different name and id of the extensions checked.
 
         Dictionary example: 
@@ -402,7 +447,8 @@ class Property:
                                                        'internal_id': ext['id']
                                                        } for ext in extensions}
         for name in dict_extensions:
-            new_id = self._getExtensionPackage(name, verbose)
+            new_id = self._getExtensionPackage(
+                name, platform=platform, verbose=verbose)
             if new_id != dict_extensions[name]['package_id']:
                 dict_extensions[name]['package_id'] = new_id
                 dict_extensions[name]['update'] = True
@@ -435,7 +481,7 @@ class Property:
                 }
                 }
         res = _requests.patch(
-            config.endpoints['global']+'/extensions/'+str(extension_id), headers=header, data=_json.dumps(data))
+            config.endpoints['global']+'/extensions/'+str(extension_id), header=self.header, data=_json.dumps(data))
         upgrade = res.json()
         return upgrade
 
@@ -457,9 +503,10 @@ class Property:
                 list_page_number = [
                     {'page[number]': str(x)} for x in range(2, pages_left+2)]
                 urls = [self._Rules for x in range(2, pages_left+2)]
+                headers = [self.header for x in range(2, pages_left+2)]
                 with _futures.ThreadPoolExecutor(workers) as executor:
-                    res = executor.map(lambda x, y: _getData(
-                        x, params=y), urls, list_page_number)
+                    res = executor.map(lambda x, y, z: _getData(
+                        x, params=y, header=z), urls, list_page_number, headers)
                 res = list(res)
                 append_data = [val for sublist in [data['data']
                                                    for data in res] for val in sublist]
@@ -506,7 +553,7 @@ class Property:
             urls = [self._Rules for x in range(2, pages_left+2)]
             with _futures.ThreadPoolExecutor(workers) as executor:
                 res = executor.map(lambda x, y: _getData(
-                    x, params=y), urls, list_parameters)
+                    x, params=y, header=self.header), urls, list_parameters)
             res = list(res)
             append_data = [val for sublist in [data['data']
                                                for data in res] for val in sublist]
@@ -588,7 +635,7 @@ class Property:
                 urls = [self._DataElement for x in range(2, pages_left+2)]
                 with _futures.ThreadPoolExecutor(workers) as executor:
                     res = executor.map(lambda x, y: _getData(
-                        x, params=y), urls, list_page_number)
+                        x, params=y, header=self.header), urls, list_page_number)
                 res = list(res)
                 append_data = [val for sublist in [data['data']
                                                    for data in res] for val in sublist]
@@ -631,7 +678,7 @@ class Property:
             urls = [self._Rules for x in range(2, pages_left+2)]
             with _futures.ThreadPoolExecutor(workers) as executor:
                 res = executor.map(lambda x, y: _getData(
-                    x, params=y), urls, list_parameters)
+                    x, params=y, header=self.header), urls, list_parameters)
             res = list(res)
             append_data = [val for sublist in [data['data']
                                                for data in res] for val in sublist]
@@ -669,7 +716,7 @@ class Property:
             urls = [self._Libraries for x in range(2, pages_left+2)]
             with _futures.ThreadPoolExecutor(workers) as executor:
                 res = executor.map(lambda x, y: _getData(
-                    x, params=y), urls, list_page_number)
+                    x, params=y, header=self.header), urls, list_page_number)
             res = list(res)
             append_data = [val for sublist in [data['data']
                                                for data in res] for val in sublist]
@@ -703,7 +750,7 @@ class Property:
             urls = [url for x in range(2, pages_left+2)]
             with _futures.ThreadPoolExecutor(workers) as executor:
                 res = executor.map(lambda x, y: _getData(
-                    x, params=y), urls, list_page_number)
+                    x, params=y, header=self.header), urls, list_page_number)
             res = list(res)
             append_data = [val for sublist in [data['data']
                                                for data in res] for val in sublist]
@@ -758,7 +805,7 @@ class Property:
                 "type": "rules"
             }
         }
-        rules = _postData(self._Rules, obj)
+        rules = _postData(self._Rules, obj, header=self.header)
         try:
             data = rules['data']
             self.ruleComponents[data['id']] = {'name': data['attributes']['name'],
@@ -767,15 +814,17 @@ class Property:
             data = rules
         return data
 
-    def createRuleComponents(self, name: str, settings: str = None, descriptor: str = None, extension_id: dict = None, rule_id: dict = None, **kwargs)->object:
+    def createRuleComponents(self, name: str, settings: str = None, descriptor: str = None, extension_infos: dict = None, rule_infos: dict = None, **kwargs)->object:
         """
         Create a ruleComponent by provided a rule name and descriptor (minimum). It returns an object.
         It takes additional information in order to link the ruleCompoment to a rule and with an Extension.
         Arguments: 
             name : REQUIRED : name of the rule component
             descriptor : REQUIRED : delegate_descriptor_id for the rule component
-            extension_id : REQUIRED : Extension used for that rule component (dictionary)
-            rule_id : REQUIRED : rule information link to that rule component (dictionary)
+            extension_infos : REQUIRED : Extension used for that rule component (dictionary with "id" and "type")
+            (can be found from translator)
+            rule_infos : REQUIRED : rule information link to that rule component (dictionary with "data", "id" and "type")
+            (can be found from translator)
             settings : OPTIONAL : settings for that rule component
         """
 
@@ -787,9 +836,9 @@ class Property:
                 },
                 "relationships": {
                     "extension": {
-                        "data": extension_id
+                        "data": extension_infos
                     },
-                    "rules": rule_id
+                    "rules": rule_infos
                 },
                 "type": "rule_components"
             }
@@ -798,7 +847,7 @@ class Property:
             obj['data']['attributes']['settings'] = settings
         if 'order' in kwargs:
             obj['data']['attributes']['order'] = kwargs.get('order')
-        rc = _postData(self._RuleComponents, obj)
+        rc = _postData(self._RuleComponents, obj, header=self.header)
         try:
             data = rc['data']
         except:
@@ -834,7 +883,7 @@ class Property:
                 obj['data']['attributes']['settings'] = settings
         except:
             pass
-        dataElements = _postData(self._DataElement, obj)
+        dataElements = _postData(self._DataElement, obj, header=self.header)
         try:
             data = dataElements['data']
         except:
@@ -868,7 +917,7 @@ class Property:
                 "type": "environments"
             }
         }
-        env = _postData(self._Environments, obj)
+        env = _postData(self._Environments, obj, header=self.header)
         data = env['data']
         return data
 
@@ -906,7 +955,7 @@ class Property:
                 obj['data']['attributes']['server'] = kwargs.get('server')
                 obj['data']['attributes']['path'] = kwargs.get('path', '/')
                 obj['data']['attributes']['port'] = kwargs.get('port', 22)
-        host = _postData(self._Host, obj)
+        host = _postData(self._Host, obj, header=self.header)
         try:
             data = host['data']
         except:
@@ -928,7 +977,7 @@ class Property:
                 "type": "libraries"
             }
         }
-        lib = _postData(self._Libraries, obj)
+        lib = _postData(self._Libraries, obj, header=self.header)
         try:
             data = lib['data']
             if return_class:
@@ -956,7 +1005,7 @@ class Property:
             }
         }
         extensions = _patchData(
-            config.endpoints['global']+'/extensions/'+extension_id, obj)
+            config.endpoints['global']+'/extensions/'+extension_id, obj, header=self.header)
         data = extensions['data']
         return data
 
@@ -976,7 +1025,8 @@ class Property:
                 "type": "rules"
             }
         }
-        rules = _patchData(config.endpoints['global']+'/rules/'+rule_id, obj)
+        rules = _patchData(
+            config.endpoints['global']+'/rules/'+rule_id, obj, header=self.header)
         data = rules
         return data
 
@@ -997,7 +1047,7 @@ class Property:
             }
         }
         dataElements = _patchData(
-            config.endpoints['global']+'/data_elements/'+dataElement_id, obj)
+            config.endpoints['global']+'/data_elements/'+dataElement_id, obj, header=self.header)
         data = dataElements
         return data
 
@@ -1020,7 +1070,8 @@ class Property:
                 "type": "rules"
             }
         }
-        rules = _patchData(config.endpoints['global']+'/rules/'+rule_id, obj)
+        rules = _patchData(
+            config.endpoints['global']+'/rules/'+rule_id, obj, header=self.header)
         try:
             data = rules['data']
         except:
@@ -1042,7 +1093,7 @@ class Property:
             }
         }
         rc = _patchData(
-            config.endpoints['global']+'/rule_components/'+rc_id, obj)
+            config.endpoints['global']+'/rule_components/'+rc_id, obj, header=self.header)
         try:
             data = rc['data']
         except:
@@ -1064,7 +1115,7 @@ class Property:
             }
         }
         dataElements = _patchData(
-            config.endpoints['global']+'/data_elements/'+dataElement_id, obj)
+            config.endpoints['global']+'/data_elements/'+dataElement_id, obj, header=self.header)
         try:
             data = dataElements['data']
         except:
@@ -1090,7 +1141,7 @@ class Property:
             }
         }
         env = _patchData(
-            config.endpoints['global']+'/environments/'+env_id, obj)
+            config.endpoints['global']+'/environments/'+env_id, obj, header=self.header)
         try:
             data = env['data']
         except:
@@ -1112,7 +1163,7 @@ class Property:
             }
         }
         extensions = _patchData(
-            config.endpoints['global']+'/extensions/'+extension_id, obj)
+            config.endpoints['global']+'/extensions/'+extension_id, obj, header=self.header)
         try:
             data = extensions['data']
         except:
@@ -1125,7 +1176,8 @@ class Property:
         Arguments: 
             extension_id : REQUIRED : Rule ID that needs to be deleted
         """
-        data = _deleteData('https://reactor.adobe.io/extensions/'+extension_id)
+        data = _deleteData(
+            'https://reactor.adobe.io/extensions/'+extension_id, header=self.header)
         return data
 
     def deleteRule(self, rule_id: str)->str:
@@ -1134,7 +1186,8 @@ class Property:
         Arguments: 
             rule_id : REQUIRED : Rule ID that needs to be deleted
         """
-        data = _deleteData('https://reactor.adobe.io/rules/'+rule_id)
+        data = _deleteData('https://reactor.adobe.io/rules/' +
+                           rule_id, header=self.header)
         return data
 
     def deleteDataElement(self, dataElement_id: str)->str:
@@ -1144,7 +1197,7 @@ class Property:
             dataElement_id : REQUIRED : Data Element ID that needs to be deleted
         """
         data = _deleteData(
-            'https://reactor.adobe.io/data_elements/'+dataElement_id)
+            'https://reactor.adobe.io/data_elements/'+dataElement_id, header=self.header)
         return data
 
     def deleteRuleComponent(self, rc_id: str)->str:
@@ -1153,7 +1206,8 @@ class Property:
         Arguments: 
             rc_id : REQUIRED : Rule Component ID that needs to be deleted
         """
-        data = _deleteData('https://reactor.adobe.io/rule_components/'+rc_id)
+        data = _deleteData(
+            'https://reactor.adobe.io/rule_components/'+rc_id, header=self.header)
         return data
 
     def deleteEnvironments(self, env_id: str)->str:
@@ -1162,7 +1216,8 @@ class Property:
         Arguments: 
             env_id : REQUIRED : Environment ID that needs to be deleted
         """
-        data = _deleteData('https://reactor.adobe.io/environments/'+env_id)
+        data = _deleteData(
+            'https://reactor.adobe.io/environments/'+env_id, header=self.header)
         return data
 
     def extractAnalyticsConfig(self)->object:
@@ -1277,8 +1332,13 @@ def createProperty(companyId: str, name: str, platform: str = 'web', return_clas
         else:  # if a string but only 1 domain
             domains = list(domains)
     obj['data']['attributes']['name'] = name
-    obj['data']['attributes']['domains'] = domains
     obj['data']['attributes']['platform'] = platform
+    if platform == "mobile":
+        obj['data']['attributes']['ssl_enabled'] = kwargs.get(
+            'ssl_enabled', True)
+        obj['data']['attributes']['privacy'] = kwargs.get('privacy', 'optedin')
+    elif platform == "web":
+        obj['data']['attributes']['domains'] = domains
     obj['data']['attributes']['development'] = development
     obj['data']['attributes']['undefined_vars_return_empty'] = undefined_vars_return_empty
     obj['data']['type'] = 'properties'
@@ -1688,6 +1748,9 @@ class Translator:
             row = self.extensions[self.extensions.eq(
                 base_id).any(1)].index.values[0]
             new_value = self.extensions.loc[row, target_property]
+            # print(f"name : {rule_component['rule_name']}")
+            # print(f"old_id : {base_id}")
+            # print(f"new_id : {new_value}")
             new_rc['extension']['id'] = new_value
             if self.rules.empty == False:
                 new_rc['rule_setting'] = {
@@ -1695,7 +1758,11 @@ class Translator:
                         'id': self.rules.loc[rule_component['rule_name'], target_property],
                         'type':'rules'}
                     ]}
+                new_rc['rule_id'] = self.rules.loc[rule_component['rule_name'],
+                                                   target_property]
             else:
+                print(
+                    "You didn't load the rules. Please use setExtensions and setRules, and extendExtensions and extendRules")
                 del new_rc['rules']
             return new_rc
 

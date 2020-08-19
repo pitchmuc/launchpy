@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="launchpy",  # Replace with your own username
-    version="0.1.5",
+    version="0.2.0",
     author="Julien Piccini",
     author_email="piccini.julien@gmail.com",
     description="Python wrapper around the Adobe Experience Launch API.",
@@ -24,7 +24,7 @@ setuptools.setup(
         "Topic :: Software Development :: Libraries",
         "Development Status :: 4 - Beta"
     ],
-    python_requires='>=3.6',
+    python_requires='>=3.7',
     install_requires=['pandas', "requests",
                       "PyJWT", "pathlib2", "pathlib", "PyJWT[crypto]"],
 )

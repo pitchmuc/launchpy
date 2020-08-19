@@ -13,6 +13,9 @@ header = {"Accept": "application/vnd.api+json;revision=1",
           }
 
 date_limit = 0
+scope_admin = "https://ims-na1.adobelogin.com/s/ent_reactor_admin_sdk"
+scope_dev = "https://ims-na1.adobelogin.com/s/ent_reactor_sdk"
+official_scope = ""
 endpoints = {
     "global": 'https://reactor.adobe.io/',
     "companies": '/companies',
