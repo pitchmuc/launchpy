@@ -156,6 +156,7 @@ def _getData(url: str, params: dict = None, *args: str, **kwargs)->object:
     try:
         infos = res.json()
         if kwargs.get('verbose') == True:
+            print(res.request.url)
             print(res.text)
     except:
         infos = res.text
@@ -762,8 +763,8 @@ class Property:
         Create an extension in your property. Your extension_id argument should be the latest one extension id available.
         Arguments : 
             extension_id : REQUIRED : ID for the extension to be created
-            settings : OPTIONAL: setting to set in the extension
-            delegate_descriptor_id : OPTIONAL : delegate descriptor id
+            settings : REQUIRED: string that define the setting to set in the extension. Usually, it can be empty.
+            delegate_descriptor_id : REQUIRED : delegate descriptor id (set in name)
         """
         obj = {
             "data": {
@@ -1220,89 +1221,90 @@ class Property:
             'https://reactor.adobe.io/environments/'+env_id, header=self.header)
         return data
 
-    def extractAnalyticsConfig(self)->object:
-        """
-        Extract the analytics configuration that has been done in the Analytics Extensions and Rules.
-        Return a dictionary of the different element in a dataframe
-        """
-        dict_eVars = _defaultdict(list)
-        dict_props = _defaultdict(list)
-        dict_events = _defaultdict(list)
-        dict_value_eVars = _defaultdict(list)
-        dict_value_props = _defaultdict(list)
-        p_rules = self.getRules()
-        p_ext = self.getExtensions()
-        p_rcs = self.getRuleComponents()
-        analytics = [ext for ext in p_ext if ext['attributes']
-                     ['name'] == 'adobe-analytics'][0]
-        analytics_rcs = [rc for rc in p_rcs if rc['attributes']['delegate_descriptor_id'].find(
-            'adobe-analytics::actions::set-variables') - 1]
+    # Not supported for the moment
+    # def extractAnalyticsConfig(self)->object:
+    #     """
+    #     Extract the analytics configuration that has been done in the Analytics Extensions and Rules.
+    #     Return a dictionary of the different element in a dataframe
+    #     """
+    #     dict_eVars = _defaultdict(list)
+    #     dict_props = _defaultdict(list)
+    #     dict_events = _defaultdict(list)
+    #     dict_value_eVars = _defaultdict(list)
+    #     dict_value_props = _defaultdict(list)
+    #     p_rules = self.getRules()
+    #     p_ext = self.getExtensions()
+    #     p_rcs = self.getRuleComponents()
+    #     analytics = [ext for ext in p_ext if ext['attributes']
+    #                  ['name'] == 'adobe-analytics'][0]
+    #     analytics_rcs = [rc for rc in p_rcs if rc['attributes']['delegate_descriptor_id'].find(
+    #         'adobe-analytics::actions::set-variables') - 1]
 
-        def searchSetupAnalytics(element: object, verbose: bool = False):
-            """
-            fills the different dictionaries with where informations are held. 
-            """
-            if element['type'] == "rule_components":
-                name = element['rule_name']
-            elif element['type'] == "extensions":
-                name = 'Analytics Extension'
-            settings = _json.loads(element['attributes']['settings'])
-            if 'trackerProperties' in settings.keys():
-                tracker_properties = settings['trackerProperties']
-            else:
-                tracker_properties = {}
-            if verbose:
-                print(name)
-            if len(tracker_properties) > 0:
-                if 'eVars' in tracker_properties.keys():
-                    for v in tracker_properties['eVars']:
-                        dict_eVars[v['name']].append(f'{name} - Interface')
-                        dict_value_eVars[v['name']].append(v['value'])
-                if 'props' in tracker_properties.keys():
-                    for p in tracker_properties['props']:
-                        dict_props[p['name']].append(f'{name} - Interface')
-                        dict_value_props[p['name']].append(p['value'])
-                if 'events' in tracker_properties.keys():
-                    for e in tracker_properties['events']:
-                        dict_events[e['name']].append(f'{name} - Interface')
-            if 'customSetup' in settings.keys():
-                code = settings['customSetup']['source']
-                if len(code) > 0:
-                    matchevents = re.findall('(event[0-9]+)', code)
-                    matcheVars = re.findall('(eVar[0-9]+)\s*=', code)
-                    matchprops = re.findall('(prop[0-9]+?)\s*=', code)
-                    if matcheVars is not None:
-                        for v in set(matcheVars):
-                            value = f'{name} - Custom Code'
-                            if value not in dict_eVars[v]:
-                                dict_eVars[v].append(f'{name} - Custom Code')
-                    if matchprops is not None:
-                        for p in set(matchprops):
-                            value = f'{name} - Custom Code'
-                            if value not in dict_props[p]:
-                                dict_props[p].append(f'{name} - Custom Code')
-                    if matchevents is not None:
-                        for e in set(matchevents):
-                            value = f'{name} - Custom Code'
-                            if value not in dict_events[e]:
-                                dict_events[e].append(f'{name} - Custom Code')
-        searchSetupAnalytics(analytics)
-        for rc in analytics_rcs:
-            searchSetupAnalytics(rc)
-        df_eVars = _pd.DataFrame(
-            dict([(k, _pd.Series(v)) for k, v in dict_eVars.items()])).T.fillna('')
-        df_eVars.columns = ['location ' +
-                            str(i) for i in range(1, len(df_eVars.columns)+1)]
-        df_props = _pd.DataFrame(
-            dict([(k, _pd.Series(v)) for k, v in dict_props.items()])).T.fillna('')
-        df_props.columns = ['location ' +
-                            str(i) for i in range(1, len(df_props.columns)+1)]
-        df_events = _pd.DataFrame(
-            dict([(k, _pd.Series(v)) for k, v in dict_events.items()])).T.fillna('')
-        df_events.columns = ['location ' +
-                             str(i) for i in range(1, len(df_events.columns)+1)]
-        data = {'eVars': df_eVars, 'props': df_props, 'events': df_events}
-        return data
+    #     def searchSetupAnalytics(element: object, verbose: bool = False):
+    #         """
+    #         fills the different dictionaries with where informations are held.
+    #         """
+    #         if element['type'] == "rule_components":
+    #             name = element['rule_name']
+    #         elif element['type'] == "extensions":
+    #             name = 'Analytics Extension'
+    #         settings = _json.loads(element['attributes']['settings'])
+    #         if 'trackerProperties' in settings.keys():
+    #             tracker_properties = settings['trackerProperties']
+    #         else:
+    #             tracker_properties = {}
+    #         if verbose:
+    #             print(name)
+    #         if len(tracker_properties) > 0:
+    #             if 'eVars' in tracker_properties.keys():
+    #                 for v in tracker_properties['eVars']:
+    #                     dict_eVars[v['name']].append(f'{name} - Interface')
+    #                     dict_value_eVars[v['name']].append(v['value'])
+    #             if 'props' in tracker_properties.keys():
+    #                 for p in tracker_properties['props']:
+    #                     dict_props[p['name']].append(f'{name} - Interface')
+    #                     dict_value_props[p['name']].append(p['value'])
+    #             if 'events' in tracker_properties.keys():
+    #                 for e in tracker_properties['events']:
+    #                     dict_events[e['name']].append(f'{name} - Interface')
+    #         if 'customSetup' in settings.keys():
+    #             code = settings['customSetup']['source']
+    #             if len(code) > 0:
+    #                 matchevents = re.findall('(event[0-9]+)', code)
+    #                 matcheVars = re.findall('(eVar[0-9]+)\s*=', code)
+    #                 matchprops = re.findall('(prop[0-9]+?)\s*=', code)
+    #                 if matcheVars is not None:
+    #                     for v in set(matcheVars):
+    #                         value = f'{name} - Custom Code'
+    #                         if value not in dict_eVars[v]:
+    #                             dict_eVars[v].append(f'{name} - Custom Code')
+    #                 if matchprops is not None:
+    #                     for p in set(matchprops):
+    #                         value = f'{name} - Custom Code'
+    #                         if value not in dict_props[p]:
+    #                             dict_props[p].append(f'{name} - Custom Code')
+    #                 if matchevents is not None:
+    #                     for e in set(matchevents):
+    #                         value = f'{name} - Custom Code'
+    #                         if value not in dict_events[e]:
+    #                             dict_events[e].append(f'{name} - Custom Code')
+    #     searchSetupAnalytics(analytics)
+    #     for rc in analytics_rcs:
+    #         searchSetupAnalytics(rc)
+    #     df_eVars = _pd.DataFrame(
+    #         dict([(k, _pd.Series(v)) for k, v in dict_eVars.items()])).T.fillna('')
+    #     df_eVars.columns = ['location ' +
+    #                         str(i) for i in range(1, len(df_eVars.columns)+1)]
+    #     df_props = _pd.DataFrame(
+    #         dict([(k, _pd.Series(v)) for k, v in dict_props.items()])).T.fillna('')
+    #     df_props.columns = ['location ' +
+    #                         str(i) for i in range(1, len(df_props.columns)+1)]
+    #     df_events = _pd.DataFrame(
+    #         dict([(k, _pd.Series(v)) for k, v in dict_events.items()])).T.fillna('')
+    #     df_events.columns = ['location ' +
+    #                          str(i) for i in range(1, len(df_events.columns)+1)]
+    #     data = {'eVars': df_eVars, 'props': df_props, 'events': df_events}
+    #     return data
 
 
 def createProperty(companyId: str, name: str, platform: str = 'web', return_class: bool = True, **kwargs)->dict:
@@ -1350,6 +1352,49 @@ def createProperty(companyId: str, name: str, platform: str = 'web', return_clas
         return property_class
     else:
         return new_property['data']
+
+
+def getExtensionsCatalogue(availability: str = None, name: str = None, platform: str = "web", save: bool = False)->list:
+    """
+    Return a list of the Extension Catalogue available for your organization
+    Arguments: 
+        availability : OPTIONAL : to filter for a specific type of extension. ("public" or "private")
+        name : OPTIONAL : to filter for a specific extension name (contains method)
+        platform : OPTIONAL : to filter for a specific platform (default "web", mobile possible)
+        save : OPTIONAL : save the results in a txt file (packages.txt). Default False.
+    """
+    path = config.endpoints['global']+'/extension_packages'
+    params = {'page[size]': '100'}
+    if availability is not None:
+        params["filter[availability]"] = f"EQ {availability}"
+    if name is not None:
+        params['filter[display_name]'] = f"CONTAINS {name}"
+    if platform is not None:
+        params['filter[platform]'] = f"EQ {platform}"
+    extensions = _getData(path, params=params, header=config.header)
+    data = extensions['data']  # properties information for page 1
+    # searching if page 1 is enough
+    pagination = extensions['meta']['pagination']
+    # requesting all the pages
+    if pagination['current_page'] != pagination['total_pages'] and pagination['total_pages'] != 0:
+        # calculate how many page to download
+        pages_left = pagination['total_pages'] - pagination['current_page']
+        workers = min(pages_left, 5)  # max 5 threads
+        params = [{
+            'page[number]': str(x), **params} for x in range(2, pages_left+2)]  # starting page 2
+        urls = [path for x in range(2, pages_left+2)]
+        with _futures.ThreadPoolExecutor(workers) as executor:
+            res = executor.map(lambda x, y: _getData(
+                x, params=y), urls, params)
+        res = list(res)
+        append_data = [val for sublist in [data['data'] for data in res]
+                       for val in sublist]  # flatten list of list
+        data = data + append_data
+    if save:
+        with open('packages.txt', 'w') as f:
+            for row in data:
+                f.write(f"{row}\n")
+    return data
 
 
 def extensionsInfo(data: list)->dict:
@@ -1930,7 +1975,7 @@ class Library:
     @_checkToken
     def _setEnvironment(self, obj: dict)->None:
         new_env = _requests.patch(config.endpoints['global']+'/libraries/'+self.id +
-                                  '/relationships/environment', headers=header, data=_json.dumps(obj))
+                                  '/relationships/environment', headers=config.header, data=_json.dumps(obj))
         res = new_env.json()
         return res
 
@@ -1940,7 +1985,7 @@ class Library:
         Remove environment
         """
         new_env = _requests.get(
-            config.endpoints['global']+'/libraries/'+self.id+'/relationships/environment', headers=header)
+            config.endpoints['global']+'/libraries/'+self.id+'/relationships/environment', headers=config.header)
         res = new_env.json()
         return res
 
@@ -1986,7 +2031,7 @@ class Library:
             status = self._setEnvironment(obj)
         if 'error' in status.keys():
             raise SystemExit('Issue setting environment')
-        build = _requests.post(self._Builds, headers=header)
+        build = _requests.post(self._Builds, headers=config.header)
         build_json = build.json()
         build_id = build_json['data']['id']
         build_status = build_json['data']['attributes']['status']

@@ -55,6 +55,19 @@ It returns either the instance of the Property class or the object returned by t
 
 The core has some facilitators methods that should help you along the way of using this API. Those facilitators are the real bonus of this wrapper and I hope you will understand how to use them.
 
+### Extension Packages
+
+When creating a new property, you may want to see the possible packages that you can install. There is a method available in the core components to access the available module.
+
+* getExtensionsCatalogue: returns a list of the extension available for your company.
+  Arguments:
+  * availability : OPTIONAL : to filter for a specific type of extension. ("public" or "private")
+  * name : OPTIONAL : to filter for a specific extension name (contains method)
+  * platform : OPTIONAL : to filter for a specific platform (default "web", mobile possible)
+  * save : OPTIONAL : save the results in a txt file (packages.txt). Default False.
+
+You will need to use the name, the display name and 
+
 ### The Info methods
 
 There are 4 different methods that are actually giving you around the same information about the different component of Launch:

@@ -5,7 +5,7 @@ with open("README.md", "r") as fh:
 
 setuptools.setup(
     name="launchpy",  # Replace with your own username
-    version="0.2.0",
+    version="0.2.1",
     author="Julien Piccini",
     author_email="piccini.julien@gmail.com",
     description="Python wrapper around the Adobe Experience Launch API.",
