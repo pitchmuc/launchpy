@@ -970,6 +970,8 @@ class Property:
             name : REQUIRED : name of the library
             return_class : OPTIONAL : Bool. will return a instance of the Library class if True.
         """
+        if name is None:
+            raise Exception("Require a name")
         obj = {
             "data": {
                 "attributes": {
@@ -1005,8 +1007,9 @@ class Property:
                 "type": "extensions"
             }
         }
+        path = f'/extensions/{extension_id}'
         extensions = _patchData(
-            config.endpoints['global']+'/extensions/'+extension_id, obj, header=self.header)
+            config.endpoints['global']+path, obj, header=self.header)
         data = extensions['data']
         return data
 
@@ -1017,6 +1020,8 @@ class Property:
             rule_id : REQUIRED : Rule ID
             attr_dict : REQUIRED : dictionary that will be passed to Launch for update
         """
+        if rule_id is None:
+            raise Exception("A rule ID is required")
         obj = {
             "data": {
                 "meta": {
@@ -1026,10 +1031,24 @@ class Property:
                 "type": "rules"
             }
         }
+        path = f"/rules/{rule_id}"
         rules = _patchData(
-            config.endpoints['global']+'/rules/'+rule_id, obj, header=self.header)
+            config.endpoints['global']+path, obj, header=self.header)
         data = rules
         return data
+    
+    def getRuleRevision(self,rule_id:str)->dict:
+        """
+        Retrieve the revisions of the specified Rule.
+        Argument:
+            rule_id : REQUIRED : Rule ID
+        """
+        if rule_id is None:
+            raise Exception("A rule ID is required")
+        path = f"/rules/{rule_id}/revisions"
+        revisions = _getData(config.endpoints['global']+path,header=self.header)
+        return revisions
+
 
     def reviseDataElements(self, dataElement_id: str)->object:
         """
@@ -1999,6 +2018,7 @@ class Library:
         if self.build_required == False and self.state != 'approved':
             return 'build is not required'
 
+        status = ""
         if self.state == 'development':
             env_id = self._dev_env
             obj = {
@@ -2060,6 +2080,7 @@ class Library:
                 - 'approve' : if state == submitted
                 - 'reject' : if state == submitted
         """
+        path = f'/libraries/{self.id}'
         if action == None:
             if self.state == 'development':
                 action = 'submit'
@@ -2074,7 +2095,7 @@ class Library:
         }
         }
         transition = _patchData(
-            config.endpoints['global']+'/libraries/'+self.id, obj)
+            config.endpoints['global']+path, obj)
         data = transition
         self.state = data['data']['attributes']['state']
         self.build_required = data['data']['attributes']['build_required']
