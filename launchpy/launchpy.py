@@ -124,7 +124,7 @@ class Admin:
             nb_page : OPTIONAL : How many page to return. (default 10)
             type_of : OPTIONAL : event to look for.
             **kwargs option
-            data : data being passed from one recursion to another. 
+            data : data being passed from one recursion to another.
             verbose : if want to follow up the completion (bool)
             end_date : the past date you want to stop iterating. Date to be in datetime isoformat.
         """
@@ -1767,7 +1767,7 @@ class Library:
         self.getExtensions()
         return self.relationships
 
-    def addDataElements(self, data_element_ids: list)->object:
+    def addDataElements(self, data_element_ids: list)->dict:
         """
         Take a list of data elements id and attach them to the library. 
         Arguments:
@@ -1780,13 +1780,33 @@ class Library:
         if type(data_element_ids) == str:
             data_element_ids = data_element_ids.split(' ')
         for ids in data_element_ids:
-            obj['data'].append(
-                {"id": ids, "type": "data_elements", "meta": {"action": "revise"}})
-        url = self.endpoint + f'/libraries/{self.id}/relationships/data_elements'
-        res = self.connector.postData(url, data=obj)
+            obj['data'].append({"id": ids,
+            "type": "data_elements", "meta": {"action": "revise"}})
+        url =  f'/libraries/{self.id}/relationships/data_elements'
+        res = self.connector.postData(self.endpoint +url, data=obj)
+        return res
+    
+    def updateDataElement(self,data_element_ids:list)->dict:
+        """
+        Update the data element inside the library. (PATCH)
+        Arguments:
+            data_element_ids: REQUIRED : list of data elements id
+        """
+        if self.state != 'development':
+            print('State is not development, cannot update relationships')
+            return None
+        obj = {'data': []}
+        if type(data_element_ids) == str:
+            data_element_ids = data_element_ids.split(' ')
+        for ids in data_element_ids:
+            obj['data'].append({"id": ids,
+            "type": "data_elements", "meta": {"action": "revise"}})
+        url =  f'/libraries/{self.id}/relationships/data_elements'
+        res = self.connector.patchData(self.endpoint +url, data=obj)
         return res
 
-    def addRules(self, rules_ids: list)->object:
+
+    def addRules(self, rules_ids: list)->dict:
         """
         Take a list of rules id and attach them to the library. 
         Arguments:
@@ -1801,8 +1821,27 @@ class Library:
         for ids in rules_ids:
             obj['data'].append({"id": ids, "type": "rules",
                                 "meta": {"action": "revise"}})
-        url = self.endpoint + f'/libraries/{self.id}/relationships/rules'
-        res = self.connector.postData(url, data=obj)
+        url = f'/libraries/{self.id}/relationships/rules'
+        res = self.connector.postData(self.endpoint + url, data=obj)
+        return res
+    
+    def updateRules(self,rules_ids:list)->dict:
+        """
+        Replace all existing rules with the ones posted.
+        Arguments:
+            rules_ids: REQUIRED : list of rules id
+        """
+        if self.state != 'development':
+            print('State is not development, cannot add relationships')
+            return None
+        obj = {'data': []}
+        if type(rules_ids) == str:
+            rules_ids = rules_ids.split(' ')
+        for ids in rules_ids:
+            obj['data'].append({"id": ids, "type": "rules",
+                                "meta": {"action": "revise"}})
+        url = f'/libraries/{self.id}/relationships/rules'
+        res = self.connector.patchData(self.endpoint + url, data=obj)
         return res
 
     def addExtensions(self, extensions_ids: list)->object:
@@ -1818,10 +1857,29 @@ class Library:
         if type(extensions_ids) == str:
             extensions_ids = extensions_ids.split(' ')
         for ids in extensions_ids:
-            obj['data'].append(
-                {"id": ids, "type": "extensions", "meta": {"action": "revise"}})
-        url = self.endpoint+'/libraries/{self.id}/relationships/extensions'
-        res = self.connector.postData(url, data=obj)
+            obj['data'].append({"id": ids, "type": "extensions", 
+                                "meta": {"action": "revise"}})
+        url = f'/libraries/{self.id}/relationships/extensions'
+        res = self.connector.postData(self.endpoint+url, data=obj)
+        return res
+    
+    def updateExtensions(self, extensions_ids: list)->object:
+        """
+        Replace all existing extensions into the library. 
+        Arguments:
+            extensions_ids: REQUIRED : list of extension id
+        """
+        if self.state != 'development':
+            print('State is not development, cannot add relationships')
+            return None
+        obj = {'data': []}
+        if type(extensions_ids) == str:
+            extensions_ids = extensions_ids.split(' ')
+        for ids in extensions_ids:
+            obj['data'].append({"id": ids, "type": "extensions", 
+                                "meta": {"action": "revise"}})
+        url = f'/libraries/{self.id}/relationships/extensions'
+        res = self.connector.patchData(self.endpoint+url, data=obj)
         return res
 
     def setEnvironments(self, environments_list: list, dev_name: str = None)->None:

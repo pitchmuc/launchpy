@@ -1,4 +1,4 @@
-# The launchpy property class
+# The Property class in launchpy
 
 The launchpy property class helds most of the methods that are being display in the Launch API documentation ().
 The name of the class and instanciation method implies that these methods works on one property at a time.

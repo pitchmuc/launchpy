@@ -9,3 +9,4 @@ This has been started after the 0.3.0 release.
 * Adding the `Admin` class to retrieve the CompanyId.
 * Adding the `configure` method for server usage of the API
 * Update documentation to reflect changes in the module.
+* add update for Data Element, Rules, Extension for library management.

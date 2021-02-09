@@ -47,11 +47,11 @@ admin.properties
 You can request Audit Events directly from the Admin instance.\
 These events will give you information about what has happened on your different properties so it is property agnostic.\
 The method takes those arguments:
-* 
+* page_size : How many result per page. (default 50 - max 100)
+* nb_page : How many page to return. (default 10)
+* type_of : event to look for.
 
-You can request the audit events by using the following method:
-
-
+As you can see, we can only have 10 pages of 100 results.
 
 ### createProperty
 
