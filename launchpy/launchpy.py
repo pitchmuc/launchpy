@@ -1,21 +1,42 @@
-import time as _time
-import json as _json
-from collections import defaultdict as _defaultdict
-from concurrent import futures as _futures
-from copy import deepcopy as _deepcopy
-import re
+import time
+import json
+from collections import defaultdict
+from concurrent import futures
+from copy import deepcopy
 import os
 import datetime
 # Non standard libraries
-import pandas as _pd
-import requests as _requests
-import jwt as _jwt
+import pandas as pd
 from pathlib import Path
-from launchpy import config
+from launchpy import config, connector
 
 # Set up default values
-_TokenEndpoint = "https://ims-na1.adobelogin.com/ims/exchange/jwt"
-_orga_admin = {'_org_admin', '_deployment_admin', '_support_admin'}
+
+
+def saveFile(data:str,filename:str=None,type:str='txt',encoding:str='utf-8')->None:
+    """
+    Save file to your system.
+    Arguments:
+        data : REQUIRED : data to be saved
+        filename : REQUIRED : name of the file or the path
+        type : OPTIONAL : Can be "txt", "json", "js"
+            json
+    """
+    if type=="txt":
+        if '.txt' not in filename:
+            filename = f"{filename}.txt"
+        with open(Path(filename),'w',encoding=encoding) as f:
+            f.write(data)
+    elif type == "js":
+        if '.js' not in filename:
+            filename = f"{filename}.js"
+        with open(Path(filename),'w',encoding=encoding) as f:
+            f.write(data)
+    elif type=="json":
+        if '.json' not in filename:
+            filename = f"{filename}.json"
+        with open(Path(filename),'w',encoding=encoding) as f:
+            f.write(json.dumps(data,indent=4))
 
 
 def createConfigFile(scope: bool = False, verbose: object = False)->None:
@@ -23,6 +44,7 @@ def createConfigFile(scope: bool = False, verbose: object = False)->None:
     This function will create a 'config_admin.json' file where you can store your access data. 
     Arguments:
         scope: OPTIONAL : if you have problem with scope during API connection, you may need to update this.
+            scope=""
     """
     json_data = {
         'org_id': '<orgID>',
@@ -33,283 +55,194 @@ def createConfigFile(scope: bool = False, verbose: object = False)->None:
         'scope': "https://ims-na1.adobelogin.com/s/ent_reactor_admin_sdk"
     }
     with open('config_admin.json', 'w') as cf:
-        cf.write(_json.dumps(json_data, indent=4))
+        cf.write(json.dumps(json_data, indent=4))
     if verbose:
         print(
             f" file created at this location : {os.getcwd()}{os.sep}config_admin.json")
 
 
-def importConfigFile(file: str)-> None:
-    """
-    This function will read the 'config_admin.json' to retrieve the information to be used by this module. 
-    """
-    with open(Path(file), 'r') as file:
-        f = _json.load(file)
-        config.config["org_id"] = f['org_id']
-        config.config["api_key"] = f['api_key']
-        config.config["tech_id"] = f['tech_id']
-        config.config["secret"] = f['secret']
-        config.config["pathToKey"] = f['pathToKey']
-        config.official_scope = f.get('scope', "")
-    config.date_limit = 0
+class Admin:
+
+    def __init__(self,config_object:dict=config.config_object,header:dict=config.header):
+        """
+        Instantiate the connector for the Login class
+        """
+        self.connector = connector.AdobeRequest(
+            config_object=config_object, header=header)
+        self.header = self.connector.header
+        self.COMPANY_ID = {}
+        self.properties = []
+        self.endpoint = config.endpoints['global']
+        
+
+    def getCompanyId(self)->object:
+        """
+        Retrieve the company id for later call for the properties
+        """
+        path =  "/companies"
+        companies = self.connector.getData(self.endpoint + path)
+        companyID = companies['data'][0]['id']
+        self.COMPANY_ID = companyID
+        return companyID
 
 
-def retrieveToken(verbose: bool = False, save: bool = False, params: dict = None)->str:
-    """ Retrieve the token by using the information provided by the user during the import importConfigFile function. 
-
-    Argument : 
-        verbose : OPTIONAL : Default False. If set to True, print information.
-    """
-
-    if config.config['pathToKey'].startswith('/'):
-        config.config['pathToKey'] = "."+config.config['pathToKey']
-    with open(Path(config.config['pathToKey']), 'r') as f:
-        private_key_unencrypted = f.read()
-        header_jwt = {'cache-control': 'no-cache',
-                      'content-type': 'application/x-www-form-urlencoded'}
-    jwtPayload_admin = {
-        # Expiration set to 24 hours
-        "exp": round(24*60*60 + int(_time.time())),
-        "iss": config.config['org_id'],
-        "sub": config.config['tech_id'],
-        config.scope_admin: True,
-        "aud": "https://ims-na1.adobelogin.com/c/"+config.config["api_key"]
-    }
-    jwtPayload_dev = {
-        # Expiration set to 24 hours
-        "exp": round(24*60*60 + int(_time.time())),
-        "iss": config.config['org_id'],
-        "sub": config.config['tech_id'],
-        config.scope_dev: True,
-        "aud": "https://ims-na1.adobelogin.com/c/"+config.config["api_key"]
-    }
-    encoded_jwt_admin = _jwt.encode(
-        jwtPayload_admin, private_key_unencrypted, algorithm='RS256')  # working algorithm
-    encoded_jwt_dev = _jwt.encode(
-        jwtPayload_dev, private_key_unencrypted, algorithm='RS256')  # working algorithm
-    payload_admin = {
-        "client_id": config.config['api_key'],
-        "client_secret": config.config['secret'],
-        "jwt_token": encoded_jwt_admin.decode("utf-8")
-    }
-    payload_dev = {
-        "client_id": config.config['api_key'],
-        "client_secret": config.config['secret'],
-        "jwt_token": encoded_jwt_dev.decode("utf-8")
-    }
-    response = _requests.post(
-        _TokenEndpoint, headers=header_jwt, data=payload_dev)
-    json_response = response.json()
-    if 'error' in json_response.keys():
-        if json_response['error'] == "invalid_scope":
-            try:
-                response = _requests.post(
-                    _TokenEndpoint, headers=header_jwt, data=payload_admin)
-                json_response = response.json()
-            except Exception as e:
-                print(_json.dumps(json_response, indent=4))
-                raise Exception(e)
-    try:
-        token = json_response['access_token']
-        _updateHeader(token)
-    except Exception as e:
-        print(_json.dumps(json_response, indent=4))
-        raise Exception(e)
-    expire = json_response['expires_in']
-    config.date_limit = _time.time() + expire/1000 - 500  # end of time for the token
-    if save:
-        with open('token.txt', 'w') as f:  # save the token
-            f.write(token)
-    if verbose == True:
-        print('token valid till : ' + _time.ctime(_time.time() + expire/1000))
-        print(f"token has been saved here : {os.getcwd()}{os.sep}token.txt")
-    return token
-
-
-def _checkToken(func):
-    """    decorator that checks that the token is valid before calling the API    """
-    def checking(*args, **kwargs):  # if function is not wrapped, will fire
-        now = _time.time()
-        if now > config.date_limit - 1000:
-            config.token = retrieveToken(*args, **kwargs)
-            return func(*args, **kwargs)
-        else:  # need to return the function for decorator to return something
-            return func(*args, **kwargs)
-    return checking  # return the function as object
-
-
-def _updateHeader(token_str: str)->None:
-    """ update the header when new token is generated"""
-    config.token = token_str
-    config.header = {"Accept": "application/vnd.api+json;revision=1",
-                     "Content-Type": "application/vnd.api+json",
-                     "Authorization": "Bearer " + config.token,
-                     "X-Api-Key": config.config['api_key'],
-                     "X-Gw-Ims-Org-Id": config.config['org_id']
-                     }
-
-
-@_checkToken
-def _getData(url: str, params: dict = None, *args: str, **kwargs)->object:
-    header = kwargs.get('header', config.header)
-    res = _requests.get(url, headers=header, params=params)
-    try:
-        infos = res.json()
-        if kwargs.get('verbose') == True:
-            print(res.request.url)
-            print(res.text)
-    except:
-        infos = res.text
-    return infos
-
-
-@_checkToken
-def _postData(url: str, obj: dict, **kwargs)->object:
-    header = kwargs.get('header', config.header)
-    res = _requests.post(url, headers=header, data=_json.dumps(obj))
-    if kwargs.get('verbose') == True:
-        print(res.text)
-    try:
-        infos = res.json()
-    except:
-        infos = res.text
-    return infos
-
-
-@_checkToken
-def _patchData(url: str, obj: dict, **kwargs)->object:
-    header = kwargs.get('header', config.header)
-    res = _requests.patch(url, headers=header, data=_json.dumps(obj))
-    if kwargs.get('verbose') == True:
-        print(res.text)
-    try:
-        infos = res.json()
-    except:
-        infos = res.text
-    return infos
-
-
-@_checkToken
-def _putData(url: str, obj: dict, **kwargs)->object:
-    header = kwargs.get('header', config.header)
-    res = _requests.put(url, headers=header, data=_json.dumps(obj))
-    if kwargs.get('verbose') == True:
-        print(res.text)
-    try:
-        infos = res.json()
-    except:
-        infos = res.text
-    return infos
-
-
-@_checkToken
-def _deleteData(url: str, **kwargs)->object:
-    header = kwargs.get('header', config.header)
-    res = _requests.delete(url, headers=header)
-    if kwargs.get('verbose') == True:
-        print(res.text)
-    return res.status_code
-
-#profile_response = _requests.get(_endpoint+getProfile,headers=header)
-#json_profile = profile_response.json()
-
-
-@_checkToken
-def getCompanyId()->object:
-    """
-    Retrieve the company id for later call for the properties
-    """
-    path = config.endpoints['global'] + config.endpoints['companies']
-    companies = _requests.get(path, headers=config.header)
-    companyID = companies.json()['data'][0]['id']
-    return companyID
-
-
-def getProperties(companyID: str)->object:
-    """
-    Retrieve the different properties available for a specific company.
-    Arguments :
-        companyID : REQUIRED : Company from where you want the properties
-    """
-    path = config.endpoints['global'] + \
-        config.endpoints['properties'].format(_company_id=companyID)
-    req_properties = _getData(path)
-    properties = req_properties
-    data = properties['data']  # properties information for page 1
-    # searching if page 1 is enough
-    pagination = properties['meta']['pagination']
-    # requesting all the pages
-    if pagination['current_page'] != pagination['total_pages'] and pagination['total_pages'] != 0:
-        # calculate how many page to download
-        pages_left = pagination['total_pages'] - pagination['current_page']
-        workers = min(pages_left, 5)  # max 5 threads
-        list_page_number = [{
-            'page[number]': str(x)} for x in range(2, pages_left+2)]  # starting page 2
-        urls = [path for x in range(2, pages_left+2)]
-        with _futures.ThreadPoolExecutor(workers) as executor:
-            res = executor.map(lambda x, y: _getData(
-                x, params=y), urls, list_page_number)
-        res = list(res)
-        append_data = [val for sublist in [data['data'] for data in res]
-                       for val in sublist]  # flatten list of list
-        data = data + append_data
-    return data
-
-
-def getAuditEvents(page_size: int = 50, nb_page: int = 10, **kwargs)->list:
-    """
-    Retrieve the different events that happened inside a Launch property.
-    Arguments :
-        page_size : OPTIONAL : How many result per page. (default 50 - max 100)
-        nb_page : OPTIONAL : How many page to return. (default 10)
-        type_of : OPTIONAL : event to look for.
-        **kwargs option
-        data : data being passed from one recursion to another. 
-        verbose : if want to follow up the completion (bool)
-        end_date : the past date you want to stop iterating. Date to be in datetime isoformat.
-    """
-    params = {'include': 'property', 'page[size]': '50'}
-    params['page[number]'] = kwargs.get('page_nb', 1)
-    if page_size is not None:
-        params['page[size]'] = page_size
-    path = config.endpoints['global'] + config.endpoints['auditEvents']
-    events = _getData(path, params=params)
-    data = events['data']
-    last_date = datetime.datetime.fromisoformat(
-        data[-1]['attributes']['updated_at'][:-1])
-    curr_page = events['meta']['pagination']['current_page']
-    if kwargs.get('end_date', False):
-        date_check = datetime.datetime.fromisoformat(kwargs.get('end_date'))
-    else:
-        date_check = last_date  # ensure true in that condition if no date given
-    if kwargs.get('verbose', False):
-        if curr_page % 10 == 0 or curr_page == 1:
-            print(f'current page {curr_page}')
-        print(f'% completion : {curr_page / nb_page*100}%')
-    # checking if we need to pursue iteration related to update date.
-    if curr_page == nb_page and last_date > date_check:
-        nb_page += 1
-    if curr_page == 100:
-        print('You have reach maximum limit of the API (100 pages of 100 results)')
+    def getProperties(self,companyID: str)->list:
+        """
+        Retrieve the different properties available for a specific company.
+        Arguments :
+            companyID : REQUIRED : Company from where you want the properties
+        """
+        path = f"/companies/{companyID}/properties"
+        properties = self.connector.getData(self.endpoint + path)
+        data = properties['data']  # properties information for page 1
+        # searching if page 1 is enough
+        pagination = properties['meta']['pagination']
+        # requesting all the pages
+        if pagination['current_page'] != pagination['total_pages'] and pagination['total_pages'] != 0:
+            # calculate how many page to download
+            pages_left = pagination['total_pages'] - pagination['current_page']
+            workers = min(pages_left, 5)  # max 5 threads
+            list_page_number = [{
+                'page[number]': str(x)} for x in range(2, pages_left+2)]  # starting page 2
+            urls = [self.endpoint + path for x in range(2, pages_left+2)]
+            with futures.ThreadPoolExecutor(workers) as executor:
+                res = executor.map(lambda x, y: self.connector.getData(
+                    x, params=y), urls, list_page_number)
+            res = list(res)
+            append_data = [val for sublist in [data['data'] for data in res]
+                        for val in sublist]  # flatten list of list
+            data = data + append_data
+        self.properties = data
         return data
-    else:
-        if (curr_page < events['meta']['pagination']['total_pages'] and curr_page < nb_page):
-            data += getAuditEvents(page_size=page_size, nb_page=nb_page,
-                                   page_nb=curr_page+1, verbose=kwargs.get('verbose', False), end_date=kwargs.get('end_date', False))
-    return data
 
 
-def getRessource(res_url: str = None, params: dict = None):
-    """
-    Enable you to request a specific resource from Launch API.
-    Arguments:
-        res_url : REQUIRED : Resource URL to request
-        params : OPTIONAL : If you want to pass any parameter.
-    """
-    if res_url is None:
-        raise Exception("You must provide a resource url")
-    res = _getData(res_url, header=config.header, params=params)
-    return res
+    def getAuditEvents(self, page_size: int = 50, nb_page: int = 10, **kwargs)->list:
+        """
+        Retrieve the different events that happened inside a Launch property.
+        Arguments :
+            page_size : OPTIONAL : How many result per page. (default 50 - max 100)
+            nb_page : OPTIONAL : How many page to return. (default 10)
+            type_of : OPTIONAL : event to look for.
+            **kwargs option
+            data : data being passed from one recursion to another. 
+            verbose : if want to follow up the completion (bool)
+            end_date : the past date you want to stop iterating. Date to be in datetime isoformat.
+        """
+        params = {'include': 'property', 'page[size]': '50'}
+        params['page[number]'] = kwargs.get('page_nb', 1)
+        if page_size is not None:
+            params['page[size]'] = page_size
+        path = '/audit_events'
+        events = self.connector.getData(self.endpoint + path, params=params)
+        data = events['data']
+        last_date = datetime.datetime.fromisoformat(
+            data[-1]['attributes']['updated_at'][:-1])
+        curr_page = events['meta']['pagination']['current_page']
+        if kwargs.get('end_date', False):
+            date_check = datetime.datetime.fromisoformat(kwargs.get('end_date'))
+        else:
+            date_check = last_date  # ensure true in that condition if no date given
+        if kwargs.get('verbose', False):
+            if curr_page % 10 == 0 or curr_page == 1:
+                print(f'current page {curr_page}')
+            print(f'% completion : {curr_page / nb_page*100}%')
+        # checking if we need to pursue iteration related to update date.
+        if curr_page == nb_page and last_date > date_check:
+            nb_page += 1
+        if curr_page == 100:
+            print('You have reach maximum limit of the API (100 pages of 100 results)')
+            return data
+        else:
+            if (curr_page < events['meta']['pagination']['total_pages'] and curr_page < nb_page):
+                data += self.getAuditEvents(page_size=page_size, nb_page=nb_page,
+                                    page_nb=curr_page+1, verbose=kwargs.get('verbose', False), end_date=kwargs.get('end_date', False))
+        return data
+    
+    def createProperty(self,companyId: str, name: str, platform: str = 'web', return_class: bool = True, **kwargs)->dict:
+        """
+        Create a property with default information. Will return empty value as default value. 
+        Returns a property instance.
+        Arguments : 
+            - companyId : REQUIRED : id of the company
+            - name : REQUIRED : name of the property
+            - platform : REQUIRED : default 'web', can be 'app'
+            - return_class : REQUIRED : default True, will return an instance of property class. 
+            If set to false, will just return the object created. 
+            **kwargs : can use the different parameter reference here : https://developer.adobelaunch.com/api/reference/1.0/properties/create/
+
+        """
+        obj = {}
+        obj['data'] = {}
+        obj['data']['attributes'] = {}
+        # in case some optional value are filled in
+        undefined_vars_return_empty = kwargs.get(
+            'undefined_vars_return_empty', True)
+        development = kwargs.get('development', False)
+        domains = kwargs.get('domains', ['example.com'])
+        if type(domains) == str:  # change the domains to list as required
+            if ',' in domains:
+                domains = domains.split(',')
+            else:  # if a string but only 1 domain
+                domains = list(domains)
+        obj['data']['attributes']['name'] = name
+        obj['data']['attributes']['platform'] = platform
+        if platform == "mobile":
+            obj['data']['attributes']['ssl_enabled'] = kwargs.get(
+                'ssl_enabled', True)
+            obj['data']['attributes']['privacy'] = kwargs.get('privacy', 'optedin')
+        elif platform == "web":
+            obj['data']['attributes']['domains'] = domains
+        obj['data']['attributes']['development'] = development
+        obj['data']['attributes']['undefined_vars_return_empty'] = undefined_vars_return_empty
+        obj['data']['type'] = 'properties'
+        path = f"/companies/{companyId}/properties"
+        new_property = self.connector.postData(self.endpoint +path, obj)
+        if return_class:
+            property_class = Property(new_property['data'])
+            return property_class
+        else:
+            return new_property['data']
+
+
+    def getExtensionsCatalogue(self, availability: str = None, name: str = None, platform: str = "web", save: bool = False)->list:
+        """
+        Return a list of the Extension Catalogue available for your organization
+        Arguments: 
+            availability : OPTIONAL : to filter for a specific type of extension. ("public" or "private")
+            name : OPTIONAL : to filter for a specific extension name (contains method)
+            platform : OPTIONAL : to filter for a specific platform (default "web", mobile possible)
+            save : OPTIONAL : save the results in a txt file (packages.txt). Default False.
+        """
+        path = config.endpoints['global']+'/extension_packages'
+        params = {'page[size]': '100'}
+        if availability is not None:
+            params["filter[availability]"] = f"EQ {availability}"
+        if name is not None:
+            params['filter[display_name]'] = f"CONTAINS {name}"
+        if platform is not None:
+            params['filter[platform]'] = f"EQ {platform}"
+        extensions = self.connector.getData(path, params=params)
+        data = extensions['data']  # properties information for page 1
+        # searching if page 1 is enough
+        pagination = extensions['meta']['pagination']
+        # requesting all the pages
+        if pagination['current_page'] != pagination['total_pages'] and pagination['total_pages'] != 0:
+            # calculate how many page to download
+            pages_left = pagination['total_pages'] - pagination['current_page']
+            workers = min(pages_left, 5)  # max 5 threads
+            params = [{
+                'page[number]': str(x), **params} for x in range(2, pages_left+2)]  # starting page 2
+            urls = [path for x in range(2, pages_left+2)]
+            with futures.ThreadPoolExecutor(workers) as executor:
+                res = executor.map(lambda x, y: self.connector.getData(
+                    x, params=y), urls, params)
+            res = list(res)
+            append_data = [val for sublist in [data['data'] for data in res]
+                        for val in sublist]  # flatten list of list
+            data = data + append_data
+        if save:
+                saveFile(data,'packages.txt',type='txt')
+        return data
 
 
 class Property:
@@ -326,12 +259,17 @@ class Property:
           rules : dictionnary to extract ruleComponents from rules. Filled when running getRules
         """
 
-    def __init__(self, data: object) -> None:
+    def __init__(self, data: object,config_object:dict=config.config_object,header:dict=config.header) -> None:
         """
         Instanciate the class with the object retrieved by getProperties.
-        Attributes : 
-          data : Object that has been retrieved on getProperties. Single property. 
+        Arguments : 
+          data : REQUIRED : Object that has been retrieved on getProperties. Single property. 
+          config : OPTIONAL : Configuration required to generate JWT token
+          header : OPTIONAL : Header used for the requests
         """
+        self.connector = connector.AdobeRequest(
+            config_object=config_object, header=header)
+        self.endpoint = config.endpoints['global']
         self.dict = data
         self.name = data['attributes']['name']
         self.id = data['id']
@@ -353,13 +291,14 @@ class Property:
         self._Environments = data['links']['environments']
         self._Libraries = data['relationships']['libraries']['links']['related']
         self.ruleComponents = {}
-        self.header = _deepcopy(config.header)
+        self.header = deepcopy(config.header)
 
     def __repr__(self)-> dict:
-        return _json.dumps(self.dict, indent=4)
+        return json.dumps(self.dict, indent=4)
 
     def __str__(self)-> str:
-        return str(_json.dumps(self.dict, indent=4))
+        return str(json.dumps(self.dict, indent=4))
+    
 
     def _getExtensionPackage(self, ext_name: str, platform: str = "web", verbose: bool = False)->dict:
         """
@@ -370,22 +309,34 @@ class Property:
             platform : REQUIRED : if you want to look for specific platform.
             verbose : OPTIONAL : set to true to print statement along the way (default False)
         """
-        uri = '/extension_packages'
+        path = '/extension_packages'
         params = {'filter[name]': 'EQ '+str(ext_name), 'platform': platform}
-        res_ext = _requests.get(
-            config.endpoints['global']+uri, params=params, headers=self.header)
-        data = res_ext.json()['data'][0]
+        res_ext = self.connector.getData(
+            self.endpoint+path, params=params)
+        data = res_ext['data'][0]
         extension_id = data['id']
         if verbose:
             print('extension name : ' + str(data['attributes']['name']))
             print('extension id : ' + str(data['id']))
         return extension_id
 
+    def getRessource(self,res_url: str = None, params: dict = None):
+        """
+        Enable you to request a specific resource from Launch API.
+        Arguments:
+            res_url : REQUIRED : Resource URL to request
+            params : OPTIONAL : If you want to pass any parameter.
+        """
+        if res_url is None:
+            raise Exception("You must provide a resource url")
+        res = self.connector.getData(res_url, params=params)
+        return res
+
     def getEnvironments(self)->object:
         """
         Retrieve the environment sets for this property
         """
-        env = _getData(self._Environments, header=self.header)
+        env = self.connector.getData(self._Environments)
         data = env['data']  # skip meta for now
         return data
 
@@ -393,7 +344,7 @@ class Property:
         """
         Retrieve the hosts sets for this property
         """
-        host = _getData(self._Host, header=self.header)
+        host = self.connector.getData(self._Host, header=self.header)
         data = host['data']  # skip meta for now
         return data
 
@@ -401,7 +352,7 @@ class Property:
         """
         retrieve the different information from url retrieve in the properties
         """
-        extensions = _getData(self._Extensions)
+        extensions = self.connector.getData(self._Extensions)
         try:
             pagination = extensions['meta']['pagination']
             data = extensions['data']  # keep only information on extensions
@@ -414,8 +365,8 @@ class Property:
                 list_page_number = [
                     {'page[number]': str(x)} for x in range(2, pages_left+2)]
                 urls = [self._Extensions for x in range(2, pages_left+2)]
-                with _futures.ThreadPoolExecutor(workers) as executor:
-                    res = executor.map(lambda x, y: _getData(
+                with futures.ThreadPoolExecutor(workers) as executor:
+                    res = executor.map(lambda x, y: self.connector.getData(
                         x, params=y, header=self.header), urls, list_page_number)
                 res = list(res)
                 append_data = [val for sublist in [data['data'] for data in res]
@@ -481,17 +432,17 @@ class Property:
                 }
                 }
                 }
-        res = _requests.patch(
-            config.endpoints['global']+'/extensions/'+str(extension_id), header=self.header, data=_json.dumps(data))
-        upgrade = res.json()
-        return upgrade
+        path = f"/extensions/{extension_id}"
+        res = self.connector.patchData(
+            self.endpoint+path, data=json.dumps(data))
+        return res
 
     def getRules(self)->object:
         """
         Return the list of the rules data.
         On top, it fills the ruleComponents attribute with a dictionnary based on rule id and their rule name and the ruleComponent of each.
         """
-        rules = _getData(self._Rules)
+        rules = self.connector.getData(self._Rules)
         try:
             data = rules['data']  # skip meta for now
             pagination = rules['meta']['pagination']
@@ -505,8 +456,8 @@ class Property:
                     {'page[number]': str(x)} for x in range(2, pages_left+2)]
                 urls = [self._Rules for x in range(2, pages_left+2)]
                 headers = [self.header for x in range(2, pages_left+2)]
-                with _futures.ThreadPoolExecutor(workers) as executor:
-                    res = executor.map(lambda x, y, z: _getData(
+                with futures.ThreadPoolExecutor(workers) as executor:
+                    res = executor.map(lambda x, y, z: self.connector.getData(
                         x, params=y, header=z), urls, list_page_number, headers)
                 res = list(res)
                 append_data = [val for sublist in [data['data']
@@ -541,7 +492,7 @@ class Property:
             filters['filter[published]'] = f"EQ {str(published).lower()}"
         if 'created_at' in kwargs:
             pass  # documentation unclear on how to handle it
-        rules = _getData(self._Rules, params=filters)
+        rules = self.connector.getData(self._Rules, params=filters)
         data = rules['data']  # skip meta for now
         pagination = rules['meta']['pagination']
         # requesting all the pages
@@ -552,8 +503,8 @@ class Property:
             list_parameters = [{'&page[number]':
                                 str(x), **filters} for x in range(2, pages_left+2)]
             urls = [self._Rules for x in range(2, pages_left+2)]
-            with _futures.ThreadPoolExecutor(workers) as executor:
-                res = executor.map(lambda x, y: _getData(
+            with futures.ThreadPoolExecutor(workers) as executor:
+                res = executor.map(lambda x, y: self.connector.getData(
                     x, params=y, header=self.header), urls, list_parameters)
             res = list(res)
             append_data = [val for sublist in [data['data']
@@ -596,14 +547,13 @@ class Property:
         workers = min((len(list_urls), 5))
 
         def request_data(url, header, name, ids):
-            rule_component = _requests.get(url, headers=header)
-            # print(rule_component.request.url)
-            data = rule_component.json()['data']
+            rule_component = self.connector.getData(url)
+            data = rule_component['data']
             for element in data:
                 element['rule_name'] = name
                 element['rule_id'] = ids
             return data
-        with _futures.ThreadPoolExecutor(workers) as executor:
+        with futures.ThreadPoolExecutor(workers) as executor:
             res = executor.map(lambda x, y, z, a: request_data(
                 x, header=y, name=z, ids=a), list_urls, headers, names, ids)
         list_data = list(res)
@@ -621,7 +571,7 @@ class Property:
         Retrieve data elements of that property.
         Returns a list.
         """
-        dataElements = _getData(self._DataElement)
+        dataElements = self.connector.getData(self._DataElement)
         try:
             data = dataElements['data']  # data for page 1
             pagination = dataElements['meta']['pagination']
@@ -634,8 +584,8 @@ class Property:
                 list_page_number = [{'page[number]':
                                      str(x)} for x in range(2, pages_left+2)]
                 urls = [self._DataElement for x in range(2, pages_left+2)]
-                with _futures.ThreadPoolExecutor(workers) as executor:
-                    res = executor.map(lambda x, y: _getData(
+                with futures.ThreadPoolExecutor(workers) as executor:
+                    res = executor.map(lambda x, y: self.connector.getData(
                         x, params=y, header=self.header), urls, list_page_number)
                 res = list(res)
                 append_data = [val for sublist in [data['data']
@@ -666,7 +616,7 @@ class Property:
         if 'created_at' in kwargs:
             pass  # documentation unclear on how to handle it
         parameters = {**filters}
-        dataElements = _getData(self._DataElement, params=parameters)
+        dataElements = self.connector.getData(self._DataElement, params=parameters)
         data = dataElements['data']  # skip meta for now
         pagination = dataElements['meta']['pagination']
         # requesting all the pages
@@ -677,8 +627,8 @@ class Property:
             list_parameters = [{'page[number]': str(
                 x), **parameters} for x in range(2, pages_left+2)]
             urls = [self._Rules for x in range(2, pages_left+2)]
-            with _futures.ThreadPoolExecutor(workers) as executor:
-                res = executor.map(lambda x, y: _getData(
+            with futures.ThreadPoolExecutor(workers) as executor:
+                res = executor.map(lambda x, y: self.connector.getData(
                     x, params=y, header=self.header), urls, list_parameters)
             res = list(res)
             append_data = [val for sublist in [data['data']
@@ -704,7 +654,7 @@ class Property:
             if state not in ['development', "submitted", "approved", "rejected", "published"]:
                 raise KeyError("State provided didn't match possible state.")
             params['filter[state]'] = f"EQ {state}"
-        libs = _getData(self._Libraries, params=params)
+        libs = self.connector.getData(self._Libraries, params=params)
         data = libs['data']  # dat for page 1
         pagination = libs['meta']['pagination']
         # requesting all the pages
@@ -715,8 +665,8 @@ class Property:
             list_page_number = [
                 {'page[number]': str(x), **params} for x in range(2, pages_left+2)]
             urls = [self._Libraries for x in range(2, pages_left+2)]
-            with _futures.ThreadPoolExecutor(workers) as executor:
-                res = executor.map(lambda x, y: _getData(
+            with futures.ThreadPoolExecutor(workers) as executor:
+                res = executor.map(lambda x, y: self.connector.getData(
                     x, params=y, header=self.header), urls, list_page_number)
             res = list(res)
             append_data = [val for sublist in [data['data']
@@ -738,7 +688,7 @@ class Property:
             url = self.dict['relationships']['notes']['links']['related']
         else:
             url = data['relationships']['notes']['links']['related']
-        notes = _getData(url)
+        notes = self.connector.getData(url)
         data = notes['data']  # data for page 1
         pagination = notes['meta']['pagination']
         # requesting all the pages
@@ -749,8 +699,8 @@ class Property:
             list_page_number = [
                 {'page[number]': str(x)} for x in range(2, pages_left+2)]
             urls = [url for x in range(2, pages_left+2)]
-            with _futures.ThreadPoolExecutor(workers) as executor:
-                res = executor.map(lambda x, y: _getData(
+            with futures.ThreadPoolExecutor(workers) as executor:
+                res = executor.map(lambda x, y: self.connector.getData(
                     x, params=y, header=self.header), urls, list_page_number)
             res = list(res)
             append_data = [val for sublist in [data['data']
@@ -784,7 +734,7 @@ class Property:
         if settings is not None and descriptor is not None:
             obj['data']['attributes']['settings'] = str(settings)
             obj['data']['attributes']['delegate_descriptor_id'] = descriptor
-        extensions = _postData(self._Extensions, obj)
+        extensions = self.connector.postData(self._Extensions, obj)
         try:
             data = extensions['data']
         except:
@@ -806,7 +756,7 @@ class Property:
                 "type": "rules"
             }
         }
-        rules = _postData(self._Rules, obj, header=self.header)
+        rules = self.connector.postData(self._Rules, obj, header=self.header)
         try:
             data = rules['data']
             self.ruleComponents[data['id']] = {'name': data['attributes']['name'],
@@ -848,7 +798,7 @@ class Property:
             obj['data']['attributes']['settings'] = settings
         if 'order' in kwargs:
             obj['data']['attributes']['order'] = kwargs.get('order')
-        rc = _postData(self._RuleComponents, obj, header=self.header)
+        rc = self.connector.postData(self._RuleComponents, obj, header=self.header)
         try:
             data = rc['data']
         except:
@@ -884,7 +834,7 @@ class Property:
                 obj['data']['attributes']['settings'] = settings
         except:
             pass
-        dataElements = _postData(self._DataElement, obj, header=self.header)
+        dataElements = self.connector.postData(self._DataElement, obj, header=self.header)
         try:
             data = dataElements['data']
         except:
@@ -918,7 +868,7 @@ class Property:
                 "type": "environments"
             }
         }
-        env = _postData(self._Environments, obj, header=self.header)
+        env = self.connector.postData(self._Environments, obj, header=self.header)
         data = env['data']
         return data
 
@@ -956,7 +906,7 @@ class Property:
                 obj['data']['attributes']['server'] = kwargs.get('server')
                 obj['data']['attributes']['path'] = kwargs.get('path', '/')
                 obj['data']['attributes']['port'] = kwargs.get('port', 22)
-        host = _postData(self._Host, obj, header=self.header)
+        host = self.connector.postData(self._Host, obj, header=self.header)
         try:
             data = host['data']
         except:
@@ -980,7 +930,7 @@ class Property:
                 "type": "libraries"
             }
         }
-        lib = _postData(self._Libraries, obj, header=self.header)
+        lib = self.connector.postData(self._Libraries, obj, header=self.header)
         try:
             data = lib['data']
             if return_class:
@@ -1008,7 +958,7 @@ class Property:
             }
         }
         path = f'/extensions/{extension_id}'
-        extensions = _patchData(
+        extensions = self.connector.patchData(
             config.endpoints['global']+path, obj, header=self.header)
         data = extensions['data']
         return data
@@ -1032,7 +982,7 @@ class Property:
             }
         }
         path = f"/rules/{rule_id}"
-        rules = _patchData(
+        rules = self.connector.patchData(
             config.endpoints['global']+path, obj, header=self.header)
         data = rules
         return data
@@ -1046,7 +996,7 @@ class Property:
         if rule_id is None:
             raise Exception("A rule ID is required")
         path = f"/rules/{rule_id}/revisions"
-        revisions = _getData(config.endpoints['global']+path,header=self.header)
+        revisions = self.connector.getData(config.endpoints['global']+path,header=self.header)
         return revisions
 
 
@@ -1066,7 +1016,7 @@ class Property:
                 }
             }
         }
-        dataElements = _patchData(
+        dataElements = self.connector.patchData(
             config.endpoints['global']+'/data_elements/'+dataElement_id, obj, header=self.header)
         data = dataElements
         return data
@@ -1090,7 +1040,7 @@ class Property:
                 "type": "rules"
             }
         }
-        rules = _patchData(
+        rules = self.connector.patchData(
             config.endpoints['global']+'/rules/'+rule_id, obj, header=self.header)
         try:
             data = rules['data']
@@ -1112,7 +1062,7 @@ class Property:
                 "id": rc_id
             }
         }
-        rc = _patchData(
+        rc = self.connector.patchData(
             config.endpoints['global']+'/rule_components/'+rc_id, obj, header=self.header)
         try:
             data = rc['data']
@@ -1134,7 +1084,7 @@ class Property:
                 "id": dataElement_id
             }
         }
-        dataElements = _patchData(
+        dataElements = self.connector.patchData(
             config.endpoints['global']+'/data_elements/'+dataElement_id, obj, header=self.header)
         try:
             data = dataElements['data']
@@ -1160,7 +1110,7 @@ class Property:
                 "type": "environments"
             }
         }
-        env = _patchData(
+        env = self.connector.patchData(
             config.endpoints['global']+'/environments/'+env_id, obj, header=self.header)
         try:
             data = env['data']
@@ -1182,7 +1132,7 @@ class Property:
                 "type": "extensions"
             }
         }
-        extensions = _patchData(
+        extensions = self.connector.patchData(
             config.endpoints['global']+'/extensions/'+extension_id, obj, header=self.header)
         try:
             data = extensions['data']
@@ -1196,7 +1146,7 @@ class Property:
         Arguments: 
             extension_id : REQUIRED : Rule ID that needs to be deleted
         """
-        data = _deleteData(
+        data = self.connector.deleteData(
             'https://reactor.adobe.io/extensions/'+extension_id, header=self.header)
         return data
 
@@ -1206,7 +1156,7 @@ class Property:
         Arguments: 
             rule_id : REQUIRED : Rule ID that needs to be deleted
         """
-        data = _deleteData('https://reactor.adobe.io/rules/' +
+        data = self.connector.deleteData('https://reactor.adobe.io/rules/' +
                            rule_id, header=self.header)
         return data
 
@@ -1216,7 +1166,7 @@ class Property:
         Arguments: 
             dataElement_id : REQUIRED : Data Element ID that needs to be deleted
         """
-        data = _deleteData(
+        data = self.connector.deleteData(
             'https://reactor.adobe.io/data_elements/'+dataElement_id, header=self.header)
         return data
 
@@ -1226,7 +1176,7 @@ class Property:
         Arguments: 
             rc_id : REQUIRED : Rule Component ID that needs to be deleted
         """
-        data = _deleteData(
+        data = self.connector.deleteData(
             'https://reactor.adobe.io/rule_components/'+rc_id, header=self.header)
         return data
 
@@ -1236,7 +1186,7 @@ class Property:
         Arguments: 
             env_id : REQUIRED : Environment ID that needs to be deleted
         """
-        data = _deleteData(
+        data = self.connector.deleteData(
             'https://reactor.adobe.io/environments/'+env_id, header=self.header)
         return data
 
@@ -1246,11 +1196,11 @@ class Property:
     #     Extract the analytics configuration that has been done in the Analytics Extensions and Rules.
     #     Return a dictionary of the different element in a dataframe
     #     """
-    #     dict_eVars = _defaultdict(list)
-    #     dict_props = _defaultdict(list)
-    #     dict_events = _defaultdict(list)
-    #     dict_value_eVars = _defaultdict(list)
-    #     dict_value_props = _defaultdict(list)
+    #     dict_eVars = defaultdict(list)
+    #     dict_props = defaultdict(list)
+    #     dict_events = defaultdict(list)
+    #     dict_value_eVars = defaultdict(list)
+    #     dict_value_props = defaultdict(list)
     #     p_rules = self.getRules()
     #     p_ext = self.getExtensions()
     #     p_rcs = self.getRuleComponents()
@@ -1267,7 +1217,7 @@ class Property:
     #             name = element['rule_name']
     #         elif element['type'] == "extensions":
     #             name = 'Analytics Extension'
-    #         settings = _json.loads(element['attributes']['settings'])
+    #         settings = json.loads(element['attributes']['settings'])
     #         if 'trackerProperties' in settings.keys():
     #             tracker_properties = settings['trackerProperties']
     #         else:
@@ -1310,110 +1260,23 @@ class Property:
     #     searchSetupAnalytics(analytics)
     #     for rc in analytics_rcs:
     #         searchSetupAnalytics(rc)
-    #     df_eVars = _pd.DataFrame(
-    #         dict([(k, _pd.Series(v)) for k, v in dict_eVars.items()])).T.fillna('')
+    #     df_eVars = pd.DataFrame(
+    #         dict([(k, pd.Series(v)) for k, v in dict_eVars.items()])).T.fillna('')
     #     df_eVars.columns = ['location ' +
     #                         str(i) for i in range(1, len(df_eVars.columns)+1)]
-    #     df_props = _pd.DataFrame(
-    #         dict([(k, _pd.Series(v)) for k, v in dict_props.items()])).T.fillna('')
+    #     df_props = pd.DataFrame(
+    #         dict([(k, pd.Series(v)) for k, v in dict_props.items()])).T.fillna('')
     #     df_props.columns = ['location ' +
     #                         str(i) for i in range(1, len(df_props.columns)+1)]
-    #     df_events = _pd.DataFrame(
-    #         dict([(k, _pd.Series(v)) for k, v in dict_events.items()])).T.fillna('')
+    #     df_events = pd.DataFrame(
+    #         dict([(k, pd.Series(v)) for k, v in dict_events.items()])).T.fillna('')
     #     df_events.columns = ['location ' +
     #                          str(i) for i in range(1, len(df_events.columns)+1)]
     #     data = {'eVars': df_eVars, 'props': df_props, 'events': df_events}
     #     return data
 
 
-def createProperty(companyId: str, name: str, platform: str = 'web', return_class: bool = True, **kwargs)->dict:
-    """
-    Create a property with default information. Will return empty value as default value. 
-    Returns a property instance.
-    Arguments : 
-        - companyId : REQUIRED : id of the company
-        - name : REQUIRED : name of the property
-        - platform : REQUIRED : default 'web', can be 'app'
-        - return_class : REQUIRED : default True, will return an instance of property class. 
-        If set to false, will just return the object created. 
-        **kwargs : can use the different parameter reference here : https://developer.adobelaunch.com/api/reference/1.0/properties/create/
 
-    """
-    obj = {}
-    obj['data'] = {}
-    obj['data']['attributes'] = {}
-    # in case some optional value are filled in
-    undefined_vars_return_empty = kwargs.get(
-        'undefined_vars_return_empty', True)
-    development = kwargs.get('development', False)
-    domains = kwargs.get('domains', ['example.com'])
-    if type(domains) == str:  # change the domains to list as required
-        if ',' in domains:
-            domains = domains.split(',')
-        else:  # if a string but only 1 domain
-            domains = list(domains)
-    obj['data']['attributes']['name'] = name
-    obj['data']['attributes']['platform'] = platform
-    if platform == "mobile":
-        obj['data']['attributes']['ssl_enabled'] = kwargs.get(
-            'ssl_enabled', True)
-        obj['data']['attributes']['privacy'] = kwargs.get('privacy', 'optedin')
-    elif platform == "web":
-        obj['data']['attributes']['domains'] = domains
-    obj['data']['attributes']['development'] = development
-    obj['data']['attributes']['undefined_vars_return_empty'] = undefined_vars_return_empty
-    obj['data']['type'] = 'properties'
-    path = config.endpoints['global'] + \
-        config.endpoints['properties'].format(_company_id=companyId)
-    new_property = _postData(path, obj)
-    if return_class:
-        property_class = Property(new_property['data'])
-        return property_class
-    else:
-        return new_property['data']
-
-
-def getExtensionsCatalogue(availability: str = None, name: str = None, platform: str = "web", save: bool = False)->list:
-    """
-    Return a list of the Extension Catalogue available for your organization
-    Arguments: 
-        availability : OPTIONAL : to filter for a specific type of extension. ("public" or "private")
-        name : OPTIONAL : to filter for a specific extension name (contains method)
-        platform : OPTIONAL : to filter for a specific platform (default "web", mobile possible)
-        save : OPTIONAL : save the results in a txt file (packages.txt). Default False.
-    """
-    path = config.endpoints['global']+'/extension_packages'
-    params = {'page[size]': '100'}
-    if availability is not None:
-        params["filter[availability]"] = f"EQ {availability}"
-    if name is not None:
-        params['filter[display_name]'] = f"CONTAINS {name}"
-    if platform is not None:
-        params['filter[platform]'] = f"EQ {platform}"
-    extensions = _getData(path, params=params, header=config.header)
-    data = extensions['data']  # properties information for page 1
-    # searching if page 1 is enough
-    pagination = extensions['meta']['pagination']
-    # requesting all the pages
-    if pagination['current_page'] != pagination['total_pages'] and pagination['total_pages'] != 0:
-        # calculate how many page to download
-        pages_left = pagination['total_pages'] - pagination['current_page']
-        workers = min(pages_left, 5)  # max 5 threads
-        params = [{
-            'page[number]': str(x), **params} for x in range(2, pages_left+2)]  # starting page 2
-        urls = [path for x in range(2, pages_left+2)]
-        with _futures.ThreadPoolExecutor(workers) as executor:
-            res = executor.map(lambda x, y: _getData(
-                x, params=y), urls, params)
-        res = list(res)
-        append_data = [val for sublist in [data['data'] for data in res]
-                       for val in sublist]  # flatten list of list
-        data = data + append_data
-    if save:
-        with open('packages.txt', 'w') as f:
-            for row in data:
-                f.write(f"{row}\n")
-    return data
 
 
 def extensionsInfo(data: list)->dict:
@@ -1449,7 +1312,7 @@ def rulesInfo(data: list)-> dict:
     Arguments : 
         - data : REQUIRED : list information returned by the getRules method. 
     """
-    rules = _defaultdict(None)
+    rules = defaultdict(None)
     for rule in data:
         rules[rule['attributes']['name']] = {
             'created_at': rule['attributes']['created_at'],
@@ -1496,7 +1359,7 @@ def dataElementInfo(data: list)->dict:
     arguments : 
         - data : list return by the getDataElement value
     """
-    elements = _defaultdict(None)
+    elements = defaultdict(None)
     for element in data:
         elements[element['attributes']['name']] = {
             'id': element['id'],
@@ -1533,19 +1396,18 @@ def extractSettings(element: dict, save: bool = False)->dict:
     Extract the settings from your element. For your custom code, it will extract the javaScript. 
     Arguments: 
         element : REQUIRED : element from which you would like to extract the setting from. 
-        save : OPTIONAL : bool, if you want to save the setting in a JS or JSON file, set it to true. (default False)
+        save : OPTIONAL : bool, if you want to save the setting in a JS or JSON file, set it to true (UTF-16). (default False)
     """
     element_type = element['type']
     if element_type == 'data_elements':
         if element['attributes']['delegate_descriptor_id'] == 'core::dataElements::custom-code':
             settings = element['attributes']['settings']
-            code = _json.loads(settings)['source']
+            code = json.loads(settings)['source']
             if save is True:
                 name = f'DE - {str(element["attributes"]["name"])}.js'
                 name = name.replace('"', "'").replace('|', '').replace('>', '').replace(
                     '<', '').replace('/', '').replace('\\', '').replace(':', ';').replace('?', '')
-                with open(name, 'w') as f:
-                    f.write(code)
+                saveFile(code,name,type='js',encoding='utf-16')
             return code
         else:
             settings = element['attributes']['settings']
@@ -1553,18 +1415,16 @@ def extractSettings(element: dict, save: bool = False)->dict:
                 name = f'DE - {str(element["attributes"]["name"])} - settings.json'
                 name = name.replace('"', "'").replace('|', '').replace('>', '').replace(
                     '<', '').replace('/', '').replace('\\', '').replace(':', ';').replace('?', '')
-                with open(name, 'w') as f:
-                    f.write(settings)
+                saveFile(settings,name,type='json',encoding='utf-16')
             return settings
     elif element_type == 'extensions':
         if element['attributes']['delegate_descriptor_id'] == "adobe-analytics::extensionConfiguration::config":
-            settings = _json.loads(element['attributes']['settings'])
+            settings = json.loads(element['attributes']['settings'])
             if save is True:
                 name = f'EXT - {str(element["attributes"]["name"])}.json'
                 name = name.replace('"', "'").replace('|', '').replace('>', '').replace(
                     '<', '').replace('/', '').replace('\\', '').replace(':', ';').replace('?', '')
-                with open(name, 'w') as f:
-                    f.write(_json.dumps(settings, indent=4))
+                saveFile(settings,name,type='json',encoding='utf-16')
             return settings
         else:
             settings = element['attributes']['settings']
@@ -1572,8 +1432,7 @@ def extractSettings(element: dict, save: bool = False)->dict:
                 name = f'EXT - {str(element["attributes"]["name"])} - settings.json'
                 name = name.replace('"', "'").replace('|', '').replace('>', '').replace(
                     '<', '').replace('/', '').replace('\\', '').replace(':', ';').replace('?', '')
-                with open(name, 'w') as f:
-                    f.write(settings)
+                saveFile(settings,name,type='json',encoding='utf-16')
             return settings
     elif element_type == 'rule_components':
         rule_name = element['rule_name']
@@ -1581,33 +1440,30 @@ def extractSettings(element: dict, save: bool = False)->dict:
             1]
         if element['attributes']['delegate_descriptor_id'] == "core::conditions::custom-code":
             settings = element['attributes']['settings']
-            code = _json.loads(settings)['source']
+            code = json.loads(settings)['source']
             if save is True:
                 name = f'RC - {rule_name} - {element_place} - {element["attributes"]["name"]}.js'
                 name = name.replace('"', "'").replace('|', '').replace('>', '').replace(
                     '<', '').replace('/', '').replace('\\', '').replace(':', ';').replace('?', '')
-                with open(f'{name}', 'w') as f:
-                    f.write(code)
+                saveFile(code,name,type='js',encoding='utf-16')
             return code
         elif element['attributes']['delegate_descriptor_id'] == "core::events::custom-code":
             settings = element['attributes']['settings']
-            code = _json.loads(settings)['source']
+            code = json.loads(settings)['source']
             if save is True:
                 name = f'RC - {rule_name} - {element_place} - {element["attributes"]["name"]}.js'
                 name = name.replace('"', "'").replace('|', '').replace('>', '').replace(
                     '<', '').replace('/', '').replace('\\', '').replace(':', ';').replace('?', '')
-                with open(f'{name}', 'w') as f:
-                    f.write(code)
+                saveFile(code,name,type='js',encoding='utf-16')
             return code
         elif element['attributes']['delegate_descriptor_id'] == "core::actions::custom-code":
             settings = element['attributes']['settings']
-            code = _json.loads(settings)['source']
+            code = json.loads(settings)['source']
             if save is True:
                 name = f'RC - {rule_name} - {element_place} - {element["attributes"]["name"]}.js'
                 name = name.replace('"', "'").replace('|', '').replace('>', '').replace(
                     '<', '').replace('/', '').replace('\\', '').replace(':', ';').replace('?', '')
-                with open(f'{name}', 'w') as f:
-                    f.write(code)
+                saveFile(code,name,type='js',encoding='utf-16')
             return code
         else:
             settings = element['attributes']['settings']
@@ -1615,8 +1471,7 @@ def extractSettings(element: dict, save: bool = False)->dict:
                 name = f'RC - {rule_name} - {element_place} - {element["attributes"]["name"]} - settings.json'
                 name = name.replace('"', "'").replace('|', '').replace('>', '').replace(
                     '<', '').replace('/', '').replace('\\', '').replace(':', ';').replace('?', '')
-                with open(name, 'w') as f:
-                    f.write(_json.dumps(settings, indent=4))
+                saveFile(settings,name,type='json',encoding='utf-16')
             return settings
 
 
@@ -1634,8 +1489,7 @@ def extractAttributes(element: dict, save: bool = False)->dict:
         name = f'{element_type} - {el_name} - attributes.json'
         name = name.replace('"', "'").replace('|', '').replace('>', '').replace(
             '<', '').replace('/', '').replace('\\', '').replace(':', ';').replace('?', '')
-        with open(name, 'w') as f:
-            f.write(_json.dumps(attributes, indent=4))
+        saveFile(attributes,name,type='json',encoding='utf-16')
     return attributes
 
 
@@ -1670,7 +1524,7 @@ def duplicateAttributes(base_elements: list = None, target_elements: list = None
         check_name = element['attributes']['name']
         if check_name in index.keys():
             base_setting = element['attributes'][key]
-            copy_target = _deepcopy(target_elements[index[check_name]])
+            copy_target = deepcopy(target_elements[index[check_name]])
             copy_target_attr = copy_target['attributes']
             copy_target_attr[key] = base_setting
             new_list.append(copy_target_attr)
@@ -1732,8 +1586,8 @@ class Translator:
     """
 
     def __init__(self):
-        self.rules = _pd.DataFrame()
-        self.extensions = _pd.DataFrame()
+        self.rules = pd.DataFrame()
+        self.extensions = pd.DataFrame()
 
     def setBaseExtensions(self, base_property_extensions: object, property_name: str):
         """
@@ -1742,8 +1596,8 @@ class Translator:
             base_property : REQUIRED : list of all extensions retrieve through getExtensions method
             property_name : REQUIRED : name of your base property.
         """
-        df = _pd.DataFrame(extensionsInfo(base_property_extensions)).T
-        df = _pd.DataFrame(df['id'])
+        df = pd.DataFrame(extensionsInfo(base_property_extensions)).T
+        df = pd.DataFrame(df['id'])
         df.columns = [property_name]
         self.extensions = df
 
@@ -1754,8 +1608,8 @@ class Translator:
             new_property_extensions: REQUIRED : the extension list from your target property. 
             new_prop_name : REQUIRED : target property name. 
         """
-        df = _pd.DataFrame(extensionsInfo(new_property_extensions)).T
-        df = _pd.DataFrame(df['id'])
+        df = pd.DataFrame(extensionsInfo(new_property_extensions)).T
+        df = pd.DataFrame(df['id'])
         self.extensions[new_prop_name] = df
         return self.extensions
 
@@ -1766,8 +1620,8 @@ class Translator:
             base_property : REQUIRED : list of all rules retrieve through getExtensions method
             property_name : REQUIRED : name of your base property.
         """
-        df = _pd.DataFrame(rulesInfo(base_property_rules)).T
-        df = _pd.DataFrame(df['id'])
+        df = pd.DataFrame(rulesInfo(base_property_rules)).T
+        df = pd.DataFrame(df['id'])
         df.columns = [property_name]
         self.rules = df
 
@@ -1778,8 +1632,8 @@ class Translator:
             new_property_rules: REQUIRED : the rules list from your target property. 
             new_prop_name : REQUIRED : target property name. 
         """
-        df = _pd.DataFrame(rulesInfo(new_property_rules)).T
-        df = _pd.DataFrame(df['id'])
+        df = pd.DataFrame(rulesInfo(new_property_rules)).T
+        df = pd.DataFrame(df['id'])
         self.rules[new_prop_name] = df
         return self.rules
 
@@ -1796,7 +1650,7 @@ class Translator:
             raise AttributeError(
                 "You didn't import the base extensions or the target extensions")
         if data_element is not None:
-            new_de = _deepcopy(data_element)
+            new_de = deepcopy(data_element)
             base_id = new_de['extension']['id']
             row = self.extensions[self.extensions.iloc[:, 0]
                                   == base_id].index.values[0]
@@ -1807,7 +1661,7 @@ class Translator:
             if self.rules.empty == True:
                 print(
                     "The rules have not been imported, the rule id needs to be changed")
-            new_rc = _deepcopy(rule_component)
+            new_rc = deepcopy(rule_component)
             base_id = new_rc['extension']['id']
             row = self.extensions[self.extensions.eq(
                 base_id).any(1)].index.values[0]
@@ -1836,24 +1690,27 @@ def extractAnalyticsCode(rcSettings: str, save: bool = False, filename: str = No
     Extract the custom code of the rule and save it in a file.
     Arguments:
         rcSettings: REQUIRED : it is the analytics rule component settings retrieved by the extractSettings method. 
-        save : OPTIONAL : if you want to save the code as external js file. 
+        save : OPTIONAL : if you want to save the code as external js file. UTF-16. Default False. 
         filename : OPTIONAL : name of the file you want to use to save the code. 
     """
-    json_data = _json.loads(rcSettings)
+    json_data = json.loads(rcSettings)
     if 'customSetup' in json_data.keys():
         json_code = json_data['customSetup']['source']
         if filename is None:
             filename = 'code'
         filename = filename.replace('/', '_').replace('|', '_')
         if save:
-            with open(f'{filename}.js', 'w') as f:
-                f.write(json_code)
+            saveFile(json_code,filename,type='js',encoding='utf-16')
         return json_code
 
 
 class Library:
 
-    def __init__(self, data: dict):
+    def __init__(self, data: dict,config_object:dict=config.config_object,header:dict=config.header):
+        self.connector = connector.AdobeRequest(
+            config_object=config_object, header=header)
+        self.header = self.connector.header
+        self.endpoint = config.endpoints['global']
         self.id = data['id']
         self.name = data['attributes']['name']
         self.state = data['attributes']['state']
@@ -1878,8 +1735,8 @@ class Library:
         """
         retrieve the list of Data Elements attached to this library
         """
-        dataElements = _getData(self._DataElements)
-        data = dataElements.json()
+        dataElements = self.connector.getData(self._DataElements)
+        data = dataElements
         # assign the list to its dict value
         self.relationships['data_elements'] = data
         return data
@@ -1888,8 +1745,8 @@ class Library:
         """
         retrieve the list of Extensions attached to this library
         """
-        extensions = _getData(self._Extensions)
-        data = extensions.json()
+        extensions = self.connector.getData(self._Extensions)
+        data = extensions
         self.relationships['extensions'] = data
         return data
 
@@ -1897,8 +1754,8 @@ class Library:
         """
         retrieve the list of rules attached to this library
         """
-        rules = _getData(self._Rules)
-        data = rules.json()
+        rules = self.connector.getData(self._Rules)
+        data = rules
         self.relationships['rules'] = data
         return data
 
@@ -1925,7 +1782,7 @@ class Library:
                 {"id": ids, "type": "data_elements", "meta": {"action": "revise"}})
         url = config.endpoints['global']+'/libraries/' + \
             self.id+'/relationships/data_elements'
-        res = _postData(url, obj)
+        res = self.connector.postData(url, obj)
         return res
 
     def addRules(self, rules_ids: list)->object:
@@ -1943,9 +1800,9 @@ class Library:
         for ids in rules_ids:
             obj['data'].append({"id": ids, "type": "rules",
                                 "meta": {"action": "revise"}})
-        url = config.endpoints['global'] + \
+        url =  + \
             '/libraries/'+self.id+'/relationships/rules'
-        res = _postData(url, obj)
+        res = self.connector.postData(url, obj)
         return res
 
     def addExtensions(self, extensions_ids: list)->object:
@@ -1965,7 +1822,7 @@ class Library:
                 {"id": ids, "type": "extensions", "meta": {"action": "revise"}})
         url = config.endpoints['global']+'/libraries/' + \
             self.id+'/relationships/extensions'
-        res = _postData(url, obj)
+        res = self.connector.postData(url, obj)
         return res
 
     def setEnvironments(self, environments_list: list, dev_name: str = None)->None:
@@ -1991,22 +1848,19 @@ class Library:
             key1 = list(self._environments['developments'].keys())[0]
             self._dev_env = self._environments['developments'][key1]
 
-    @_checkToken
     def _setEnvironment(self, obj: dict)->None:
-        new_env = _requests.patch(config.endpoints['global']+'/libraries/'+self.id +
-                                  '/relationships/environment', headers=config.header, data=_json.dumps(obj))
-        res = new_env.json()
+        path = f'/libraries/{self.id}/relationships/environment'
+        new_env = self.connector.patchData(self.endpoint+path, data=json.dumps(obj))
+        res = new_env
         return res
 
-    @_checkToken
     def _removeEnvironment(self)->None:
         """
         Remove environment
         """
-        new_env = _requests.get(
-            config.endpoints['global']+'/libraries/'+self.id+'/relationships/environment', headers=config.header)
-        res = new_env.json()
-        return res
+        path = f'/libraries/{self.id}/relationships/environment'
+        new_env = self.connector.getData(self.endpoint+path) 
+        return new_env
 
     def build(self)->dict:
         """
@@ -2051,15 +1905,15 @@ class Library:
             status = self._setEnvironment(obj)
         if 'error' in status.keys():
             raise SystemExit('Issue setting environment')
-        build = _requests.post(self._Builds, headers=config.header)
+        build = self.connector.postData(self._Builds)
         build_json = build.json()
         build_id = build_json['data']['id']
         build_status = build_json['data']['attributes']['status']
         while build_status == 'pending':
             print('pending...')
-            _time.sleep(20)
+            time.sleep(20)
             # return the json directly
-            build = _getData(
+            build = self.connector.getData(
                 config.endpoints['global']+'/builds/'+str(build_id))
             build_status = build['data']['attributes']['status']
         if build['data']['attributes']['status'] == 'succeeded':
@@ -2094,8 +1948,7 @@ class Library:
             }
         }
         }
-        transition = _patchData(
-            config.endpoints['global']+path, obj)
+        transition = self.connector.patchData(self.endpoint+path, obj)
         data = transition
         self.state = data['data']['attributes']['state']
         self.build_required = data['data']['attributes']['build_required']
