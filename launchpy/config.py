@@ -22,5 +22,5 @@ header = {"Accept": "application/vnd.api+json;revision=1",
 endpoints = {
     "global": 'https://reactor.adobe.io/',
     "profile": '/profile',
-    "auditEvents": '/audit_events'
+    "auditEvents": 
 }
