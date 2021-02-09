@@ -19,54 +19,69 @@ The launchpy module comes with some methods directly available from the core lib
 
 ### createConfigFile
 
-This will create a json file that you will need to file with the different element requested to generate the token (API Key, Secret, Technical Account, Path to your private key).
-Once you have set up this configuration, you can actually call the 2nd method.
+This will create a json file that you will need to file with the different element requested to generate the token (API Key, Secret, Technical Account, Path to your private key, scope).
 
 ### importConfigFile
 
 This is taking the name of your config file (or path to it) in order to open it and read it.
 This will set the variable required to generate the token.
 
-### retrieveToken
+You can access the element imported by looking at the config element in launchpy.
 
-This method is actually generating a token. It can be used once you have actually set up your config file and import it into your environment.
-However, this method is not required. If you try to retrieve a company id without a token, a token will automatically be generated for you.
+```python
+import launchpy
 
-### getCompanyId
+launchpy.importConfigFile('myConfig.json')
 
-This method will return the company ID from your adobe IO connector. Your token are usually generated for only one company and this is returning which company you are allowed to look for.
+## Look at the configuration
+launchpy.config.config_object
+```
 
-### getProperties
+### Configure method
 
-This method takes one argument (the company id) and it will return a list of property that you will be able to feed the Property class.
+The configure method enables you to configure the `config_object` directly from the python console with environment.\
+This is useful when you do not wish to import a config file.\
+The method can be called with the following parameters:
 
-### createProperty
+```python
+import launchpy as lp
 
-It takes several arguments:
+lp.configure(
+  org_id = 'ED48F97C5922D95E@AdobeOrg',
+  tech_id = '310E95EE8@techacct.adobe.com',
+  secret = 'c6854473-9731-ebd7e31e155f',
+  client_id = 'df4b231cea4c6e90d91b10052',
+  path_to_key ='./config/private.key',
+  scope ="https://ims-na1.adobelogin.com/s/ent_reactor_admin_sdk",
+)
+```
 
-* the company id
-* a name
-* the platform (by default it is web)
-* return_class : a Boolean if you want to return an instance of the Property class.
+## 1. The Admin class
 
-It returns either the instance of the Property class or the object returned by the API.
+The Admin methods helps your retrieving vital information to use the API later, such as the companyId.\
+You can also realize several property agnostics methods directly from this instance.\
+The Admin methods can be found on the linked documentation [here](./admin.md)
 
-## Core module helper / facilitators
+## 2. Property class
+
+The Property methods enable you to manipulate and retrieve the different element of the Launch instance.
+The Property methods can be found on the linked documentation [here](./property.md)
+
+## 3. Library class
+
+The library methods helps you to publish the different changes that you have made on your Launch instances.
+You need to instanciate a class for managing the different state of your library process (Approve / Build / Reject).
+Documentation can be found [here](./library.md)
+
+## 4. Translator class
+
+The translator class is helping to translate extension or rule ID from one property to another.
+However, due to the possibility of Launch to realize this copy paste directly in the UI now, this class is less relevant.
+You can still access documentation of this class methods [here](./translator.md).
+
+## 5. Core module helper / facilitators
 
 The core has some facilitators methods that should help you along the way of using this API. Those facilitators are the real bonus of this wrapper and I hope you will understand how to use them.
-
-### Extension Packages
-
-When creating a new property, you may want to see the possible packages that you can install. There is a method available in the core components to access the available module.
-
-* getExtensionsCatalogue: returns a list of the extension available for your company.
-  Arguments:
-  * availability : OPTIONAL : to filter for a specific type of extension. ("public" or "private")
-  * name : OPTIONAL : to filter for a specific extension name (contains method)
-  * platform : OPTIONAL : to filter for a specific platform (default "web", mobile possible)
-  * save : OPTIONAL : save the results in a txt file (packages.txt). Default False.
-
-You will need to use the name, the display name and 
 
 ### The Info methods
 
@@ -139,20 +154,3 @@ Possible kwargs :
 * key : OPTIONAL : the type of element you want to copy paste (settings, name,enabled ,etc…). default value for the key are “settings”.
 * name_filter : OPTIONAL : Filter the elements to copy to only the ones containing the string in the filter.
 * example : name_filter=’analytics’ will only copy the element that has analytics in their name
-
-## 2. Property class
-
-The property methods enable you to manipulate and retrieve the different element of the Launch instance.
-The property methods can be found on the linked documentation [here](./property.md)
-
-## 3. Library class
-
-The library methods helps you to publish the different changes that you have made on your Launch instances.
-You need to instanciate a class for managing the different state of your library process (Approve / Build / Reject).
-Documentation can be found [here](./library.md)
-
-## 4. Translator class
-
-The translator class is helping to translate extension or rule ID from one property to another.
-However, due to the possibility of Launch to realize this copy paste directly in the UI now, this class is less relevant.
-You can still access documentation of this class methods [here](./translator.md).

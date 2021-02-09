@@ -158,15 +158,16 @@ class Admin:
                                     page_nb=curr_page+1, verbose=kwargs.get('verbose', False), end_date=kwargs.get('end_date', False))
         return data
     
-    def createProperty(self,companyId: str, name: str, platform: str = 'web', return_class: bool = True, **kwargs)->dict:
+    def createProperty(self,companyId: str, name: str, platform: str = 'web', sequential: bool=True ,return_class: bool = True, **kwargs)->dict:
         """
         Create a property with default information. Will return empty value as default value. 
         Returns a property instance.
         Arguments : 
             - companyId : REQUIRED : id of the company
             - name : REQUIRED : name of the property
-            - platform : REQUIRED : default 'web', can be 'app'
-            - return_class : REQUIRED : default True, will return an instance of property class. 
+            - platform : OPTIONAL : default 'web', can be 'app'
+            - sequential : OPTIONAL : enable Sequential Rule Component
+            - return_class : OPTIONAL : default True, will return an instance of property class. (default True)
             If set to false, will just return the object created. 
             **kwargs : can use the different parameter reference here : https://developer.adobelaunch.com/api/reference/1.0/properties/create/
 
@@ -194,9 +195,10 @@ class Admin:
             obj['data']['attributes']['domains'] = domains
         obj['data']['attributes']['development'] = development
         obj['data']['attributes']['undefined_vars_return_empty'] = undefined_vars_return_empty
+        obj['data']['attributes']['rule_component_sequencing_enabled'] = sequential
         obj['data']['type'] = 'properties'
         path = f"/companies/{companyId}/properties"
-        new_property = self.connector.postData(self.endpoint +path, obj)
+        new_property = self.connector.postData(self.endpoint +path, data=obj)
         if return_class:
             property_class = Property(new_property['data'])
             return property_class
@@ -734,7 +736,7 @@ class Property:
         if settings is not None and descriptor is not None:
             obj['data']['attributes']['settings'] = str(settings)
             obj['data']['attributes']['delegate_descriptor_id'] = descriptor
-        extensions = self.connector.postData(self._Extensions, obj)
+        extensions = self.connector.postData(self._Extensions, data=obj)
         try:
             data = extensions['data']
         except:
@@ -756,7 +758,7 @@ class Property:
                 "type": "rules"
             }
         }
-        rules = self.connector.postData(self._Rules, obj, header=self.header)
+        rules = self.connector.postData(self._Rules, data=obj, header=self.header)
         try:
             data = rules['data']
             self.ruleComponents[data['id']] = {'name': data['attributes']['name'],
@@ -798,7 +800,7 @@ class Property:
             obj['data']['attributes']['settings'] = settings
         if 'order' in kwargs:
             obj['data']['attributes']['order'] = kwargs.get('order')
-        rc = self.connector.postData(self._RuleComponents, obj, header=self.header)
+        rc = self.connector.postData(self._RuleComponents, data=obj, header=self.header)
         try:
             data = rc['data']
         except:
@@ -834,7 +836,7 @@ class Property:
                 obj['data']['attributes']['settings'] = settings
         except:
             pass
-        dataElements = self.connector.postData(self._DataElement, obj, header=self.header)
+        dataElements = self.connector.postData(self._DataElement, data=obj, header=self.header)
         try:
             data = dataElements['data']
         except:
@@ -868,7 +870,7 @@ class Property:
                 "type": "environments"
             }
         }
-        env = self.connector.postData(self._Environments, obj, header=self.header)
+        env = self.connector.postData(self._Environments, data=obj, header=self.header)
         data = env['data']
         return data
 
@@ -906,7 +908,7 @@ class Property:
                 obj['data']['attributes']['server'] = kwargs.get('server')
                 obj['data']['attributes']['path'] = kwargs.get('path', '/')
                 obj['data']['attributes']['port'] = kwargs.get('port', 22)
-        host = self.connector.postData(self._Host, obj, header=self.header)
+        host = self.connector.postData(self._Host, data=obj, header=self.header)
         try:
             data = host['data']
         except:
@@ -930,7 +932,7 @@ class Property:
                 "type": "libraries"
             }
         }
-        lib = self.connector.postData(self._Libraries, obj, header=self.header)
+        lib = self.connector.postData(self._Libraries, data=obj, header=self.header)
         try:
             data = lib['data']
             if return_class:
@@ -1780,9 +1782,8 @@ class Library:
         for ids in data_element_ids:
             obj['data'].append(
                 {"id": ids, "type": "data_elements", "meta": {"action": "revise"}})
-        url = config.endpoints['global']+'/libraries/' + \
-            self.id+'/relationships/data_elements'
-        res = self.connector.postData(url, obj)
+        url = self.endpoint + f'/libraries/{self.id}/relationships/data_elements'
+        res = self.connector.postData(url, data=obj)
         return res
 
     def addRules(self, rules_ids: list)->object:
@@ -1800,9 +1801,8 @@ class Library:
         for ids in rules_ids:
             obj['data'].append({"id": ids, "type": "rules",
                                 "meta": {"action": "revise"}})
-        url =  + \
-            '/libraries/'+self.id+'/relationships/rules'
-        res = self.connector.postData(url, obj)
+        url = self.endpoint + f'/libraries/{self.id}/relationships/rules'
+        res = self.connector.postData(url, data=obj)
         return res
 
     def addExtensions(self, extensions_ids: list)->object:
@@ -1820,9 +1820,8 @@ class Library:
         for ids in extensions_ids:
             obj['data'].append(
                 {"id": ids, "type": "extensions", "meta": {"action": "revise"}})
-        url = config.endpoints['global']+'/libraries/' + \
-            self.id+'/relationships/extensions'
-        res = self.connector.postData(url, obj)
+        url = self.endpoint+'/libraries/{self.id}/relationships/extensions'
+        res = self.connector.postData(url, data=obj)
         return res
 
     def setEnvironments(self, environments_list: list, dev_name: str = None)->None:
@@ -1948,7 +1947,7 @@ class Library:
             }
         }
         }
-        transition = self.connector.patchData(self.endpoint+path, obj)
+        transition = self.connector.patchData(self.endpoint+path, data=obj)
         data = transition
         self.state = data['data']['attributes']['state']
         self.build_required = data['data']['attributes']['build_required']

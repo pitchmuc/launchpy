@@ -106,7 +106,8 @@ def configure(org_id: str = None,
         client_id : REQUIRED : The client_id (old api_key) provided by the JWT connection. 
         path_to_key : REQUIRED : If you have a file containing your private key value.
         private_key : REQUIRED : If you do not use a file but pass a variable directly.
-        scope : OPTIONAL : Scope that is needed for JWT auth
+        scope : OPTIONAL : Scope that is needed for JWT auth.
+            Possible scope: https://www.adobe.io/authentication/auth-methods.html#!AdobeDocs/adobeio-auth/master/JWT/Scopes.md
     """
     if not org_id:
         raise ValueError("`org_id` must be specified in the configuration.")

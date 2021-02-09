@@ -58,12 +58,12 @@ class AdobeRequest:
             'content-type': 'application/x-www-form-urlencoded'
         }
         now_plus_24h = int(time.time()) + 24 * 60 * 60
-        jwtPayload_admin = {
+        jwtPayload_default = {
         # Expiration set to 24 hours
         "exp": now_plus_24h,
         "iss": config['org_id'],
         "sub": config['tech_id'],
-        config['scope_admin']: True,
+        config["official_scope"] : True,
         "aud": "https://ims-na1.adobelogin.com/c/"+config["client_id"]
         }
         jwtPayload_dev = {
@@ -74,7 +74,7 @@ class AdobeRequest:
             config['scope_dev']: True,
             "aud": "https://ims-na1.adobelogin.com/c/"+config["client_id"]
         }
-        encoded_jwt_admin = self._get_jwt(payload=jwtPayload_admin, private_key=private_key)
+        encoded_jwt_admin = self._get_jwt(payload=jwtPayload_default, private_key=private_key)
         encoded_jwt_dev = self._get_jwt(payload=jwtPayload_dev, private_key=private_key)
         payload_admin = {
             'client_id': config['client_id'],

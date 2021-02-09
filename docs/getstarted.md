@@ -25,6 +25,9 @@ lp.createConfigFile()
 
 This will create a JSON and you will need to fill it with the information available in your adobe io account.
 
+**NOTE**: scope in the config file has evolved over time so you can change it. Following this [link](https://www.adobe.io/authentication/auth-methods.html#!AdobeDocs/adobeio-auth/master/JWT/Scopes.md) to see the different scope possible.\
+By default, I will test the dev scope if the scope provided fails.
+
 ## 4. Import the configuration file
 
 Once this is done, you can import the configuration file.
@@ -34,20 +37,35 @@ I would recommend to store the config file and the key in the folder that you ar
 lp.importConfigFile('myconfig.json')
 ```
 
-## 5. Get Company ID(s) & retrieve properties
+## 5. Instantiate the Admin class & get Company ID to retrieve properties
 
-Once all of these setup steps are completed, you can start using the methods attached to launchpy module.
-The first method is the _getCompanyId_, that will return you the company ID that is attached to your Adobe IO account.
-you will use the *company* to retrieve the different properties.
+Once all of these setup steps are completed, you can instantiate the `Admin` class.
+The `Admin` class provides different methods that will return important information going forward.
+The first method is the `getCompanyId()`, that will return you the company ID that is attached to your Adobe IO account.
+You will use the *companyId* to retrieve the different properties.
 
 ```python
 import launchpy as lp
 lp.importConfigFile('myconfig.json')
-cid = lp.getCompanyId()
-properties = lp.getProperties(cid)
+admin = lp.Admin()
+myCid = admin.getCompanyId()
+
+myProperties = admin.getProperties(myCid)
 ```
 
 This will return you a list of properties.
+
+**NOTE**: The getCompanyId will also save the value inside an attribute (`COMPANY_ID`) of your instance.\
+The getProperties will also save the value inside a class attribute (`properties`).\
+Therefore, the different information can also be found like this:
+
+```python
+## Return the companyId after the usage of the getCompanyId() method
+admin.COMPANY_ID
+
+## Return the list of properties after the usage of the getProperties() method
+admin.properties
+```
 
 ## 6. Instanciate your Property class
 
@@ -55,7 +73,7 @@ You can use one of your element of the list return to instantiate the work on a 
 I usually select the property by name by doing the following :
 
 ```python
-myProperty = [prop for prop in properties if prop['attributes']['name'] == "mypropertyName"][0]
+myProperty = [prop for prop in myProperties if prop['attributes']['name'] == "mypropertyName"][0]
 mypropertyName = lp.Property(myProperty) ## here instanciation
 ```
 
