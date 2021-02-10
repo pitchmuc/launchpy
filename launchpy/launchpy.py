@@ -1393,11 +1393,12 @@ def _defineSearchType(_name: str = None, _id: str = None)->tuple:
     return condition, value
 
 
-def extractSettings(element: dict, save: bool = False)->dict:
+def extractSettings(element: dict, analyticsCode:bool=True, save: bool = False)->dict:
     """
     Extract the settings from your element. For your custom code, it will extract the javaScript. 
     Arguments: 
         element : REQUIRED : element from which you would like to extract the setting from. 
+        analyticsCode : OPTIONAL : if set to True (default), extract the Analytics code when there is one and not global setting.
         save : OPTIONAL : bool, if you want to save the setting in a JS or JSON file, set it to true (UTF-16). (default False)
     """
     element_type = element['type']
@@ -1469,6 +1470,15 @@ def extractSettings(element: dict, save: bool = False)->dict:
             return code
         else:
             settings = element['attributes']['settings']
+            if 'customSetup' in json.loads(settings).keys() and analyticsCode:
+                if 'source' in json.loads(settings)['customSetup']:
+                    code = json.loads(settings)['customSetup'].get('source','')
+                    if save:
+                        name = f'RC - {rule_name} - {element_place} - {element["attributes"]["name"]} - code settings.js'
+                        name = name.replace('"', "'").replace('|', '').replace('>', '').replace('<', '').replace('/', '').replace('\\', '').replace(':', ';').replace('?', '')
+                        saveFile(code,name,type='js',encoding='utf-16')
+                    return code
+
             if save:
                 name = f'RC - {rule_name} - {element_place} - {element["attributes"]["name"]} - settings.json'
                 name = name.replace('"', "'").replace('|', '').replace('>', '').replace(

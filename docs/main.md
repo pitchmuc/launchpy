@@ -13,7 +13,7 @@ Here are the main ones:
 
 if you want to have quick view on how to get started: [Get Started documentation](./getstarted.md)
 
-## 1. Core library methods
+## Core library methods
 
 The launchpy module comes with some methods directly available from the core library of that module.
 
@@ -125,6 +125,7 @@ So you can actually extract the settings for the Extensions, the data elements a
 It takes 2 arguments:
 
 * element : REQUIRED : element from which you would like to extract the setting from.
+* analyticsCode : OPTIONAL : if set to True (default), extract the Analytics code when there is one and not global setting. If you want to have everything (code + settings, set it to False)
 * save : OPTIONAL : bool, if you want to save the setting in a JS or JSON file, set it to true. (default False)
 
 ***Note*** : for the Custom Code of the Core elements (Data Elements, Rule Component Condition, Rule Component Event, Rule Component Action) it will retrieve the code in a JS file.
