@@ -245,6 +245,18 @@ class Admin:
         if save:
                 saveFile(data,'packages.txt',type='txt')
         return data
+    
+    def getRessource(self,res_url: str = None, params: dict = None):
+        """
+        Enable you to request a specific resource from Launch API.
+        Arguments:
+            res_url : REQUIRED : Resource URL to request
+            params : OPTIONAL : If you want to pass any parameter.
+        """
+        if res_url is None:
+            raise Exception("You must provide a resource url")
+        res = self.connector.getData(res_url, params=params)
+        return res
 
 
 class Property:

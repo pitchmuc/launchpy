@@ -3,6 +3,10 @@
 This page gathered the changes made between version of the launchpy module.\
 This has been started after the 0.3.0 release.
 
+## 0.3.2
+
+* adding a `getResources` method on `Admin` class.
+
 ## 0.3.1
 
 * adding *analyticsCode* parameter for `extractSettings`. See documentation on [extractSettings in main documentation](main.md)
