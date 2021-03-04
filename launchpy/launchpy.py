@@ -132,6 +132,8 @@ class Admin:
         params['page[number]'] = kwargs.get('page_nb', 1)
         if page_size is not None:
             params['page[size]'] = page_size
+        if kwargs.get('type_of',None) is not None:
+            params['type_of'] = kwargs.get('type_of')
         path = '/audit_events'
         events = self.connector.getData(self.endpoint + path, params=params)
         data = events['data']
@@ -448,7 +450,7 @@ class Property:
                 }
         path = f"/extensions/{extension_id}"
         res = self.connector.patchData(
-            self.endpoint+path, data=json.dumps(data))
+            self.endpoint+path, data=data)
         return res
 
     def getRules(self)->object:
@@ -1927,9 +1929,9 @@ class Library:
             key1 = list(self._environments['developments'].keys())[0]
             self._dev_env = self._environments['developments'][key1]
 
-    def _setEnvironment(self, obj: dict)->None:
+    def _setEnvironment(self, obj: dict,verbose:bool=False)->None:
         path = f'/libraries/{self.id}/relationships/environment'
-        new_env = self.connector.patchData(self.endpoint+path, data=json.dumps(obj))
+        new_env = self.connector.patchData(self.endpoint+path, data=obj,verbose=verbose)
         res = new_env
         return res
 
@@ -1941,7 +1943,7 @@ class Library:
         new_env = self.connector.getData(self.endpoint+path) 
         return new_env
 
-    def build(self)->dict:
+    def build(self,verbose:bool=False)->dict:
         """
         Build the library. 
         Part of the code takes care of assigning the right environement before building the library.
@@ -1950,7 +1952,6 @@ class Library:
         """
         if self.build_required == False and self.state != 'approved':
             return 'build is not required'
-
         status = ""
         if self.state == 'development':
             env_id = self._dev_env
@@ -1961,7 +1962,7 @@ class Library:
                 }
             }
             self._removeEnvironment()
-            status = self._setEnvironment(obj)
+            status = self._setEnvironment(obj,verbose=verbose)
         elif self.state == 'submitted':
             env = 'staging'
             obj = {
@@ -1971,7 +1972,7 @@ class Library:
                 }
             }
             self._removeEnvironment()
-            status = self._setEnvironment(obj)
+            status = self._setEnvironment(obj,verbose=verbose)
         elif self.state == 'approved':
             env = 'production'
             obj = {
@@ -1981,13 +1982,12 @@ class Library:
                 }
             }
             self._removeEnvironment()
-            status = self._setEnvironment(obj)
+            status = self._setEnvironment(obj,verbose=verbose)
         if 'error' in status.keys():
             raise SystemExit('Issue setting environment')
         build = self.connector.postData(self._Builds)
-        build_json = build.json()
-        build_id = build_json['data']['id']
-        build_status = build_json['data']['attributes']['status']
+        build_id = build['data']['id']
+        build_status = build['data']['attributes']['status']
         while build_status == 'pending':
             print('pending...')
             time.sleep(20)

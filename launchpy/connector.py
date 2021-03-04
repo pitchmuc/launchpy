@@ -194,6 +194,8 @@ class AdobeRequest:
             if res.status_code == 429 or res_json.get('error_code', None) == "429050":
                 res_json['status_code'] = 429
         except:
+            if kwargs.get("verbose", False):
+                print(res.text)
             res_json = {'error': 'Request Error'}
         return res_json
 
@@ -213,6 +215,8 @@ class AdobeRequest:
         try:
             status_code = res.json()
         except:
+            if kwargs.get("verbose", False):
+                print(res.text)
             status_code = {'error': 'Request Error'}
         return status_code
 
