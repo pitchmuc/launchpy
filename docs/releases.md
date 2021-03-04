@@ -3,6 +3,10 @@
 This page gathered the changes made between version of the launchpy module.\
 This has been started after the 0.3.0 release.
 
+## 0.3.3
+
+* fixing the build method for library that didn't account for new optimized call with new architecture.
+
 ## 0.3.2
 
 * adding a `getResources` method on `Admin` class.
