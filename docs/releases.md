@@ -6,6 +6,8 @@ This has been started after the 0.3.0 release.
 ## 0.3.3
 
 * fixing the build method for library that didn't account for new optimized call with new architecture.
+-- patch 0.3.3-1
+fixed methods that didn't account for new architecture.
 
 ## 0.3.2
 

@@ -360,7 +360,7 @@ class Property:
         """
         Retrieve the hosts sets for this property
         """
-        host = self.connector.getData(self._Host, header=self.header)
+        host = self.connector.getData(self._Host)
         data = host['data']  # skip meta for now
         return data
 
@@ -383,7 +383,7 @@ class Property:
                 urls = [self._Extensions for x in range(2, pages_left+2)]
                 with futures.ThreadPoolExecutor(workers) as executor:
                     res = executor.map(lambda x, y: self.connector.getData(
-                        x, params=y, header=self.header), urls, list_page_number)
+                        x, params=y), urls, list_page_number)
                 res = list(res)
                 append_data = [val for sublist in [data['data'] for data in res]
                                for val in sublist]  # flatten list of list
@@ -521,7 +521,7 @@ class Property:
             urls = [self._Rules for x in range(2, pages_left+2)]
             with futures.ThreadPoolExecutor(workers) as executor:
                 res = executor.map(lambda x, y: self.connector.getData(
-                    x, params=y, header=self.header), urls, list_parameters)
+                    x, params=y), urls, list_parameters)
             res = list(res)
             append_data = [val for sublist in [data['data']
                                                for data in res] for val in sublist]
@@ -602,7 +602,7 @@ class Property:
                 urls = [self._DataElement for x in range(2, pages_left+2)]
                 with futures.ThreadPoolExecutor(workers) as executor:
                     res = executor.map(lambda x, y: self.connector.getData(
-                        x, params=y, header=self.header), urls, list_page_number)
+                        x, params=y), urls, list_page_number)
                 res = list(res)
                 append_data = [val for sublist in [data['data']
                                                    for data in res] for val in sublist]
@@ -645,7 +645,7 @@ class Property:
             urls = [self._Rules for x in range(2, pages_left+2)]
             with futures.ThreadPoolExecutor(workers) as executor:
                 res = executor.map(lambda x, y: self.connector.getData(
-                    x, params=y, header=self.header), urls, list_parameters)
+                    x, params=y), urls, list_parameters)
             res = list(res)
             append_data = [val for sublist in [data['data']
                                                for data in res] for val in sublist]
@@ -683,7 +683,7 @@ class Property:
             urls = [self._Libraries for x in range(2, pages_left+2)]
             with futures.ThreadPoolExecutor(workers) as executor:
                 res = executor.map(lambda x, y: self.connector.getData(
-                    x, params=y, header=self.header), urls, list_page_number)
+                    x, params=y), urls, list_page_number)
             res = list(res)
             append_data = [val for sublist in [data['data']
                                                for data in res] for val in sublist]
@@ -717,7 +717,7 @@ class Property:
             urls = [url for x in range(2, pages_left+2)]
             with futures.ThreadPoolExecutor(workers) as executor:
                 res = executor.map(lambda x, y: self.connector.getData(
-                    x, params=y, header=self.header), urls, list_page_number)
+                    x, params=y), urls, list_page_number)
             res = list(res)
             append_data = [val for sublist in [data['data']
                                                for data in res] for val in sublist]
@@ -772,7 +772,7 @@ class Property:
                 "type": "rules"
             }
         }
-        rules = self.connector.postData(self._Rules, data=obj, header=self.header)
+        rules = self.connector.postData(self._Rules, data=obj)
         try:
             data = rules['data']
             self.ruleComponents[data['id']] = {'name': data['attributes']['name'],
@@ -814,7 +814,7 @@ class Property:
             obj['data']['attributes']['settings'] = settings
         if 'order' in kwargs:
             obj['data']['attributes']['order'] = kwargs.get('order')
-        rc = self.connector.postData(self._RuleComponents, data=obj, header=self.header)
+        rc = self.connector.postData(self._RuleComponents, data=obj)
         try:
             data = rc['data']
         except:
@@ -850,7 +850,7 @@ class Property:
                 obj['data']['attributes']['settings'] = settings
         except:
             pass
-        dataElements = self.connector.postData(self._DataElement, data=obj, header=self.header)
+        dataElements = self.connector.postData(self._DataElement, data=obj)
         try:
             data = dataElements['data']
         except:
@@ -884,7 +884,7 @@ class Property:
                 "type": "environments"
             }
         }
-        env = self.connector.postData(self._Environments, data=obj, header=self.header)
+        env = self.connector.postData(self._Environments, data=obj)
         data = env['data']
         return data
 
@@ -922,7 +922,7 @@ class Property:
                 obj['data']['attributes']['server'] = kwargs.get('server')
                 obj['data']['attributes']['path'] = kwargs.get('path', '/')
                 obj['data']['attributes']['port'] = kwargs.get('port', 22)
-        host = self.connector.postData(self._Host, data=obj, header=self.header)
+        host = self.connector.postData(self._Host, data=obj)
         try:
             data = host['data']
         except:
@@ -946,7 +946,7 @@ class Property:
                 "type": "libraries"
             }
         }
-        lib = self.connector.postData(self._Libraries, data=obj, header=self.header)
+        lib = self.connector.postData(self._Libraries, data=obj)
         try:
             data = lib['data']
             if return_class:
@@ -975,7 +975,7 @@ class Property:
         }
         path = f'/extensions/{extension_id}'
         extensions = self.connector.patchData(
-            config.endpoints['global']+path, obj, header=self.header)
+            self.endpoint+path, data=obj)
         data = extensions['data']
         return data
 
@@ -998,8 +998,7 @@ class Property:
             }
         }
         path = f"/rules/{rule_id}"
-        rules = self.connector.patchData(
-            config.endpoints['global']+path, obj, header=self.header)
+        rules = self.connector.patchData(self.endpoint+path, data=obj)
         data = rules
         return data
     
@@ -1012,7 +1011,7 @@ class Property:
         if rule_id is None:
             raise Exception("A rule ID is required")
         path = f"/rules/{rule_id}/revisions"
-        revisions = self.connector.getData(config.endpoints['global']+path,header=self.header)
+        revisions = self.connector.getData(self.endpoint+path)
         return revisions
 
 
@@ -1032,8 +1031,9 @@ class Property:
                 }
             }
         }
+        path = f"/data_elements/{dataElement_id}"
         dataElements = self.connector.patchData(
-            config.endpoints['global']+'/data_elements/'+dataElement_id, obj, header=self.header)
+            self.endpoint+path, data=obj)
         data = dataElements
         return data
 
@@ -1056,8 +1056,9 @@ class Property:
                 "type": "rules"
             }
         }
+        path = '/rules/'+rule_id
         rules = self.connector.patchData(
-            config.endpoints['global']+'/rules/'+rule_id, obj, header=self.header)
+            self.endpoint+path, data=obj)
         try:
             data = rules['data']
         except:
@@ -1078,8 +1079,8 @@ class Property:
                 "id": rc_id
             }
         }
-        rc = self.connector.patchData(
-            config.endpoints['global']+'/rule_components/'+rc_id, obj, header=self.header)
+        path = f'/rule_components/{rc_id}'
+        rc = self.connector.patchData(self.endpoint+path, data=obj)
         try:
             data = rc['data']
         except:
@@ -1100,8 +1101,9 @@ class Property:
                 "id": dataElement_id
             }
         }
+        path = f"/data_elements/{dataElement_id}"
         dataElements = self.connector.patchData(
-            config.endpoints['global']+'/data_elements/'+dataElement_id, obj, header=self.header)
+            self.endpoint+path, data=obj)
         try:
             data = dataElements['data']
         except:
@@ -1126,8 +1128,8 @@ class Property:
                 "type": "environments"
             }
         }
-        env = self.connector.patchData(
-            config.endpoints['global']+'/environments/'+env_id, obj, header=self.header)
+        path = '/environments/'+env_id
+        env = self.connector.patchData(self.endpoint+path, data=obj)
         try:
             data = env['data']
         except:
@@ -1149,7 +1151,7 @@ class Property:
             }
         }
         extensions = self.connector.patchData(
-            config.endpoints['global']+'/extensions/'+extension_id, obj, header=self.header)
+            config.endpoints['global']+'/extensions/'+extension_id, data=obj)
         try:
             data = extensions['data']
         except:
@@ -1163,7 +1165,7 @@ class Property:
             extension_id : REQUIRED : Rule ID that needs to be deleted
         """
         data = self.connector.deleteData(
-            'https://reactor.adobe.io/extensions/'+extension_id, header=self.header)
+            'https://reactor.adobe.io/extensions/'+extension_id)
         return data
 
     def deleteRule(self, rule_id: str)->str:
@@ -1173,7 +1175,7 @@ class Property:
             rule_id : REQUIRED : Rule ID that needs to be deleted
         """
         data = self.connector.deleteData('https://reactor.adobe.io/rules/' +
-                           rule_id, header=self.header)
+                           rule_id)
         return data
 
     def deleteDataElement(self, dataElement_id: str)->str:
@@ -1183,7 +1185,7 @@ class Property:
             dataElement_id : REQUIRED : Data Element ID that needs to be deleted
         """
         data = self.connector.deleteData(
-            'https://reactor.adobe.io/data_elements/'+dataElement_id, header=self.header)
+            'https://reactor.adobe.io/data_elements/'+dataElement_id)
         return data
 
     def deleteRuleComponent(self, rc_id: str)->str:
@@ -1193,7 +1195,7 @@ class Property:
             rc_id : REQUIRED : Rule Component ID that needs to be deleted
         """
         data = self.connector.deleteData(
-            'https://reactor.adobe.io/rule_components/'+rc_id, header=self.header)
+            'https://reactor.adobe.io/rule_components/'+rc_id)
         return data
 
     def deleteEnvironments(self, env_id: str)->str:
@@ -1203,7 +1205,7 @@ class Property:
             env_id : REQUIRED : Environment ID that needs to be deleted
         """
         data = self.connector.deleteData(
-            'https://reactor.adobe.io/environments/'+env_id, header=self.header)
+            'https://reactor.adobe.io/environments/'+env_id)
         return data
 
     # Not supported for the moment
