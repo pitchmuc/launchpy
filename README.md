@@ -1,7 +1,19 @@
 # Launchpy
 
-Python wrapper for the Adobe Launch API.
-This module is name launchpy. You can actually copy it into your python3X/Lib folder so you can import it from anywhere in your module.
+Python wrapper for the Adobe Launch API.\
+This module is named launchpy.
+
+## Installation
+
+You can install the module by realising the following pip command:
+
+``pip install launchpy`
+
+You can access the version of the module that you run via the following attribute:
+
+``launchpy.__version__`
+
+## Content of the module
 
 This module is built around 5 main parts:
 
