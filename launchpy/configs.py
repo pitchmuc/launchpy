@@ -25,7 +25,7 @@ def find_path(path: str) -> Optional[Path]:
     else:
         return None
 
-def createConfigFile(verbose: bool = False, destination: str = 'config_analytics_template.json') -> None:
+def createConfigFile(verbose: bool = False, filename: str = 'config_launch_template.json') -> None:
     """Creates a `config_admin.json` file with the pre-defined configuration format
     to store the access data in under the specified `destination`.
     """
@@ -46,7 +46,9 @@ def createConfigFile(verbose: bool = False, destination: str = 'config_analytics
         'pathToKey': '<path/to/your/privatekey.key>',
         'scope': "https://ims-na1.adobelogin.com/s/ent_reactor_admin_sdk"
     }
-    with open('config_admin.json', 'w') as cf:
+    if '.json' not in filename:
+        filename = f"{filename}.json"
+    with open(filename, 'w') as cf:
         cf.write(json.dumps(json_data, indent=4))
     if verbose:
         print(

@@ -64,5 +64,6 @@ Here is the list of the update methods available.
 * updateDataElements
 * updateEnvironment
 * updateExtension
+* updateCustomCode
 
 [main documentation](./main.md)
