@@ -11,6 +11,8 @@ This has been started after the 0.3.0 release.
 * separate `Library` class to its own submodule
 * cleaning code in launchpy core library
 * small fix `createConfigFile` method.
+*Patch*
+* adding encoding option and default to utf-8. `ENCODING` is now an attribute to launchpy 
 
 ## 0.3.3
 

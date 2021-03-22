@@ -11,8 +11,9 @@ from launchpy import config, connector
 from typing import IO, Union
 from .library import Library
 
+ENCODING = 'utf-8'
 
-def saveFile(data:str,filename:str=None,type:str='txt',encoding:str='utf-8')->None:
+def saveFile(data:str,filename:str=None,type:str='txt',encoding:str=ENCODING)->None:
     """
     Save file to your system.
     Arguments:
@@ -38,12 +39,14 @@ def saveFile(data:str,filename:str=None,type:str='txt',encoding:str='utf-8')->No
             f.write(json.dumps(data,indent=4))
 
 
-def createConfigFile(scope: bool = False, verbose: object = False)->None:
+def createConfigFile(scope: str = "https://ims-na1.adobelogin.com/s/ent_reactor_admin_sdk", verbose: object = False)->None:
     """
     This function will create a 'config_admin.json' file where you can store your access data. 
     Arguments:
         scope: OPTIONAL : if you have problem with scope during API connection, you may need to update this.
-            scope=""
+            scope="https://ims-na1.adobelogin.com/s/ent_reactor_admin_sdk"
+            or 
+            scope="https://ims-na1.adobelogin.com/s/ent_reactor_sdk"
     """
     json_data = {
         'org_id': '<orgID>',
@@ -212,6 +215,7 @@ class Admin:
         Arguments:
             propertyId : REQUIRED : The property ID to be updated
             attributes : REQUIRED : the dictionary containing the attributes to be updated
+                more info here https://developer.adobelaunch.com/api/reference/1.0/properties/update/
         """
         if propertyId is None:
             raise ValueError('Require a property ID')
@@ -1120,7 +1124,7 @@ class Property:
             data = rc
         return data
     
-    def updateCustomCode(self,rc_id:str=None,customCode:Union[str,IO]=None,encoding:str='utf-16')->dict:
+    def updateCustomCode(self,rc_id:str=None,customCode:Union[str,IO]=None,encoding:str=ENCODING)->dict:
         """
         Update the custom code of a rule (analytics or core)
         Arguments:
@@ -1146,22 +1150,9 @@ class Property:
         elif 'customSetup' in myRCsettings.keys():
             myRCsettings['customSetup']['source'] = myCode
         myNewSettings = json.dumps(myRCsettings)
-        obj = {
-            "data": {
-                "attributes" :{
-                    "settings": myNewSettings
-                },
-                "type": "rule_components",
-                "id": rc_id
-            }
-        }
-        path = f'/rule_components/{rc_id}'
-        rc = self.connector.patchData(self.endpoint+path, data=obj)
-        try:
-            data = rc['data']
-        except:
-            data = rc
-        return data
+        obj = {"settings": myNewSettings}
+        res = self.updateRuleComponent(rc_id=rc_id, attr_dict=obj)
+        return res
 
 
     def updateDataElements(self, dataElement_id: str, attr_dict: object, **kwargs)->object:
@@ -1397,7 +1388,7 @@ def _defineSearchType(_name: str = None, _id: str = None)->tuple:
     return condition, value
 
 
-def extractSettings(element: dict, analyticsCode:bool=True, save: bool = False)->dict:
+def extractSettings(element: dict, analyticsCode:bool=True, save: bool = False,encoding:str=ENCODING)->dict:
     """
     Extract the settings from your element. For your custom code, it will extract the javaScript. 
     Arguments: 
@@ -1414,7 +1405,7 @@ def extractSettings(element: dict, analyticsCode:bool=True, save: bool = False)-
                 name = f'DE - {str(element["attributes"]["name"])}.js'
                 name = name.replace('"', "'").replace('|', '').replace('>', '').replace(
                     '<', '').replace('/', '').replace('\\', '').replace(':', ';').replace('?', '')
-                saveFile(code,name,type='js',encoding='utf-16')
+                saveFile(code,name,type='js',encoding=encoding)
             return code
         else:
             settings = element['attributes']['settings']
@@ -1422,7 +1413,7 @@ def extractSettings(element: dict, analyticsCode:bool=True, save: bool = False)-
                 name = f'DE - {str(element["attributes"]["name"])} - settings.json'
                 name = name.replace('"', "'").replace('|', '').replace('>', '').replace(
                     '<', '').replace('/', '').replace('\\', '').replace(':', ';').replace('?', '')
-                saveFile(settings,name,type='json',encoding='utf-16')
+                saveFile(settings,name,type='json',encoding=encoding)
             return settings
     elif element_type == 'extensions':
         if element['attributes']['delegate_descriptor_id'] == "adobe-analytics::extensionConfiguration::config":
@@ -1431,7 +1422,7 @@ def extractSettings(element: dict, analyticsCode:bool=True, save: bool = False)-
                 name = f'EXT - {str(element["attributes"]["name"])}.json'
                 name = name.replace('"', "'").replace('|', '').replace('>', '').replace(
                     '<', '').replace('/', '').replace('\\', '').replace(':', ';').replace('?', '')
-                saveFile(settings,name,type='json',encoding='utf-16')
+                saveFile(settings,name,type='json',encoding=encoding)
             return settings
         else:
             settings = element['attributes']['settings']
@@ -1439,7 +1430,7 @@ def extractSettings(element: dict, analyticsCode:bool=True, save: bool = False)-
                 name = f'EXT - {str(element["attributes"]["name"])} - settings.json'
                 name = name.replace('"', "'").replace('|', '').replace('>', '').replace(
                     '<', '').replace('/', '').replace('\\', '').replace(':', ';').replace('?', '')
-                saveFile(settings,name,type='json',encoding='utf-16')
+                saveFile(settings,name,type='json',encoding=encoding)
             return settings
     elif element_type == 'rule_components':
         rule_name = element['rule_name']
@@ -1452,7 +1443,7 @@ def extractSettings(element: dict, analyticsCode:bool=True, save: bool = False)-
                 name = f'RC - {rule_name} - {element_place} - {element["attributes"]["name"]}.js'
                 name = name.replace('"', "'").replace('|', '').replace('>', '').replace(
                     '<', '').replace('/', '').replace('\\', '').replace(':', ';').replace('?', '')
-                saveFile(code,name,type='js',encoding='utf-16')
+                saveFile(code,name,type='js',encoding=encoding)
             return code
         elif element['attributes']['delegate_descriptor_id'] == "core::events::custom-code":
             settings = element['attributes']['settings']
@@ -1461,7 +1452,7 @@ def extractSettings(element: dict, analyticsCode:bool=True, save: bool = False)-
                 name = f'RC - {rule_name} - {element_place} - {element["attributes"]["name"]}.js'
                 name = name.replace('"', "'").replace('|', '').replace('>', '').replace(
                     '<', '').replace('/', '').replace('\\', '').replace(':', ';').replace('?', '')
-                saveFile(code,name,type='js',encoding='utf-16')
+                saveFile(code,name,type='js',encoding=encoding)
             return code
         elif element['attributes']['delegate_descriptor_id'] == "core::actions::custom-code":
             settings = element['attributes']['settings']
@@ -1470,7 +1461,7 @@ def extractSettings(element: dict, analyticsCode:bool=True, save: bool = False)-
                 name = f'RC - {rule_name} - {element_place} - {element["attributes"]["name"]}.js'
                 name = name.replace('"', "'").replace('|', '').replace('>', '').replace(
                     '<', '').replace('/', '').replace('\\', '').replace(':', ';').replace('?', '')
-                saveFile(code,name,type='js',encoding='utf-16')
+                saveFile(code,name,type='js',encoding=encoding)
             return code
         else:
             settings = element['attributes']['settings']
@@ -1480,18 +1471,18 @@ def extractSettings(element: dict, analyticsCode:bool=True, save: bool = False)-
                     if save:
                         name = f'RC - {rule_name} - {element_place} - {element["attributes"]["name"]} - code settings.js'
                         name = name.replace('"', "'").replace('|', '').replace('>', '').replace('<', '').replace('/', '').replace('\\', '').replace(':', ';').replace('?', '')
-                        saveFile(code,name,type='js',encoding='utf-16')
+                        saveFile(code,name,type='js',encoding=encoding)
                     return code
 
             if save:
                 name = f'RC - {rule_name} - {element_place} - {element["attributes"]["name"]} - settings.json'
                 name = name.replace('"', "'").replace('|', '').replace('>', '').replace(
                     '<', '').replace('/', '').replace('\\', '').replace(':', ';').replace('?', '')
-                saveFile(settings,name,type='json',encoding='utf-16')
+                saveFile(settings,name,type='json',encoding=encoding)
             return settings
 
 
-def extractAttributes(element: dict, save: bool = False)->dict:
+def extractAttributes(element: dict, save: bool = False,encoding:str=ENCODING)->dict:
     """
     Extract the attributes of your element. You can save it in a file as well. 
     Arguments:
@@ -1505,7 +1496,7 @@ def extractAttributes(element: dict, save: bool = False)->dict:
         name = f'{element_type} - {el_name} - attributes.json'
         name = name.replace('"', "'").replace('|', '').replace('>', '').replace(
             '<', '').replace('/', '').replace('\\', '').replace(':', ';').replace('?', '')
-        saveFile(attributes,name,type='json',encoding='utf-16')
+        saveFile(attributes,name,type='json',encoding=encoding)
     return attributes
 
 
@@ -1701,7 +1692,7 @@ class Translator:
             return new_rc
 
 
-def extractAnalyticsCode(rcSettings: str, save: bool = False, filename: str = None)->None:
+def extractAnalyticsCode(rcSettings: str, save: bool = False, filename: str = None,encoding:str=ENCODING)->None:
     """
     Extract the custom code of the rule and save it in a file.
     Arguments:
@@ -1716,5 +1707,5 @@ def extractAnalyticsCode(rcSettings: str, save: bool = False, filename: str = No
             filename = 'code'
         filename = filename.replace('/', '_').replace('|', '_')
         if save:
-            saveFile(json_code,filename,type='js',encoding='utf-16')
+            saveFile(json_code,filename,type='js',encoding=encoding)
         return json_code
