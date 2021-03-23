@@ -155,22 +155,23 @@ class AdobeRequest:
             print(f"request URL : {res.request.url}")
             print(f"statut_code : {res.status_code}")
         try:
-            if res.status_code == 429 and internRetry > 0:
+            if res.status_code == 429:
                 if kwargs.get("verbose", False):
-                    print(f'Too many requests: {internRetry} retry left')
+                    print(f'Too many requests')
                 time.sleep(45)
-                res_json = self.getData(endpoint, params=params, data=data, headers=headers, retry=1, **kwargs)
+                res_json = self.getData(endpoint, params=params, data=data, headers=headers, retry=internRetry, **kwargs)
                 return res_json
             res_json = res.json()
         except:
             res_json = {'error': 'Request Error'}
-            if internRetry > 0:
+            while internRetry > 0:
+                internRetry -= 1
                 if kwargs.get("verbose", False):
                     print('Retry parameter activated')
                     print(f'{internRetry} retry left')
                 if 'error' in res_json.keys():
                     time.sleep(30)
-                    res_json = self.getData(endpoint, params=params, data=data, headers=headers, retry=1, **kwargs)
+                    res_json = self.getData(endpoint, params=params, data=data, headers=headers, retry=internRetry, **kwargs)
                     return res_json
         return res_json
 
@@ -192,9 +193,12 @@ class AdobeRequest:
         try:
             res_json = res.json()
             if res.status_code == 429 or res_json.get('error_code', None) == "429050":
-                res_json['status_code'] = 429
+                time.sleep(45)
+                res_json = self.postData(endpoint, params=params, data=data, headers=headers, **kwargs)
+                return res_json
         except:
             if kwargs.get("verbose", False):
+                print("status_code: {res.status_code}")
                 print(res.text)
             res_json = {'error': 'Request Error'}
         return res_json
@@ -232,7 +236,7 @@ class AdobeRequest:
         elif params is None and data is not None:
             res = requests.put(endpoint, headers=headers, data=json.dumps(data))
         elif params is not None and data is not None:
-            res = requests.put(endpoint, headers=headers, params=params, data=json.dumps(data=data))
+            res = requests.put(endpoint, headers=headers, params=params, data=json.dumps(data))
         try:
             status_code = res.json()
         except:

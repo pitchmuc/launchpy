@@ -7,3 +7,4 @@ from .__version__ import __version__
 from .launchpy import *
 from .configs import *
 from .library import *
+from .admin import *

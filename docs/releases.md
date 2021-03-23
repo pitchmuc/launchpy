@@ -3,6 +3,11 @@
 This page gathered the changes made between version of the launchpy module.\
 This has been started after the 0.3.0 release.
 
+## 0.3.5
+
+* cleaning glbal variables
+* separating admin code.
+
 ## 0.3.4
 
 * Adding a `getRuleComponent` method to retrieve singleComponent
