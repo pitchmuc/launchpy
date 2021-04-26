@@ -51,7 +51,7 @@ def createConfigFile(scope: str = "https://ims-na1.adobelogin.com/s/ent_reactor_
         'tech_id': "<something>@techacct.adobe.com",
         'secret': "<YourSecret>",
         'pathToKey': '<path/to/your/privatekey.key>',
-        'scope': "https://ims-na1.adobelogin.com/s/ent_reactor_admin_sdk"
+        'scope': scope
     }
     with open('config_admin.json', 'w') as cf:
         cf.write(json.dumps(json_data, indent=4))
@@ -251,8 +251,17 @@ class Property:
         res = self.connector.patchData(
             self.endpoint+path, data=data)
         return res
+    
+    def getProfile(self)->dict:
+        """
+        Returns the information about a profile.
+        """
+        path = "/profile"
+        res = self.connector.getData(self.endpoint+path)
+        return res['data']
 
-    def getRules(self)->object:
+
+    def getRules(self,verbose:bool=False)->object:
         """
         Return the list of the rules data.
         On top, it fills the ruleComponents attribute with a dictionnary based on rule id and their rule name and the ruleComponent of each.
@@ -262,6 +271,8 @@ class Property:
             data = rules['data']  # skip meta for now
             pagination = rules['meta']['pagination']
             # requesting all the pages
+            if verbose:
+                print('handling pagination')
             if pagination['current_page'] != pagination['total_pages'] and pagination['total_pages'] != 0:
                 # calculate how many page to download
                 pages_left = pagination['total_pages'] - \
@@ -275,6 +286,8 @@ class Property:
                     res = executor.map(lambda x, y, z: self.connector.getData(
                         x, params=y, header=z), urls, list_page_number, headers)
                 res = list(res)
+                if verbose:
+                    print('parsing responses')
                 append_data = [val for sublist in [data['data']
                                                    for data in res] for val in sublist]
                 data = data + append_data
@@ -287,7 +300,7 @@ class Property:
             data = rules
         return data
 
-    def searchRules(self, name: str = None, enabled: bool = None, published: bool = None, dirty: bool = None, **kwargs)->object:
+    def searchRules(self, name: str = None, enabled: bool = None, published: bool = None, dirty: bool = None, verbose:bool = False, **kwargs)->object:
         """
         Returns the rules searched through the different operator. One argument is required in order to return a result. 
         Arguments: 
@@ -312,6 +325,8 @@ class Property:
         pagination = rules['meta']['pagination']
         # requesting all the pages
         if pagination['current_page'] != pagination['total_pages'] and pagination['total_pages'] != 0:
+            if verbose:
+                print('handling pagination')
             # calculate how many page to download
             pages_left = pagination['total_pages'] - pagination['current_page']
             workers = min(pages_left, 5)  # max 5 threads
@@ -322,6 +337,8 @@ class Property:
                 res = executor.map(lambda x, y: self.connector.getData(
                     x, params=y), urls, list_parameters)
             res = list(res)
+            if verbose:
+                    print('parsing responses')
             append_data = [val for sublist in [data['data']
                                                for data in res] for val in sublist]
             data = data + append_data
@@ -332,7 +349,7 @@ class Property:
             }
         return data
 
-    def getRuleComponents(self, **kwargs)->dict:
+    def getRuleComponents(self, verbose:bool=False,**kwargs)->dict:
         """
         Returns a list of all the ruleComponents gathered in the ruleComponents attributes.
         You must have retrieved the rules before using this method (getRules()), otherwise, the method will also realize it and it will take longer, without saving the rules.
@@ -346,15 +363,21 @@ class Property:
             rules = self.getRules()
             ruleComponents = self.ruleComponents
         if kwargs.get('rule_ids', False):
+            rule_ids = kwargs.get('rule_ids')
             if type(kwargs["rule_ids"]) == str:
-                kwargs["rule_ids"] = list(kwargs["rule_ids"])
+                rule_ids = list(kwargs["rule_ids"])
+            if verbose:
+                print(f"using the rule_ids. {len(rule_ids)} rules given")
             ruleComponents = {rule: {'name': ruleComponents[rule]['name'],
-                                     'url': ruleComponents[rule]['url']} for rule in ruleComponents if rule in kwargs["rule_ids"]}
+                                     'url': ruleComponents[rule]['url']} for rule in ruleComponents if rule in rule_ids}
         if kwargs.get('rule_names', False):
+            rule_names = kwargs.get('rule_names')
             if type(kwargs["rule_names"]) == str:
-                kwargs["rule_names"] = list(kwargs["rule_names"])
+                rule_names = list(kwargs["rule_names"])
+            if verbose:
+                print(f"using the rule_names. {len(rule_names)} rules given")
             ruleComponents = {rule: {'name': ruleComponents[rule]['name'],
-                                     'url': ruleComponents[rule]['url']} for rule in ruleComponents if ruleComponents[rule]['name'] in kwargs["rule_names"]}
+                                     'url': ruleComponents[rule]['url']} for rule in ruleComponents if ruleComponents[rule]['name'] in rule_names}
         list_urls = [ruleComponents[_id]['url'] for _id in ruleComponents]
         names = [ruleComponents[_id]['name'] for _id in ruleComponents]
         ids = list(ruleComponents.keys())
@@ -368,11 +391,15 @@ class Property:
                 element['rule_name'] = name
                 element['rule_id'] = ids
             return data
+        if verbose:
+            print('Starting requests')
         with futures.ThreadPoolExecutor(workers) as executor:
             res = executor.map(lambda x, y, z, a: request_data(
                 x, header=y, name=z, ids=a), list_urls, headers, names, ids)
         list_data = list(res)
         expanded_list = []
+        if verbose:
+            print('parsing response')
         for element in list_data:
             if type(element) is list:
                 for sub_element in element:
@@ -393,7 +420,7 @@ class Property:
         res:dict = self.connector.getData(self.endpoint+path)
         return res
 
-    def getDataElements(self)->object:
+    def getDataElements(self,verbose:bool=False)->object:
         """
         Retrieve data elements of that property.
         Returns a list.
@@ -404,6 +431,8 @@ class Property:
             pagination = dataElements['meta']['pagination']
             # requesting all the pages
             if pagination['current_page'] != pagination['total_pages'] and pagination['total_pages'] != 0:
+                if verbose:
+                    print('handling pagination')
                 # calculate how many page to download
                 pages_left = pagination['total_pages'] - \
                     pagination['current_page']
@@ -415,6 +444,8 @@ class Property:
                     res = executor.map(lambda x, y: self.connector.getData(
                         x, params=y), urls, list_page_number)
                 res = list(res)
+                if verbose:
+                    print('parsing responses')
                 append_data = [val for sublist in [data['data']
                                                    for data in res] for val in sublist]
                 data = data + append_data
@@ -1255,6 +1286,47 @@ def extractSettings(element: dict, analyticsCode:bool=True, save: bool = False,e
                     '<', '').replace('/', '').replace('\\', '').replace(':', ';').replace('?', '')
                 saveFile(settings,name,type='json',encoding=encoding)
             return settings
+
+def findRuleComponentSettingsFileName(rc:dict=None)->str:
+    """
+    Return the filename use to save your custom code of your ruleComponent in a file using the extractSettings method.
+    Returns None when this is not a Custom code from CORE or Adobe Analytics.
+    Argument:
+        rc : REQUIRED : rule component object you want to retrieve the filename for.
+    """
+    element_type = rc['type']
+    if element_type != 'rule_components':
+        raise TypeError('Require a rule component element')
+    elif element_type == 'rule_components':
+        rule_name = rc['rule_name']
+        element_place = rc['attributes']['delegate_descriptor_id'].split('::')[
+            1]
+        if rc['attributes']['delegate_descriptor_id'] == "core::conditions::custom-code":
+            name = f'RC - {rule_name} - {element_place} - {rc["attributes"]["name"]}.js'
+            name = name.replace('"', "'").replace('|', '').replace('>', '').replace(
+                '<', '').replace('/', '').replace('\\', '').replace(':', ';').replace('?', '')
+            return name
+        elif rc['attributes']['delegate_descriptor_id'] == "core::events::custom-code":
+            name = f'RC - {rule_name} - {element_place} - {rc["attributes"]["name"]}.js'
+            name = name.replace('"', "'").replace('|', '').replace('>', '').replace(
+                '<', '').replace('/', '').replace('\\', '').replace(':', ';').replace('?', '')
+            return name
+        elif rc['attributes']['delegate_descriptor_id'] == "core::actions::custom-code":
+            name = f'RC - {rule_name} - {element_place} - {rc["attributes"]["name"]}.js'
+            name = name.replace('"', "'").replace('|', '').replace('>', '').replace(
+                '<', '').replace('/', '').replace('\\', '').replace(':', ';').replace('?', '')
+            return name
+        else:
+            settings = rc['attributes']['settings']
+            if 'customSetup' in json.loads(settings).keys() and "adobe-analytics::" in rc['attributes']['delegate_descriptor_id']:
+                if 'source' in json.loads(settings)['customSetup']:
+                    name = f'RC - {rule_name} - {element_place} - {rc["attributes"]["name"]} - code settings.js'
+                    name = name.replace('"', "'").replace('|', '').replace('>', '').replace('<', '').replace('/', '').replace('\\', '').replace(':', ';').replace('?', '')
+                    return name
+            else:
+                return None
+    else:
+        return None
 
 
 def extractAttributes(element: dict, save: bool = False,encoding:str='utf-8')->dict:
