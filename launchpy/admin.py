@@ -13,6 +13,7 @@ class Admin:
             config_object=config_object, header=header)
         self.header = self.connector.header
         self.COMPANY_ID = {}
+        self.COMPANY_NAME = {}
         self.properties = []
         self.endpoint = config.endpoints['global']
         
@@ -26,6 +27,16 @@ class Admin:
         companyID = companies['data'][0]['id']
         self.COMPANY_ID = companyID
         return companyID
+    
+    def getCompanyName(self) -> object:
+        """
+        Retrieve the company id for later call for the properties
+        """
+        path = "/companies"
+        companies = self.connector.getData(self.endpoint + path)
+        companyName = companies['data'][0]['attributes']['name']
+        self.COMPANY_NAME = companyName
+        return companyName
 
 
     def getProperties(self,companyID: str)->list:
