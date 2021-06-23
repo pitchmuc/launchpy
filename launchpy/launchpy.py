@@ -879,7 +879,33 @@ class Property:
         data = dataElements
         return data
 
-    def updateRules(self, rule_id: str, attr_dict: object)->object:
+    def updateRule(self, rule_id: str, attr_dict: object)->object:
+        """
+        Update the rule based on elements passed in attr_dict. 
+        arguments: 
+            rule_id : REQUIRED : Rule ID
+            attr_dict : REQUIRED : dictionary that will be passed to Launch for update
+
+        documentation : https://developer.adobelaunch.com/api/reference/1.0/rules/update/
+        """
+        obj = {
+            "data": {
+                "attributes": attr_dict,
+                "id": rule_id,
+                "type": "rules"
+            }
+        }
+        path = '/rules/'+rule_id
+        rules = self.connector.patchData(
+            self.endpoint+path, data=obj)
+        try:
+            data = rules['data']
+        except Exception as err:
+            print(err.args[0])
+            data = rules
+        return data
+
+    def reviseRule(self, rule_id: str, attr_dict: object)->object:
         """
         Update the rule based on elements passed in attr_dict. 
         arguments: 
@@ -903,7 +929,8 @@ class Property:
             self.endpoint+path, data=obj)
         try:
             data = rules['data']
-        except:
+        except Exception as err:
+            print(err.args[0])
             data = rules
         return data
 
@@ -925,7 +952,8 @@ class Property:
         rc = self.connector.patchData(self.endpoint+path, data=obj)
         try:
             data = rc['data']
-        except:
+        except Exception as err:
+            print(err.args[0])
             data = rc
         return data
     
