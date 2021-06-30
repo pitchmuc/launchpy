@@ -311,7 +311,7 @@ class Property:
         """
         filters = {}
         if name != None:
-            filters['filter[name]=CONTAINS '] = f"CONTAINS {name}"
+            filters['filter[name]='] = f"CONTAINS {name}"
         if dirty != None:
             filters['filter[dirty]'] = f"EQ {str(dirty).lower()}"
         if enabled != None:
