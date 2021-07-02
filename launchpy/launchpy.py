@@ -644,7 +644,7 @@ class Property:
                 "attributes": {
                     "name": name,
                     "delegate_descriptor_id": descriptor,
-                    "order": order
+                    "rule_order": order
                 },
                 "relationships": {
                     "extension": {
