@@ -623,7 +623,7 @@ class Property:
             data = rules
         return data
 
-    def createRuleComponents(self, name: str, settings: str = None, descriptor: str = None, extension_infos: dict = None, rule_infos: dict = None, rule_order: float = None, **kwargs) -> object:
+    def createRuleComponents(self, name: str, settings: str = None, descriptor: str = None, extension_infos: dict = None, rule_infos: dict = None, order: float = None, **kwargs) -> object:
         """
         Create a ruleComponent by provided a rule name and descriptor (minimum). It returns an object.
         It takes additional information in order to link the ruleCompoment to a rule and with an Extension.
@@ -636,15 +636,15 @@ class Property:
             (can be found from translator)
             settings : OPTIONAL : settings for that rule component
         """
-        if rule_order is None:
-            rule_order = 50.0
+        if order is None:
+            order = 0
 
         obj = {
             "data": {
                 "attributes": {
                     "name": name,
                     "delegate_descriptor_id": descriptor,
-                    "rule_order": rule_order
+                    "order": order
                 },
                 "relationships": {
                     "extension": {
