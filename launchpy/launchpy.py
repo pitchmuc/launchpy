@@ -299,7 +299,7 @@ class Property:
             data = rules
         return data
 
-    def searchRules(self, name: str = None, enabled: bool = None, published: bool = None, dirty: bool = None, verbose: bool = False, **kwargs) -> object:
+    def searchRules(self, name: str = None, name_contains: str = None ,enabled: bool = None, published: bool = None, dirty: bool = None, verbose: bool = False, **kwargs) -> object:
         """
         Returns the rules searched through the different operator. One argument is required in order to return a result. 
         Arguments: 
@@ -310,6 +310,8 @@ class Property:
         """
         filters = {}
         if name != None:
+            filters['filter[name]='] = f"EQ {name}"
+        if name_contains != None:
             filters['filter[name]='] = f"CONTAINS {name}"
         if dirty != None:
             filters['filter[dirty]'] = f"EQ {str(dirty).lower()}"
