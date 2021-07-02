@@ -10,7 +10,8 @@ from launchpy import config, connector
 from typing import IO, Union
 from .library import Library
 
-def saveFile(data:str,filename:str=None,type:str='txt',encoding:str='utf-8')->None:
+
+def saveFile(data: str, filename: str = None, type: str = 'txt', encoding: str = 'utf-8') -> None:
     """
     Save file to your system.
     Arguments:
@@ -19,24 +20,24 @@ def saveFile(data:str,filename:str=None,type:str='txt',encoding:str='utf-8')->No
         type : OPTIONAL : Can be "txt", "json", "js"
             json
     """
-    if type=="txt":
+    if type == "txt":
         if '.txt' not in filename:
             filename = f"{filename}.txt"
-        with open(Path(filename),'w',encoding=encoding) as f:
+        with open(Path(filename), 'w', encoding=encoding) as f:
             f.write(data)
     elif type == "js":
         if '.js' not in filename:
             filename = f"{filename}.js"
-        with open(Path(filename),'w',encoding=encoding) as f:
+        with open(Path(filename), 'w', encoding=encoding) as f:
             f.write(data)
-    elif type=="json":
+    elif type == "json":
         if '.json' not in filename:
             filename = f"{filename}.json"
-        with open(Path(filename),'w',encoding=encoding) as f:
-            f.write(json.dumps(data,indent=4))
+        with open(Path(filename), 'w', encoding=encoding) as f:
+            f.write(json.dumps(data, indent=4))
 
 
-def createConfigFile(scope: str = "https://ims-na1.adobelogin.com/s/ent_reactor_admin_sdk", verbose: object = False)->None:
+def createConfigFile(scope: str = "https://ims-na1.adobelogin.com/s/ent_reactor_admin_sdk", verbose: object = False) -> None:
     """
     This function will create a 'config_admin.json' file where you can store your access data. 
     Arguments:
@@ -74,7 +75,7 @@ class Property:
           rules : dictionnary to extract ruleComponents from rules. Filled when running getRules
         """
 
-    def __init__(self, data: object,config_object:dict=config.config_object,header:dict=config.header) -> None:
+    def __init__(self, data: object, config_object: dict = config.config_object, header: dict = config.header) -> None:
         """
         Instanciate the class with the object retrieved by getProperties.
         Arguments : 
@@ -108,14 +109,13 @@ class Property:
         self.ruleComponents = {}
         self.header = deepcopy(config.header)
 
-    def __repr__(self)-> dict:
+    def __repr__(self) -> dict:
         return json.dumps(self.dict, indent=4)
 
-    def __str__(self)-> str:
+    def __str__(self) -> str:
         return str(json.dumps(self.dict, indent=4))
-    
 
-    def _getExtensionPackage(self, ext_name: str, platform: str = "web", verbose: bool = False)->dict:
+    def _getExtensionPackage(self, ext_name: str, platform: str = "web", verbose: bool = False) -> dict:
         """
         Retrieve extension id of the catalog from an extension name.
         It will be used later on to check for available updates. 
@@ -135,7 +135,7 @@ class Property:
             print('extension id : ' + str(data['id']))
         return extension_id
 
-    def getRessource(self,res_url: str = None, params: dict = None):
+    def getRessource(self, res_url: str = None, params: dict = None):
         """
         Enable you to request a specific resource from Launch API.
         Arguments:
@@ -147,7 +147,7 @@ class Property:
         res = self.connector.getData(res_url, params=params)
         return res
 
-    def getEnvironments(self)->object:
+    def getEnvironments(self) -> object:
         """
         Retrieve the environment sets for this property
         """
@@ -155,7 +155,7 @@ class Property:
         data = env['data']  # skip meta for now
         return data
 
-    def getHost(self)->object:
+    def getHost(self) -> object:
         """
         Retrieve the hosts sets for this property
         """
@@ -163,7 +163,7 @@ class Property:
         data = host['data']  # skip meta for now
         return data
 
-    def getExtensions(self)-> object:
+    def getExtensions(self) -> object:
         """
         retrieve the different information from url retrieve in the properties
         """
@@ -221,7 +221,7 @@ class Property:
                 dict_extensions[name]['update'] = True
         return dict_extensions
 
-    def upgradeExtension(self, extension_id: str, package_id: str, **kwargs)-> object:
+    def upgradeExtension(self, extension_id: str, package_id: str, **kwargs) -> object:
         """
         Upgrade the extension with the new package id (EP...). 
         Returns the extension data. 
@@ -251,8 +251,8 @@ class Property:
         res = self.connector.patchData(
             self.endpoint+path, data=data)
         return res
-    
-    def getProfile(self)->dict:
+
+    def getProfile(self) -> dict:
         """
         Returns the information about a profile.
         """
@@ -260,8 +260,7 @@ class Property:
         res = self.connector.getData(self.endpoint+path)
         return res['data']
 
-
-    def getRules(self,verbose:bool=False)->object:
+    def getRules(self, verbose: bool = False) -> object:
         """
         Return the list of the rules data.
         On top, it fills the ruleComponents attribute with a dictionnary based on rule id and their rule name and the ruleComponent of each.
@@ -300,7 +299,7 @@ class Property:
             data = rules
         return data
 
-    def searchRules(self, name: str = None, enabled: bool = None, published: bool = None, dirty: bool = None, verbose:bool = False, **kwargs)->object:
+    def searchRules(self, name: str = None, enabled: bool = None, published: bool = None, dirty: bool = None, verbose: bool = False, **kwargs) -> object:
         """
         Returns the rules searched through the different operator. One argument is required in order to return a result. 
         Arguments: 
@@ -338,7 +337,7 @@ class Property:
                     x, params=y), urls, list_parameters)
             res = list(res)
             if verbose:
-                    print('parsing responses')
+                print('parsing responses')
             append_data = [val for sublist in [data['data']
                                                for data in res] for val in sublist]
             data = data + append_data
@@ -349,7 +348,7 @@ class Property:
             }
         return data
 
-    def getRuleComponents(self, verbose:bool=False,**kwargs)->dict:
+    def getRuleComponents(self, verbose: bool = False, **kwargs) -> dict:
         """
         Returns a list of all the ruleComponents gathered in the ruleComponents attributes.
         You must have retrieved the rules before using this method (getRules()), otherwise, the method will also realize it and it will take longer, without saving the rules.
@@ -407,8 +406,8 @@ class Property:
             else:
                 expanded_list.append(element)
         return expanded_list
-    
-    def getRuleComponent(self,rc_id:str=None)->dict:
+
+    def getRuleComponent(self, rc_id: str = None) -> dict:
         """
         Return a ruleComponent information
         Argument:
@@ -417,10 +416,10 @@ class Property:
         if rc_id is None:
             raise ValueError('Require a ruleComponent ID')
         path = f"/rule_components/{rc_id}"
-        res:dict = self.connector.getData(self.endpoint+path)
+        res: dict = self.connector.getData(self.endpoint+path)
         return res
 
-    def getDataElements(self,verbose:bool=False)->object:
+    def getDataElements(self, verbose: bool = False) -> object:
         """
         Retrieve data elements of that property.
         Returns a list.
@@ -453,7 +452,7 @@ class Property:
             data = dataElements
         return data
 
-    def searchDataElements(self, name: str = None, enabled: bool = None, published: bool = None, dirty: bool = None, **kwargs)->object:
+    def searchDataElements(self, name: str = None, enabled: bool = None, published: bool = None, dirty: bool = None, **kwargs) -> object:
         """
         Returns the rules searched through the different operator. One argument is required in order to return a result. 
         Arguments: 
@@ -474,7 +473,8 @@ class Property:
         if 'created_at' in kwargs:
             pass  # documentation unclear on how to handle it
         parameters = {**filters}
-        dataElements = self.connector.getData(self._DataElement, params=parameters)
+        dataElements = self.connector.getData(
+            self._DataElement, params=parameters)
         data = dataElements['data']  # skip meta for now
         pagination = dataElements['meta']['pagination']
         # requesting all the pages
@@ -494,7 +494,7 @@ class Property:
             data = data + append_data
         return data
 
-    def getLibraries(self, state: str = None)->object:
+    def getLibraries(self, state: str = None) -> object:
         """
         Retrieve libraries of the property.
         Returns a list.
@@ -532,7 +532,7 @@ class Property:
             data = data + append_data
         return data
 
-    def getNotes(self, data: object)->list:
+    def getNotes(self, data: object) -> list:
         """
         Retrieve the note associated with the object pass to the method. Returns list.
         Arguments:
@@ -566,7 +566,7 @@ class Property:
             data = data + append_data
         return data
 
-    def createExtensions(self, extension_id: str, settings: str = None, descriptor: str = None, **kwargs)-> object:
+    def createExtensions(self, extension_id: str, settings: str = None, descriptor: str = None, **kwargs) -> object:
         """
         Create an extension in your property. Your extension_id argument should be the latest one extension id available.
         Arguments : 
@@ -599,7 +599,7 @@ class Property:
             data = extensions
         return data
 
-    def createRules(self, name: str)->object:
+    def createRules(self, name: str) -> object:
         """
         Create a rule by provided a rule name.
         Arguments:
@@ -623,7 +623,7 @@ class Property:
             data = rules
         return data
 
-    def createRuleComponents(self, name: str, settings: str = None, descriptor: str = None, extension_infos: dict = None, rule_infos: dict = None, **kwargs)->object:
+    def createRuleComponents(self, name: str, settings: str = None, descriptor: str = None, extension_infos: dict = None, rule_infos: dict = None, rule_order: float = None, **kwargs) -> object:
         """
         Create a ruleComponent by provided a rule name and descriptor (minimum). It returns an object.
         It takes additional information in order to link the ruleCompoment to a rule and with an Extension.
@@ -636,12 +636,15 @@ class Property:
             (can be found from translator)
             settings : OPTIONAL : settings for that rule component
         """
+        if rule_order is None:
+            rule_order = 50.0
 
         obj = {
             "data": {
                 "attributes": {
                     "name": name,
-                    "delegate_descriptor_id": descriptor
+                    "delegate_descriptor_id": descriptor,
+                    "rule_order": rule_order
                 },
                 "relationships": {
                     "extension": {
@@ -663,7 +666,7 @@ class Property:
             data = rc
         return data
 
-    def createDataElements(self, name: str, settings: str = None, descriptor: str = None, extension: dict = None, **kwargs: dict)->object:
+    def createDataElements(self, name: str, settings: str = None, descriptor: str = None, extension: dict = None, **kwargs: dict) -> object:
         """
         Create Data Elements following the usage of required arguments. 
         Arguments: 
@@ -699,7 +702,7 @@ class Property:
             data = dataElements
         return data
 
-    def createEnvironment(self, name: str, host_id: str, stage: str = 'development', **kwargs)->object:
+    def createEnvironment(self, name: str, host_id: str, stage: str = 'development', **kwargs) -> object:
         """
         Create an environment. Note that you cannot create more than 1 environment for Staging and Production stage. 
         Arguments: 
@@ -771,7 +774,7 @@ class Property:
             data = host
         return data
 
-    def createLibrary(self, name: str, return_class: bool = True)->object:
+    def createLibrary(self, name: str, return_class: bool = True) -> object:
         """
         Create a library with the name provided. Returns an instance of the Library class or the response from the API (object).
         Arguments:
@@ -799,7 +802,7 @@ class Property:
         except:
             return lib
 
-    def reviseExtensions(self, extension_id, attr_dict: dict, **kwargs)-> object:
+    def reviseExtensions(self, extension_id, attr_dict: dict, **kwargs) -> object:
         """
         update the extension with the information provided in the argument.
         argument: 
@@ -821,7 +824,7 @@ class Property:
         data = extensions['data']
         return data
 
-    def reviseRules(self, rule_id: str)->object:
+    def reviseRules(self, rule_id: str) -> object:
         """
         Update the rule.
         arguments: 
@@ -843,8 +846,8 @@ class Property:
         rules = self.connector.patchData(self.endpoint+path, data=obj)
         data = rules
         return data
-    
-    def getRuleRevision(self,rule_id:str)->dict:
+
+    def getRuleRevision(self, rule_id: str) -> dict:
         """
         Retrieve the revisions of the specified Rule.
         Argument:
@@ -856,8 +859,7 @@ class Property:
         revisions = self.connector.getData(self.endpoint+path)
         return revisions
 
-
-    def reviseDataElements(self, dataElement_id: str)->object:
+    def reviseDataElements(self, dataElement_id: str) -> object:
         """
         Update the data element information based on the information provided.
         arguments: 
@@ -879,7 +881,7 @@ class Property:
         data = dataElements
         return data
 
-    def updateRule(self, rule_id: str, attr_dict: object)->object:
+    def updateRule(self, rule_id: str, attr_dict: object) -> object:
         """
         Update the rule based on elements passed in attr_dict. 
         arguments: 
@@ -905,7 +907,7 @@ class Property:
             data = rules
         return data
 
-    def reviseRule(self, rule_id: str, attr_dict: object)->object:
+    def reviseRule(self, rule_id: str, attr_dict: object) -> object:
         """
         Update the rule based on elements passed in attr_dict. 
         arguments: 
@@ -934,7 +936,7 @@ class Property:
             data = rules
         return data
 
-    def updateRuleComponent(self, rc_id: str, attr_dict: object, **kwargs)->object:
+    def updateRuleComponent(self, rc_id: str, attr_dict: object, **kwargs) -> object:
         """
         Update the ruleComponents based on the information provided.
         arguments: 
@@ -956,8 +958,8 @@ class Property:
             print(err.args[0])
             data = rc
         return data
-    
-    def updateCustomCode(self,rc_id:str=None,customCode:Union[str,IO]=None,encoding:str='utf-8')->dict:
+
+    def updateCustomCode(self, rc_id: str = None, customCode: Union[str, IO] = None, encoding: str = 'utf-8') -> dict:
         """
         Update the custom code of a rule (analytics or core)
         Arguments:
@@ -972,7 +974,7 @@ class Property:
         if customCode is None:
             raise ValueError('Require some code to update')
         if '.js' in customCode:
-            with open(customCode,'r',encoding=encoding) as f:
+            with open(customCode, 'r', encoding=encoding) as f:
                 myCode = f.read()
         else:
             myCode = customCode
@@ -987,8 +989,7 @@ class Property:
         res = self.updateRuleComponent(rc_id=rc_id, attr_dict=obj)
         return res
 
-
-    def updateDataElements(self, dataElement_id: str, attr_dict: object, **kwargs)->object:
+    def updateDataElements(self, dataElement_id: str, attr_dict: object, **kwargs) -> object:
         """
         Update the data element information based on the information provided.
         arguments: 
@@ -1011,7 +1012,7 @@ class Property:
             data = dataElements
         return data
 
-    def updateEnvironment(self, name: str, env_id: str, **kwargs)->object:
+    def updateEnvironment(self, name: str, env_id: str, **kwargs) -> object:
         """
         Update an environment. Note :only support name change.
         Arguments:
@@ -1037,7 +1038,7 @@ class Property:
             data = env
         return data
 
-    def updateExtensions(self, extension_id, attr_dict: dict, **kwargs)-> object:
+    def updateExtensions(self, extension_id, attr_dict: dict, **kwargs) -> object:
         """
         update the extension with the information provided in the argument.
         argument: 
@@ -1059,7 +1060,7 @@ class Property:
             data = extensions
         return data
 
-    def deleteExtension(self, extension_id: str)->str:
+    def deleteExtension(self, extension_id: str) -> str:
         """
         Delete the extension that you want.  
         Arguments: 
@@ -1069,17 +1070,17 @@ class Property:
             'https://reactor.adobe.io/extensions/'+extension_id)
         return data
 
-    def deleteRule(self, rule_id: str)->str:
+    def deleteRule(self, rule_id: str) -> str:
         """
         Delete the rule that you want. 
         Arguments: 
             rule_id : REQUIRED : Rule ID that needs to be deleted
         """
         data = self.connector.deleteData('https://reactor.adobe.io/rules/' +
-                           rule_id)
+                                         rule_id)
         return data
 
-    def deleteDataElement(self, dataElement_id: str)->str:
+    def deleteDataElement(self, dataElement_id: str) -> str:
         """
         Delete a data element.  
         Arguments: 
@@ -1089,7 +1090,7 @@ class Property:
             'https://reactor.adobe.io/data_elements/'+dataElement_id)
         return data
 
-    def deleteRuleComponent(self, rc_id: str)->str:
+    def deleteRuleComponent(self, rc_id: str) -> str:
         """
         Delete the rule component that you have selected.  
         Arguments: 
@@ -1099,7 +1100,7 @@ class Property:
             'https://reactor.adobe.io/rule_components/'+rc_id)
         return data
 
-    def deleteEnvironments(self, env_id: str)->str:
+    def deleteEnvironments(self, env_id: str) -> str:
         """
         Delete the environment based on the id.  
         Arguments: 
@@ -1109,7 +1110,8 @@ class Property:
             'https://reactor.adobe.io/environments/'+env_id)
         return data
 
-def extensionsInfo(data: list)->dict:
+
+def extensionsInfo(data: list) -> dict:
     """
     Return a dictionary from the list provided from the extensions request.
     Arguments: 
@@ -1136,7 +1138,7 @@ def extensionsInfo(data: list)->dict:
     return extensions
 
 
-def rulesInfo(data: list)-> dict:
+def rulesInfo(data: list) -> dict:
     """
     Return a dictionary from the list provided from the rules request.
     Arguments : 
@@ -1159,7 +1161,7 @@ def rulesInfo(data: list)-> dict:
     return rules
 
 
-def ruleComponentInfo(data: list)->dict:
+def ruleComponentInfo(data: list) -> dict:
     """
     Return a dictionary from the list provided from the rules component request.
     Arguments : 
@@ -1183,7 +1185,7 @@ def ruleComponentInfo(data: list)->dict:
     return components
 
 
-def dataElementInfo(data: list)->dict:
+def dataElementInfo(data: list) -> dict:
     """
     return information about data elements as dictionary.
     arguments : 
@@ -1209,7 +1211,7 @@ def dataElementInfo(data: list)->dict:
     return elements
 
 
-def _defineSearchType(_name: str = None, _id: str = None)->tuple:
+def _defineSearchType(_name: str = None, _id: str = None) -> tuple:
     if _name is not None:
         condition = 'name'
         value = _name
@@ -1221,7 +1223,7 @@ def _defineSearchType(_name: str = None, _id: str = None)->tuple:
     return condition, value
 
 
-def extractSettings(element: dict, analyticsCode:bool=True, save: bool = False,encoding:str='utf-8')->dict:
+def extractSettings(element: dict, analyticsCode: bool = True, save: bool = False, encoding: str = 'utf-8') -> dict:
     """
     Extract the settings from your element. For your custom code, it will extract the javaScript. 
     Arguments: 
@@ -1239,7 +1241,7 @@ def extractSettings(element: dict, analyticsCode:bool=True, save: bool = False,e
                 name = f'DE - {str(element["attributes"]["name"])}.js'
                 name = name.replace('"', "'").replace('|', '').replace('>', '').replace(
                     '<', '').replace('/', '').replace('\\', '').replace(':', ';').replace('?', '')
-                saveFile(code,name,type='js',encoding=encoding)
+                saveFile(code, name, type='js', encoding=encoding)
             return code
         else:
             settings = element['attributes']['settings']
@@ -1247,7 +1249,7 @@ def extractSettings(element: dict, analyticsCode:bool=True, save: bool = False,e
                 name = f'DE - {str(element["attributes"]["name"])} - settings.json'
                 name = name.replace('"', "'").replace('|', '').replace('>', '').replace(
                     '<', '').replace('/', '').replace('\\', '').replace(':', ';').replace('?', '')
-                saveFile(settings,name,type='json',encoding=encoding)
+                saveFile(settings, name, type='json', encoding=encoding)
             return settings
     elif element_type == 'extensions':
         if element['attributes']['delegate_descriptor_id'] == "adobe-analytics::extensionConfiguration::config":
@@ -1256,7 +1258,7 @@ def extractSettings(element: dict, analyticsCode:bool=True, save: bool = False,e
                 name = f'EXT - {str(element["attributes"]["name"])}.json'
                 name = name.replace('"', "'").replace('|', '').replace('>', '').replace(
                     '<', '').replace('/', '').replace('\\', '').replace(':', ';').replace('?', '')
-                saveFile(settings,name,type='json',encoding=encoding)
+                saveFile(settings, name, type='json', encoding=encoding)
             return settings
         else:
             settings = element['attributes']['settings']
@@ -1264,7 +1266,7 @@ def extractSettings(element: dict, analyticsCode:bool=True, save: bool = False,e
                 name = f'EXT - {str(element["attributes"]["name"])} - settings.json'
                 name = name.replace('"', "'").replace('|', '').replace('>', '').replace(
                     '<', '').replace('/', '').replace('\\', '').replace(':', ';').replace('?', '')
-                saveFile(settings,name,type='json',encoding=encoding)
+                saveFile(settings, name, type='json', encoding=encoding)
             return settings
     elif element_type == 'rule_components':
         rule_name = element['rule_name']
@@ -1277,7 +1279,7 @@ def extractSettings(element: dict, analyticsCode:bool=True, save: bool = False,e
                 name = f'RC - {rule_name} - {element_place} - {element["attributes"]["name"]}.js'
                 name = name.replace('"', "'").replace('|', '').replace('>', '').replace(
                     '<', '').replace('/', '').replace('\\', '').replace(':', ';').replace('?', '')
-                saveFile(code,name,type='js',encoding=encoding)
+                saveFile(code, name, type='js', encoding=encoding)
             return code
         elif element['attributes']['delegate_descriptor_id'] == "core::events::custom-code":
             settings = element['attributes']['settings']
@@ -1286,7 +1288,7 @@ def extractSettings(element: dict, analyticsCode:bool=True, save: bool = False,e
                 name = f'RC - {rule_name} - {element_place} - {element["attributes"]["name"]}.js'
                 name = name.replace('"', "'").replace('|', '').replace('>', '').replace(
                     '<', '').replace('/', '').replace('\\', '').replace(':', ';').replace('?', '')
-                saveFile(code,name,type='js',encoding=encoding)
+                saveFile(code, name, type='js', encoding=encoding)
             return code
         elif element['attributes']['delegate_descriptor_id'] == "core::actions::custom-code":
             settings = element['attributes']['settings']
@@ -1295,27 +1297,30 @@ def extractSettings(element: dict, analyticsCode:bool=True, save: bool = False,e
                 name = f'RC - {rule_name} - {element_place} - {element["attributes"]["name"]}.js'
                 name = name.replace('"', "'").replace('|', '').replace('>', '').replace(
                     '<', '').replace('/', '').replace('\\', '').replace(':', ';').replace('?', '')
-                saveFile(code,name,type='js',encoding=encoding)
+                saveFile(code, name, type='js', encoding=encoding)
             return code
         else:
             settings = element['attributes']['settings']
             if 'customSetup' in json.loads(settings).keys() and analyticsCode:
                 if 'source' in json.loads(settings)['customSetup']:
-                    code = json.loads(settings)['customSetup'].get('source','')
+                    code = json.loads(settings)[
+                        'customSetup'].get('source', '')
                     if save:
                         name = f'RC - {rule_name} - {element_place} - {element["attributes"]["name"]} - code settings.js'
-                        name = name.replace('"', "'").replace('|', '').replace('>', '').replace('<', '').replace('/', '').replace('\\', '').replace(':', ';').replace('?', '')
-                        saveFile(code,name,type='js',encoding=encoding)
+                        name = name.replace('"', "'").replace('|', '').replace('>', '').replace(
+                            '<', '').replace('/', '').replace('\\', '').replace(':', ';').replace('?', '')
+                        saveFile(code, name, type='js', encoding=encoding)
                     return code
 
             if save:
                 name = f'RC - {rule_name} - {element_place} - {element["attributes"]["name"]} - settings.json'
                 name = name.replace('"', "'").replace('|', '').replace('>', '').replace(
                     '<', '').replace('/', '').replace('\\', '').replace(':', ';').replace('?', '')
-                saveFile(settings,name,type='json',encoding=encoding)
+                saveFile(settings, name, type='json', encoding=encoding)
             return settings
 
-def findRuleComponentSettingsFileName(rc:dict=None)->str:
+
+def findRuleComponentSettingsFileName(rc: dict = None) -> str:
     """
     Return the filename use to save your custom code of your ruleComponent in a file using the extractSettings method.
     Returns None when this is not a Custom code from CORE or Adobe Analytics.
@@ -1349,7 +1354,8 @@ def findRuleComponentSettingsFileName(rc:dict=None)->str:
             if 'customSetup' in json.loads(settings).keys() and "adobe-analytics::" in rc['attributes']['delegate_descriptor_id']:
                 if 'source' in json.loads(settings)['customSetup']:
                     name = f'RC - {rule_name} - {element_place} - {rc["attributes"]["name"]} - code settings.js'
-                    name = name.replace('"', "'").replace('|', '').replace('>', '').replace('<', '').replace('/', '').replace('\\', '').replace(':', ';').replace('?', '')
+                    name = name.replace('"', "'").replace('|', '').replace('>', '').replace(
+                        '<', '').replace('/', '').replace('\\', '').replace(':', ';').replace('?', '')
                     return name
             else:
                 return None
@@ -1357,7 +1363,7 @@ def findRuleComponentSettingsFileName(rc:dict=None)->str:
         return None
 
 
-def extractAttributes(element: dict, save: bool = False,encoding:str='utf-8')->dict:
+def extractAttributes(element: dict, save: bool = False, encoding: str = 'utf-8') -> dict:
     """
     Extract the attributes of your element. You can save it in a file as well. 
     Arguments:
@@ -1372,11 +1378,11 @@ def extractAttributes(element: dict, save: bool = False,encoding:str='utf-8')->d
         name = f'{element_type} - {el_name} - attributes.json'
         name = name.replace('"', "'").replace('|', '').replace('>', '').replace(
             '<', '').replace('/', '').replace('\\', '').replace(':', ';').replace('?', '')
-        saveFile(attributes,name,type='json',encoding=encoding)
+        saveFile(attributes, name, type='json', encoding=encoding)
     return attributes
 
 
-def duplicateAttributes(base_elements: list = None, target_elements: list = None, **kwargs)->list:
+def duplicateAttributes(base_elements: list = None, target_elements: list = None, **kwargs) -> list:
     """
     Take a list of element and copy their settings (default) to another list of element.
     returns a new list of the elements attributes. 
@@ -1414,7 +1420,7 @@ def duplicateAttributes(base_elements: list = None, target_elements: list = None
     return new_list
 
 
-def copySettings(data: object)->object:
+def copySettings(data: object) -> object:
     """
     copy the settings from an element and returns an object with required information
     Returns an object with the information required to create copy this element.  
@@ -1484,7 +1490,7 @@ class Translator:
         df.columns = [property_name]
         self.extensions = df
 
-    def extendExtensions(self, new_property_extensions: object, new_prop_name: str)-> None:
+    def extendExtensions(self, new_property_extensions: object, new_prop_name: str) -> None:
         """
         Add the extensions id from a target property.
         Arguments: 
@@ -1520,7 +1526,7 @@ class Translator:
         self.rules[new_prop_name] = df
         return self.rules
 
-    def translate(self, target_property: str, data_element: dict = None, rule_component: dict = None)->dict:
+    def translate(self, target_property: str, data_element: dict = None, rule_component: dict = None) -> dict:
         """
         change the id from the base element to the new property. 
         Pre checked should be done beforehands (updating Extension & Rules elements)
@@ -1568,7 +1574,7 @@ class Translator:
             return new_rc
 
 
-def extractAnalyticsCode(rcSettings: str, save: bool = False, filename: str = None,encoding:str='utf-8')->None:
+def extractAnalyticsCode(rcSettings: str, save: bool = False, filename: str = None, encoding: str = 'utf-8') -> None:
     """
     Extract the custom code of the rule and save it in a file.
     Arguments:
@@ -1584,5 +1590,5 @@ def extractAnalyticsCode(rcSettings: str, save: bool = False, filename: str = No
             filename = 'code'
         filename = filename.replace('/', '_').replace('|', '_')
         if save:
-            saveFile(json_code,filename,type='js',encoding=encoding)
+            saveFile(json_code, filename, type='js', encoding=encoding)
         return json_code
