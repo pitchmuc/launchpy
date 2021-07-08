@@ -641,7 +641,7 @@ class Property:
             settings : OPTIONAL : settings for that rule component
         """
         if order is None:
-            order = 0
+            order = 50
 
         obj = {
             "data": {
@@ -662,7 +662,7 @@ class Property:
         if settings is not None:
             obj['data']['attributes']['settings'] = settings
         if 'order' in kwargs:
-            obj['data']['attributes']['order'] = kwargs.get('order')
+            obj['data']['attributes']['rule_order'] = kwargs.get('order')
         rc = self.connector.postData(self._RuleComponents, data=obj)
         try:
             data = rc['data']
