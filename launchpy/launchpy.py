@@ -312,7 +312,7 @@ class Property:
         if name != None:
             filters['filter[name]'] = f"EQ {name}"
         if name_contains != None:
-            filters['filter[name]'] = f"CONTAINS {name}"
+            filters['filter[name]'] = f"CONTAINS {name_contains}"
         if dirty != None:
             filters['filter[dirty]'] = f"EQ {str(dirty).lower()}"
         if enabled != None:
@@ -640,8 +640,6 @@ class Property:
             (can be found from translator)
             settings : OPTIONAL : settings for that rule component
         """
-        if order is None:
-            order = 50
 
         obj = {
             "data": {
