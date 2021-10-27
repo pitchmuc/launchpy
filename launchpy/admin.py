@@ -1,7 +1,8 @@
 from launchpy import config, connector
 from concurrent import futures
 import datetime
-from .launchpy import Property,saveFile
+from .launchpy import saveFile
+from .property import Property
 
 class Admin:
 
@@ -212,6 +213,44 @@ class Admin:
         if save:
                 saveFile(data,'packages.txt',type='txt')
         return data
+    
+    def getEdgeConfigs(self)->dict:
+        """
+        Returns the edge configs, using a different endpoints.
+        """
+        url = "https://edge.adobe.io/configs/user/edge"
+        res = self.connector.getData(url,headers=self.header)
+        return res
+    
+    def getEdgeConfig(self,configId:str=None,env:str="prod")->dict:
+        """
+        Returns a specific config ID.
+        Arguments:
+            configId : REQUIRED : the configId to be retrived.
+            env : OPTIONAL : default prod. Other env possible are "dev" or "stage"
+        """
+        if configId is None:
+            raise ValueError("A configId is required")
+        url = f"https://edge.adobe.io/configs/user/edge/{configId}/environments/{env}"
+        res = self.connector.getData(url,headers=self.header)
+        return res
+    
+    def updateEdgeConfig(self,configId:str=None,data:dict=None,env:str="prod")->dict:
+        """
+        Update the edge configuration with the value pass in data. (PUT method)
+        Arguments:
+            configId : REQUIRED : the configId to be updated.
+            data : REQUIRED : Data to be passed for updating the configuration
+            env : OPTIONAL : default prod. Other env possible are "dev" or "stage"
+        """
+        if configId is None:
+            raise ValueError("A configId is required")
+        if data is None:
+            raise ValueError("Data needs to be passed for updating the config")
+        url = f"https://edge.adobe.io/configs/user/edge/{configId}/environments/{env}"
+        res = self.connector.putData(url,data=data,headers=self.header)
+        return res
+
     
     def getRessource(self,res_url: str = None, params: dict = None):
         """

@@ -8,6 +8,13 @@ This has been started after the 0.3.0 release.
 * adding `getProfile` method
 * adding verbose parameters
 
+Path
+
+* add edge methods
+* upgrade getRuleComponents method with `ruleInfo` paramater
+* refine architecture with a `property.py` file
+* change default filename for save of the extration to use the `id` of the element
+
 ## 0.3.5
 
 * cleaning glbal variables

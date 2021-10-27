@@ -15,8 +15,7 @@ config_object = {
 header = {"Accept": "application/vnd.api+json;revision=1",
           "Content-Type": "application/vnd.api+json",
           "Authorization": "Bearer " + token,
-          "X-Api-Key": config_object['api_key'],
-          "X-Gw-Ims-Org-Id": config_object['org_id']
+          "x-gw-ims-org-id": config_object['org_id']
           }
 
 endpoints = {
