@@ -6,7 +6,9 @@ This has been started after the 0.3.0 release.
 ## 0.3.7
 * Fix issue with the Property class not present in last build.
 * adding the `getRule` and `getDataElement` methods
-* adding the `getRevisions` method to fetch the last revision of the element.
+* adding the `getRevisions` method to fetch the last revision of the element.\
+Patch
+* Fixing Revision typo
 
 ## 0.3.6
 

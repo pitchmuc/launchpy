@@ -865,22 +865,27 @@ class Property:
 
     def getRevisions(self,element:dict=None)->list:
         """
-        Get the latest revisions of an elements.
+        Get the revisions of an element.
         Arguments:
             element : REQUIRED : the element definition dictionary
         """
         if element is None or type(element) != dict:
             raise ValueError("element must be a definition")
-        revisionURL = element['relationships'].get('rule_components',{}).get('links',{}).get('related','unknown')
+        revisionURL = element['relationships'].get('revisions',{}).get('links',{}).get('related','unknown')
         if revisionURL == "unknown":
             raise Exception("could not find a revision link in the element")
-        firstRevision = self.getRessource(revisionURL)
-        metaLastPage = firstRevision['meta'].get('pagination',{}).get('total_pages')
-        if metaLastPage == firstRevision['meta'].get('pagination',{}).get('current_page'):
-            return firstRevision['data']
-        else:
-            lastRevision = self.getRessource(revisionURL,params={"page[number]":metaLastPage})
-            return lastRevision['data']
+        data = []
+        params = {"page[number]":0}
+        lastPage = False
+        while lastPage == False:
+            params["page[number]"] += 1
+            revision = self.getRessource(revisionURL,params=params)
+            data += revision['data']
+            metaLastPage = revision['meta'].get('pagination',{}).get('total_pages')
+            if metaLastPage == revision['meta'].get('pagination',{}).get('current_page'):
+                lastPage=True
+        return data
+
 
 
     def reviseDataElements(self, dataElement_id: str)->dict:
