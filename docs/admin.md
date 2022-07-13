@@ -64,6 +64,20 @@ It takes several arguments:
 
 It returns either the instance of the Property class or the object returned by the API.
 
+### Other methods
+
+* updateProperty : Update a property based on the information passed in the attributes.
+  Arguments:
+  * propertyId : REQUIRED : The property ID to be updated
+  * attributes : REQUIRED : the dictionary containing the attributes to be updated
+          more info here https://developer.adobelaunch.com/api/reference/1.0/properties/update/
+
+
+* deleteProperty : Delete a property based on the information passed in the attributes.
+  Arguments:
+  * propertyId : REQUIRED : The property ID to be deleted
+
+
 
 ### Extension Packages
 
@@ -76,4 +90,5 @@ When creating a new property, you may want to see the possible packages that you
   * platform : OPTIONAL : to filter for a specific platform (default "web", mobile possible)
   * save : OPTIONAL : save the results in a txt file (packages.txt). Default False.
 
-You will need to use the name, the display name and 
+You will need to use the name, the display name and the platform
+

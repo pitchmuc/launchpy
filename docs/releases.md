@@ -9,6 +9,7 @@ This has been started after the 0.3.0 release.
 * adding the `getRevisions` method to fetch the last revision of the element.\
 Patch
 * Fixing Revision typo
+* Adding delete property + update documentation.
 
 ## 0.3.6
 

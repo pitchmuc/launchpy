@@ -172,7 +172,18 @@ class Admin:
         path = f"/properties/{propertyId}"
         res:dict = self.connector.patchData(self.endpoint+path,data=obj)
         return res
-
+    
+    def deleteProperty(self,propertyId:str=None)->dict:
+        """
+        Delete a property based on the information passed in the attributes.
+        Arguments:
+            propertyId : REQUIRED : The property ID to be deleted
+        """
+        if propertyId is None:
+            raise ValueError('Require a property ID')
+        path = f"/properties/{propertyId}"
+        res:dict = self.connector.deleteData(self.endpoint+path)
+        return res
 
     def getExtensionsCatalogue(self, availability: str = None, name: str = None, platform: str = "web", save: bool = False)->list:
         """
