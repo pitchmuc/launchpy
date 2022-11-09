@@ -1,62 +1,11 @@
 import json
 from collections import defaultdict
 from copy import deepcopy
-import os
 # Non standard libraries
 import pandas as pd
 from pathlib import Path
-from launchpy import config, connector
 from typing import IO, Union
-
-def saveFile(data:str,filename:str=None,type:str='txt',encoding:str='utf-8')->None:
-    """
-    Save file to your system.
-    Arguments:
-        data : REQUIRED : data to be saved
-        filename : REQUIRED : name of the file or the path
-        type : OPTIONAL : Can be "txt", "json", "js"
-            json
-    """
-    if type=="txt":
-        if '.txt' not in filename:
-            filename = f"{filename}.txt"
-        with open(Path(filename),'w',encoding=encoding) as f:
-            f.write(data)
-    elif type == "js":
-        if '.js' not in filename:
-            filename = f"{filename}.js"
-        with open(Path(filename),'w',encoding=encoding) as f:
-            f.write(data)
-    elif type=="json":
-        if '.json' not in filename:
-            filename = f"{filename}.json"
-        with open(Path(filename),'w',encoding=encoding) as f:
-            f.write(json.dumps(data,indent=4))
-
-
-def createConfigFile(scope: str = "https://ims-na1.adobelogin.com/s/ent_reactor_admin_sdk", verbose: object = False)->None:
-    """
-    This function will create a 'config_admin.json' file where you can store your access data. 
-    Arguments:
-        scope: OPTIONAL : if you have problem with scope during API connection, you may need to update this.
-            scope="https://ims-na1.adobelogin.com/s/ent_reactor_admin_sdk"
-            or 
-            scope="https://ims-na1.adobelogin.com/s/ent_reactor_sdk"
-    """
-    json_data = {
-        'org_id': '<orgID>',
-        'api_key': "<APIkey>",
-        'tech_id': "<something>@techacct.adobe.com",
-        'secret': "<YourSecret>",
-        'pathToKey': '<path/to/your/privatekey.key>',
-        'scope': scope
-    }
-    with open('config_admin.json', 'w') as cf:
-        cf.write(json.dumps(json_data, indent=4))
-    if verbose:
-        print(
-            f" file created at this location : {os.getcwd()}{os.sep}config_admin.json")
-
+from .configs import saveFile
 
 def extensionsInfo(data: list)->dict:
     """
@@ -398,13 +347,17 @@ def duplicateAttributes(base_elements: list = None, target_elements: list = None
     return new_list
 
 
-def copySettings(data: object)->object:
+def copySettings(data: dict=None)->object:
     """
     copy the settings from an element and returns an object with required information
     Returns an object with the information required to create copy this element.  
     Arguments:
         data : REQUIRED : Single Element Object that you want to copy (not a list of elements)
     """
+    if data is None:
+        raise ValueError("require an object")
+    if type(data) != dict:
+        raise TypeError("require a dictionary")
     obj = {}
     if data['type'] == 'extensions':
         obj['name'] = data['attributes']['name']
@@ -456,55 +409,67 @@ class Translator:
         self.rules = pd.DataFrame()
         self.extensions = pd.DataFrame()
 
-    def setBaseExtensions(self, base_property_extensions: object, property_name: str):
+    def setBaseExtensions(self, extensions: list=None, property_name: str=None)->None:
         """
         Pass all the extensions from the base property to start building the table. 
         Arguments: 
-            base_property : REQUIRED : list of all extensions retrieve through getExtensions method
+            extensions_base : REQUIRED : list of all extensions retrieve through getExtensions method
             property_name : REQUIRED : name of your base property.
         """
-        df = pd.DataFrame(extensionsInfo(base_property_extensions)).T
+        if extensions is None or type(extensions)!= list:
+            raise ValueError("Require a list of extensions to be loaded")
+        if property_name is None:
+            raise ValueError("Require the main property name")
+        df = pd.DataFrame(extensionsInfo(extensions)).T
         df = pd.DataFrame(df['id'])
         df.columns = [property_name]
         self.extensions = df
 
-    def extendExtensions(self, new_property_extensions: object, new_prop_name: str)-> None:
+    def extendExtensions(self, extensions: list=None, property_name: str=None)-> None:
         """
         Add the extensions id from a target property.
         Arguments: 
-            new_property_extensions: REQUIRED : the extension list from your target property. 
-            new_prop_name : REQUIRED : target property name. 
+            extensions: REQUIRED : the extension list from your target property. 
+            property_name : REQUIRED : target property name. 
         """
-        df = pd.DataFrame(extensionsInfo(new_property_extensions)).T
+        if extensions is None or type(extensions)!= list:
+            raise ValueError("Require a list of extensions to be loaded")
+        if property_name is None:
+            raise ValueError("Require the main property name")
+        df = pd.DataFrame(extensionsInfo(extensions)).T
         df = pd.DataFrame(df['id'])
-        self.extensions[new_prop_name] = df
+        self.extensions[property_name] = df
         return self.extensions
 
-    def setBaseRules(self, base_property_rules: object, property_name: str):
+    def setBaseRules(self, rules: list=None, property_name: str=None)->None:
         """
         Pass all the rules from the base property to start building the table. 
         Arguments: 
-            base_property : REQUIRED : list of all rules retrieve through getExtensions method
+            rules : REQUIRED : list of all rules retrieve through getExtensions method
             property_name : REQUIRED : name of your base property.
         """
-        df = pd.DataFrame(rulesInfo(base_property_rules)).T
+        if rules is None or type(rules)!= list:
+            raise ValueError("Require a list of extensions to be loaded")
+        if property_name is None:
+            raise ValueError("Require the main property name")
+        df = pd.DataFrame(rulesInfo(rules)).T
         df = pd.DataFrame(df['id'])
         df.columns = [property_name]
         self.rules = df
 
-    def extendRules(self, new_property_rules: object, new_prop_name: str):
+    def extendRules(self, rules: list=None, property_name: str=None):
         """
-        Add the extensions id from a target property.
+        Add the rule id from a target property.
         Arguments: 
-            new_property_rules: REQUIRED : the rules list from your target property. 
-            new_prop_name : REQUIRED : target property name. 
+            rules: REQUIRED : the rules list from your target property. 
+            property_name : REQUIRED : target property name. 
         """
-        df = pd.DataFrame(rulesInfo(new_property_rules)).T
+        df = pd.DataFrame(rulesInfo(rules)).T
         df = pd.DataFrame(df['id'])
-        self.rules[new_prop_name] = df
+        self.rules[property_name] = df
         return self.rules
 
-    def translate(self, target_property: str, data_element: dict = None, rule_component: dict = None)->dict:
+    def translate(self, target_property: str=None, data_element: dict = None, rule_component: dict = None)->dict:
         """
         change the id from the base element to the new property. 
         Pre checked should be done beforehands (updating Extension & Rules elements)
@@ -513,6 +478,10 @@ class Translator:
             data_element : OPTIONAL : if the elements passed are data elements
             rule_component : OPTIONAL : if the elements passed are rule components
         """
+        if target_property is None:
+            raise ValueError("Require the target property name")
+        if data_element is None and rule_component is None:
+            raise AttributeError("Require at least data element or rule component to be passed")
         if self.extensions.empty == True:
             raise AttributeError(
                 "You didn't import the base extensions or the target extensions")
@@ -526,16 +495,13 @@ class Translator:
             return new_de
         elif rule_component is not None:
             if self.rules.empty == True:
-                print(
+                raise AttributeError(
                     "The rules have not been imported, the rule id needs to be changed")
             new_rc = deepcopy(rule_component)
             base_id = new_rc['extension']['id']
             row = self.extensions[self.extensions.eq(
                 base_id).any(1)].index.values[0]
             new_value = self.extensions.loc[row, target_property]
-            # print(f"name : {rule_component['rule_name']}")
-            # print(f"old_id : {base_id}")
-            # print(f"new_id : {new_value}")
             new_rc['extension']['id'] = new_value
             if self.rules.empty == False:
                 new_rc['rule_setting'] = {
@@ -552,7 +518,7 @@ class Translator:
             return new_rc
 
 
-def extractAnalyticsCode(rcSettings: str, save: bool = False, filename: str = None,encoding:str='utf-8')->None:
+def extractAnalyticsCustomCode(rcSettings: str, save: bool = False, filename: str = None,encoding:str='utf-8')->None:
     """
     Extract the custom code of the rule and save it in a file.
     Arguments:
@@ -561,6 +527,8 @@ def extractAnalyticsCode(rcSettings: str, save: bool = False, filename: str = No
         filename : OPTIONAL : name of the file you want to use to save the code. 
         encoding : OPTIONAL : encoding to be used for saving the file.
     """
+    if rcSettings is None:
+        raise ValueError("Require settings to be passed from the Data Element")
     json_data = json.loads(rcSettings)
     if 'customSetup' in json_data.keys():
         json_code = json_data['customSetup']['source']

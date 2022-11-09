@@ -22,6 +22,7 @@ This module is built around 5 main parts:
 - Managing properties [Property Class](./docs/property.md)
 - Managing Publishing Cycle [Library Class](./docs/library.md)
 - Translator functionationality [Translator Class](./docs/translator.md)
+- Synchronizer [Synchronizer Class](./docs/synchronizer.md)
 
 ## Get Stated
 

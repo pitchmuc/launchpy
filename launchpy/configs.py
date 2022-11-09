@@ -1,11 +1,7 @@
-import json
-import os
+import json, os
 from pathlib import Path
 from typing import Optional
-
-# Non standard libraries
 from .config import config_object, header
-
 
 def find_path(path: str) -> Optional[Path]:
     """Checks if the file denoted by the specified `path` exists and returns the Path object
@@ -25,13 +21,10 @@ def find_path(path: str) -> Optional[Path]:
     else:
         return None
 
-def createConfigFile(verbose: bool = False, filename: str = 'config_launch_template.json') -> None:
-    """Creates a `config_admin.json` file with the pre-defined configuration format
-    to store the access data in under the specified `destination`.
-    """
 
+def createConfigFile(scope: str = "https://ims-na1.adobelogin.com/s/ent_reactor_admin_sdk", verbose: object = False)->None:
     """
-    This function will create a 'config_admin.json' file where you can store your access data. 
+    This function will create a 'config_launch_admin.json' file where you can store your access data. 
     Arguments:
         scope: OPTIONAL : if you have problem with scope during API connection, you may need to update this.
             scope="https://ims-na1.adobelogin.com/s/ent_reactor_admin_sdk"
@@ -40,19 +33,17 @@ def createConfigFile(verbose: bool = False, filename: str = 'config_launch_templ
     """
     json_data = {
         'org_id': '<orgID>',
-        'client_id': "<clientId>",
+        'client_id': "<client_id>",
         'tech_id': "<something>@techacct.adobe.com",
         'secret': "<YourSecret>",
         'pathToKey': '<path/to/your/privatekey.key>',
-        'scope': "https://ims-na1.adobelogin.com/s/ent_reactor_admin_sdk"
+        'scope': scope
     }
-    if '.json' not in filename:
-        filename = f"{filename}.json"
-    with open(filename, 'w') as cf:
+    with open('config_launch_admin.json', 'w') as cf:
         cf.write(json.dumps(json_data, indent=4))
     if verbose:
         print(
-            f" file created at this location : {os.getcwd()}{os.sep}config_admin.json")
+            f" file created at this location : {os.getcwd()}{os.sep}config_launch_admin.json")
 
 def importConfigFile(path: str) -> None:
     """Reads the file denoted by the supplied `path` and retrieves the configuration information
@@ -91,6 +82,31 @@ def importConfigFile(path: str) -> None:
 
         )
 
+
+def saveFile(data:str,filename:str=None,type:str='txt',encoding:str='utf-8')->None:
+    """
+    Save file to your system.
+    Arguments:
+        data : REQUIRED : data to be saved
+        filename : REQUIRED : name of the file or the path
+        type : OPTIONAL : Can be "txt", "json", "js"
+            json
+    """
+    if type=="txt":
+        if '.txt' not in filename:
+            filename = f"{filename}.txt"
+        with open(Path(filename),'w',encoding=encoding) as f:
+            f.write(data)
+    elif type == "js":
+        if '.js' not in filename:
+            filename = f"{filename}.js"
+        with open(Path(filename),'w',encoding=encoding) as f:
+            f.write(data)
+    elif type=="json":
+        if '.json' not in filename:
+            filename = f"{filename}.json"
+        with open(Path(filename),'w',encoding=encoding) as f:
+            f.write(json.dumps(data,indent=4))
 
 def configure(org_id: str = None,
               tech_id: str = None,

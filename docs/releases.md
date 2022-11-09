@@ -3,6 +3,17 @@
 This page gathered the changes made between version of the launchpy module.\
 This has been started after the 0.3.0 release.
 
+## 0.3.8
+
+* Cleaning methods and code to improve performance and load size
+* Adding and fixing typing for methods
+* Adding the `Synchronizer` class
+* change `createDataElements` to `createDataElement` as only a single data element is created each time.
+* change `updateDataElements` to `updateDataElement` for same reason
+* change `createRuleComponents` to `createRuleComponent` for same reason
+* change `createRules` to `createRule` for same reason
+* rename `extractAnalyticsCode` to `extractAnalyticsCustomCode` for clarity
+
 ## 0.3.7
 * Fix issue with the Property class not present in last build.
 * adding the `getRule` and `getDataElement` methods

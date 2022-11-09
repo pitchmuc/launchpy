@@ -2,63 +2,12 @@ import json
 from collections import defaultdict
 from concurrent import futures
 from copy import deepcopy
-import os
 # Non standard libraries
 import pandas as pd
-from pathlib import Path
 from launchpy import config, connector
 from typing import IO, Union
 from .library import Library
-
-def saveFile(data:str,filename:str=None,type:str='txt',encoding:str='utf-8')->None:
-    """
-    Save file to your system.
-    Arguments:
-        data : REQUIRED : data to be saved
-        filename : REQUIRED : name of the file or the path
-        type : OPTIONAL : Can be "txt", "json", "js"
-            json
-    """
-    if type=="txt":
-        if '.txt' not in filename:
-            filename = f"{filename}.txt"
-        with open(Path(filename),'w',encoding=encoding) as f:
-            f.write(data)
-    elif type == "js":
-        if '.js' not in filename:
-            filename = f"{filename}.js"
-        with open(Path(filename),'w',encoding=encoding) as f:
-            f.write(data)
-    elif type=="json":
-        if '.json' not in filename:
-            filename = f"{filename}.json"
-        with open(Path(filename),'w',encoding=encoding) as f:
-            f.write(json.dumps(data,indent=4))
-
-
-def createConfigFile(scope: str = "https://ims-na1.adobelogin.com/s/ent_reactor_admin_sdk", verbose: object = False)->None:
-    """
-    This function will create a 'config_admin.json' file where you can store your access data. 
-    Arguments:
-        scope: OPTIONAL : if you have problem with scope during API connection, you may need to update this.
-            scope="https://ims-na1.adobelogin.com/s/ent_reactor_admin_sdk"
-            or 
-            scope="https://ims-na1.adobelogin.com/s/ent_reactor_sdk"
-    """
-    json_data = {
-        'org_id': '<orgID>',
-        'client_id': "<client_id>",
-        'tech_id': "<something>@techacct.adobe.com",
-        'secret': "<YourSecret>",
-        'pathToKey': '<path/to/your/privatekey.key>',
-        'scope': scope
-    }
-    with open('config_admin.json', 'w') as cf:
-        cf.write(json.dumps(json_data, indent=4))
-    if verbose:
-        print(
-            f" file created at this location : {os.getcwd()}{os.sep}config_admin.json")
-
+from .configs import saveFile
 
 class Property:
     """
@@ -608,7 +557,7 @@ class Property:
             data = extensions
         return data
 
-    def createRules(self, name: str)->object:
+    def createRule(self, name: str)->object:
         """
         Create a rule by provided a rule name.
         Arguments:
@@ -632,7 +581,7 @@ class Property:
             data = rules
         return data
 
-    def createRuleComponents(self, name: str, settings: str = None, descriptor: str = None, extension_infos: dict = None, rule_infos: dict = None, **kwargs)->object:
+    def createRuleComponent(self, name: str, settings: str = None, descriptor: str = None, extension_infos: dict = None, rule_infos: dict = None, **kwargs)->object:
         """
         Create a ruleComponent by provided a rule name and descriptor (minimum). It returns an object.
         It takes additional information in order to link the ruleCompoment to a rule and with an Extension.
@@ -672,7 +621,7 @@ class Property:
             data = rc
         return data
 
-    def createDataElements(self, name: str, settings: str = None, descriptor: str = None, extension: dict = None, **kwargs: dict)->object:
+    def createDataElement(self, name: str, settings: str = None, descriptor: str = None, extension: dict = None, **kwargs: dict)->object:
         """
         Create Data Elements following the usage of required arguments. 
         Arguments: 
@@ -1005,7 +954,7 @@ class Property:
         return res
 
 
-    def updateDataElements(self, dataElement_id: str, attr_dict: object, **kwargs)->object:
+    def updateDataElement(self, dataElement_id: str, attr_dict: object, **kwargs)->object:
         """
         Update the data element information based on the information provided.
         arguments: 

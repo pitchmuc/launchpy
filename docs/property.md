@@ -35,8 +35,8 @@ The different elements that can be created :
 
 * createExtensions
 * createRules
-* createRuleComponents
-* createDataElements
+* createRuleComponent
+* createDataElement
 * createEnvironment
 * createHost
 * createLibrary
