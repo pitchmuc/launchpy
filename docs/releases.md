@@ -12,7 +12,9 @@ This has been started after the 0.3.0 release.
 * change `updateDataElements` to `updateDataElement` for same reason
 * change `createRuleComponents` to `createRuleComponent` for same reason
 * change `createRules` to `createRule` for same reason
-* rename `extractAnalyticsCode` to `extractAnalyticsCustomCode` for clarity
+* rename `extractAnalyticsCode` to `extractAnalyticsCustomCode` for clarity\
+Patch
+* reverse the creation of ruleComponent in order to preserve the order.
 
 ## 0.3.7
 * Fix issue with the Property class not present in last build.

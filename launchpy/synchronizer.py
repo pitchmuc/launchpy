@@ -139,7 +139,8 @@ class Synchronizer:
                             settings = translatedComponent['settings'],
                             descriptor = translatedComponent['descriptor'],
                             extension_infos = translatedComponent['extension'],
-                            rule_infos = translatedComponent['rule_setting']
+                            rule_infos = translatedComponent['rule_setting'],
+                            order=translatedComponent['order']
                         )
                 else: ## if a rule exist with the same name
                     targetRule = [rule for rule in self.targets[target]['rules'] if rule['attributes']['name'] == cmp_baseDict['name']][0]
@@ -160,7 +161,8 @@ class Synchronizer:
                             settings = translatedComponent['settings'],
                             descriptor = translatedComponent['descriptor'],
                             extension_infos = translatedComponent['extension'],
-                            rule_infos = translatedComponent['rule_setting']
+                            rule_infos = translatedComponent['rule_setting'],
+                            order=translatedComponent['order']
                         )                    
         
 

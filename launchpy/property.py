@@ -593,8 +593,9 @@ class Property:
             rule_infos : REQUIRED : rule information link to that rule component (dictionary with "data", "id" and "type")
             (can be found from translator)
             settings : OPTIONAL : settings for that rule component
+        possible kwargs:
+            order : the order of the rule component        
         """
-
         obj = {
             "data": {
                 "attributes": {
