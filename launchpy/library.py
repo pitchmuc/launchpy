@@ -3,8 +3,18 @@ import time
 from launchpy import config, connector
 
 class Library:
+    """
+    A class that handle the library in a Launch environment.
+    """
 
     def __init__(self, data: dict,config_object:dict=config.config_object,header:dict=config.header):
+        """
+        The instantiator for the library.
+        Arguments:
+            data : REQUIRED : The dictionary definition of the library (Retrieve by getLibrary method in Property class)
+        """
+        if data is None:
+            raise ValueError("Require a library definition") 
         self.connector = connector.AdobeRequest(
             config_object=config_object, header=header)
         self.header = self.connector.header
@@ -29,31 +39,52 @@ class Library:
         self._environments = {}
         self._dev_env = ''
 
-    def getDataElements(self)->list:
+    def getDataElements(self,page:int=0,pageSize:int=50)->list:
         """
         retrieve the list of Data Elements attached to this library
         """
-        dataElements = self.connector.getData(self._DataElements)
-        data = dataElements
+        params = {"page[number]":page,"page[size]":pageSize}
+        res = self.connector.getData(self._DataElements,params=params)
+        data = res.get('data',[])
+        next = res.get('meta',{}).get('pagination',{}).get('next_page',None)
+        while next is not None:
+            params["page[number]"] +=1
+            res = self.connector.getData(self._DataElements,params=params)
+            data += res.get('data',[])
+            next = res.get('meta',{}).get('pagination',{}).get('next_page',None)
         # assign the list to its dict value
         self.relationships['data_elements'] = data
         return data
 
-    def getExtensions(self)->list:
+    def getExtensions(self,page:int=0,pageSize:int=50)->list:
         """
         retrieve the list of Extensions attached to this library
         """
-        extensions = self.connector.getData(self._Extensions)
-        data = extensions
+        params = {"page[number]":page,"page[size]":pageSize}
+        res = self.connector.getData(self._Extensions,params=params)
+        data = res.get('data',[])
+        next = res.get('meta',{}).get('pagination',{}).get('next_page',None)
+        while next is not None:
+            params["page[number]"] +=1
+            res = self.connector.getData(self._Extensions,params=params)
+            data += res.get('data',[])
+            next = res.get('meta',{}).get('pagination',{}).get('next_page',None)
         self.relationships['extensions'] = data
         return data
 
-    def getRules(self)->list:
+    def getRules(self,page:int=0,pageSize:int=50)->list:
         """
         retrieve the list of rules attached to this library
         """
-        rules = self.connector.getData(self._Rules)
-        data = rules
+        params = {"page[number]":page,"page[size]":pageSize}
+        res = self.connector.getData(self._Rules,params=params)
+        data = res.get('data',[])
+        next = res.get('meta',{}).get('pagination',{}).get('next_page',None)
+        while next is not None:
+            params["page[number]"] +=1
+            res = self.connector.getData(self._Rules,params=params)
+            data += res.get('data',[])
+            next = res.get('meta',{}).get('pagination',{}).get('next_page',None)
         self.relationships['rules'] = data
         return data
 
@@ -82,7 +113,7 @@ class Library:
         res = self.connector.postData(self.endpoint +url, data=obj)
         return res
     
-    def updateDataElement(self,data_element_ids:list)->dict:
+    def updateDataElements(self,data_element_ids:list)->dict:
         """
         Update the data element inside the library. (PATCH)
         Arguments:
@@ -117,6 +148,7 @@ class Library:
         for ids in rules_ids:
             obj['data'].append({"id": ids, "type": "rules",
                                 "meta": {"action": "revise"}})
+
         url = f'/libraries/{self.id}/relationships/rules'
         res = self.connector.postData(self.endpoint + url, data=obj)
         return res
@@ -214,6 +246,24 @@ class Library:
         path = f'/libraries/{self.id}/relationships/environment'
         new_env = self.connector.getData(self.endpoint+path) 
         return new_env
+    
+    def updateLibrary(self)->dict:
+        """
+        Update the library
+        """
+        path = f'/libraries/{self.id}'
+        data = {
+                "data": {
+                    "id": self.id,
+                    "type": "libraries",
+                    "meta": {
+                        "action": "submit"
+                    }
+                }
+                }
+        res = self.connector.patchData(self.endpoint+path,data=data)
+        return res
+
 
     def build(self,verbose:bool=False)->dict:
         """

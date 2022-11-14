@@ -756,7 +756,7 @@ class Property:
         except:
             return lib
 
-    def reviseExtensions(self, extension_id, attr_dict: dict, **kwargs)-> object:
+    def reviseExtension(self, extension_id, attr_dict: dict, **kwargs)-> object:
         """
         update the extension with the information provided in the argument.
         argument: 
@@ -778,7 +778,7 @@ class Property:
         data = extensions['data']
         return data
 
-    def reviseRules(self, rule_id: str)->object:
+    def reviseRule(self, rule_id: str)->object:
         """
         Update the rule.
         arguments: 
@@ -836,9 +836,25 @@ class Property:
                 lastPage=True
         return data
 
+    def getLatestPublishedVersion(self,revisions:list=None)->dict:
+        """
+        Find the latest published version of a component based on the list of revisions retrieved via getRevisions methods.
+        Arguments:
+            revisions : REQUIRED : list of revisions
+        """
+        if revisions is None:
+            raise ValueError('Require a list of revisions')
+        publishedIndexVersions:dict = {index:rev['attributes']['revision_number'] for index, rev in enumerate(revisions) if rev['attributes']['published'] == True}
+        if len(publishedIndexVersions) == 0:
+            raise IndexError("You want to retrieve a published version of the component.\nBut no published version can be found. Please check if your component has been published")
+        if 0 in list(publishedIndexVersions.values()):
+            return revisions[0]
+        else:
+            maxRevisionIndex = [index for index,value in publishedIndexVersions.items() if value == max(list(publishedIndexVersions.values()))][0]
+            return revisions[maxRevisionIndex]
 
 
-    def reviseDataElements(self, dataElement_id: str)->dict:
+    def reviseDataElement(self, dataElement_id: str)->dict:
         """
         Update the data element information based on the information provided.
         arguments: 

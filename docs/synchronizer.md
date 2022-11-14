@@ -38,10 +38,11 @@ synchronizor = lp.Synchronizer(base='Prop1',targets=['Prop2'])
 
 ## SyncComponent Method
 
-The `syncComponent` method can take 2 arguments.
+The `syncComponent` method can take 3 arguments.
 Arguments:
  * componentName : The name of the component to sync between template and target properties
  * componentId : The id of the component to sync
+ * publishedVersion : Set to `False` by default. If set to True, takes the latest published version of the component.
 
 Either of these 2 can be used, but in the end, the name of the component is used to do the matching between properties.
 A component is either a Data Element or a Rule.
@@ -65,4 +66,23 @@ The method will delete all rule components existing in the Target property for t
 It will then copy all template rule component existing in that base property to the target properties.\
 No history is saved from the existing rule component, which will make revision check very hard.
 
+## SyncComponents Method
 
+You can pass down a list of component names or componentIds.\
+It takes 3 arguments:\
+Arguments:
+* componentsName : REQUIRED : The list of component names to sync
+* componentsId : REQUIRED : The list of component ID to sync*
+* publishedVersion : OPTIONAL : if you want to take the version that has been published
+
+## createTargetsLibrary
+
+The synchronizer will automatically track the component that has been updated via the module.\
+When you are done synchronizing your components, you can run this method to create a library, that will contain all of your elements you synchronized.\
+The library will be available within all of your synch properties.
+
+You can pass a name to define the library name that is created.\
+The name is then used to match if a library already exist with that name, in the case it exists, it will use this library name.\
+Note that the match looked for is a partial match (no regular expression supported).\
+Arguments:
+* name : Name of the library to create or to use.

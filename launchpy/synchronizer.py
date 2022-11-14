@@ -10,6 +10,7 @@ from launchpy import config, connector
 from typing import IO, Union
 from .admin import Admin
 from .property import Property
+from .library import Library
 from .launchpy import Translator, copySettings,extensionsInfo,rulesInfo
 
 class Synchronizer:
@@ -56,11 +57,12 @@ class Synchronizer:
             self.targets[target]['rules'] = self.targets[target]['api'].getRules()
             self.targets[target]['extensions'] = self.targets[target]['api'].getExtensions()
             self.targets[target]['dataElements'] = self.targets[target]['api'].getDataElements()
+            self.targets[target]['libraryStack'] = {'dataElements':[],'rules':[]}
             #self.targets[target]['rcs'] = self.targets[target]['api'].getRuleComponents()
             self.translator.extendExtensions(self.targets[target]['extensions'],self.targets[target]['name'])
             self.translator.extendRules(self.targets[target]['rules'],self.targets[target]['name'])
 
-    def syncComponent(self,componentName:str=None,componentId:str=None)->None:
+    def syncComponent(self,componentName:str=None,componentId:str=None,publishedVersion:bool=False)->None:
         """
         Synchronize a component from the base property to the different target properties.
         It will detect the component with the same name in target properties.
@@ -68,6 +70,7 @@ class Synchronizer:
         Arguments:
             componentName : REQUIRED : the name of the component to sync
             componentID : REQUIRED : the id of the component to sync
+            publishedVersion : OPTIONAL : if you want to take the version that has been published
         """
         if componentName is None and componentId is None:
             raise ValueError('Require a component Name of a component ID')
@@ -96,8 +99,10 @@ class Synchronizer:
             raise KeyError("The component ID or component Name cannot be matched in your template property")
         ## Here creating a dictionary that provide all information related to your component 
         cmp_baseDict = {'id':cmp_base['id'],'name':cmp_base['attributes']['name'],'component':cmp_base,'copy':copySettings(cmp_base)}
-        if[cmp_base['type'] == 'rule_components']:
-            cmp_baseDict['rule_name'] = cmp_base.get('rule_name','')
+        if publishedVersion:
+            data = self.base['api'].getRevisions(cmp_baseDict['component'])
+            publishedVersion = self.base['api'].getLatestPublishedVersion(data)
+            cmp_baseDict['component'] = publishedVersion
         ## handling the data element
         if cmp_baseDict['component']['type'] == 'data_elements':
             for target in list(self.targets.keys()):
@@ -110,12 +115,14 @@ class Synchronizer:
                         settings=translatedComponent['settings'],
                         extension=translatedComponent['extension']
                         )
+                    self.targets[target]['libraryStack']['dataElements'].append(res)
                 else:
                     old_component = [de for de in self.targets[target]['dataElements'] if de['attributes']['name'] == cmp_baseDict['name']][0]
                     res = self.targets[target]['api'].updateDataElement(
                         dataElement_id=old_component['id'],
                         attr_dict=translatedComponent,
                         )
+                    self.targets[target]['libraryStack']['dataElements'].append(res)
         if cmp_baseDict['component']['type'] == 'rules':
             ## fetching all rule components associated with a rule.
             rcsLink = cmp_baseDict['component'].get('relationships',{}).get('rule_components',{}).get('links',{}).get('related')
@@ -127,23 +134,25 @@ class Synchronizer:
             for target in list(self.targets.keys()):
                 ## if rule does not exist
                 if cmp_baseDict['name'] not in [rule['attributes']['name'] for rule in self.targets[target]['rules']]:
-                    res = self.targets[target]['api'].createRule(
+                    targetRule = self.targets[target]['api'].createRule(
                         name=cmp_baseDict['name']
                         )
-                    rule_id = res['id']
+                    targetRuleId = targetRule['id']
+                    self.targets[target]['libraryStack']['rules'].append(targetRule)
                     for rc in template_ruleComponents:
                         translatedComponent = self.translator.translate(target,rule_component=copySettings(rc))
-                        translatedComponent['rule_setting']['data'][0]['id'] = rule_id
-                        self.targets[target]['api'].createRuleComponent(
+                        translatedComponent['rule_setting']['data'][0]['id'] = targetRuleId
+                        targetRuleComponent = self.targets[target]['api'].createRuleComponent(
                             name=translatedComponent['name'],
                             settings = translatedComponent['settings'],
                             descriptor = translatedComponent['descriptor'],
                             extension_infos = translatedComponent['extension'],
                             rule_infos = translatedComponent['rule_setting'],
                             order=translatedComponent['order']
-                        )
+                        )    
                 else: ## if a rule exist with the same name
                     targetRule = [rule for rule in self.targets[target]['rules'] if rule['attributes']['name'] == cmp_baseDict['name']][0]
+                    self.targets[target]['libraryStack']['rules'].append(targetRule)
                     targetRuleId = targetRule['id']
                     rcsLinkTarget = targetRule.get('relationships',{}).get('rule_components',{}).get('links',{}).get('related')
                     resResource = self.targets[target]['api'].getRessource(rcsLinkTarget)
@@ -163,12 +172,57 @@ class Synchronizer:
                             extension_infos = translatedComponent['extension'],
                             rule_infos = translatedComponent['rule_setting'],
                             order=translatedComponent['order']
-                        )                    
+                        )
+                ## updating rule attribute if difference between base and target
+                if cmp_baseDict['component']['attributes']['enabled'] != targetRule['attributes']['enabled']:
+                    baseRuleAttr = copySettings(cmp_baseDict['component'])
+                    self.targets[target]['api'].updateRule(rule_id=targetRuleId,attr_dict=baseRuleAttr)
         
+    def syncComponents(self,componentsName:list=None,componentsId:list=None,publishedVersion:bool=False)->None:
+        """
+        Sync multiple components by looping through the list of name passed.
+        Arguments:
+            componentsName : REQUIRED : The list of component names to sync
+            componentsId : REQUIRED : The list of component ID to sync
+            publishedVersion : OPTIONAL : if you want to take the version that has been published
+        """
+        if componentsName is not None:
+            for component in componentsName:
+                self.syncComponents(componentName=component,publishedVersion=publishedVersion)
+        if componentsId is not None:
+            for component in componentsId:
+                self.syncComponents(componentId=component,publishedVersion=publishedVersion)
+    
+    def createTargetsLibrary(self,name:str="syncComponents")->None:
+        """
+        This method will create or update a Library in all of the target properties to gather all elements changed.
+        If a library exists and **contains** the same name, it will be used.
+        Argument:
+            name : REQUIRED : The name of the library to create. Default : "syncComponents"
+        """
+        for target in list(self.targets.keys()):
+            if 'library' not in list(self.targets[target].keys()):
+                librariesDev = self.targets[target]['api'].getLibraries(state="development")
+                if name in [lib['attributes']['name'] for lib in librariesDev]:
+                    lib = [lib for lib in librariesDev if name in lib['attributes']['name']][0]
+                else:
+                    lib = self.targets[target]['api'].createLibrary(name=name,return_class=False)
+                library = Library(lib)
+                self.targets[target]['library'] = library
+            self.targets[target]['library'].getFullLibrary()
+            ## taking care of rule update
+            existingRules = [rule['id'] for rule in self.targets[target]['library'].relationships['rules'] if rule['id'] in [r['id'] for r in self.targets[target]['libraryStack']['rules']]]
+            newRules = [rule['id'] for rule in self.targets[target]['libraryStack']['rules'] if rule['id'] not in existingRules]
+            if len(existingRules) > 0:
+                self.targets[target]['library'].updateRules(existingRules)
+            if len(newRules)>0:
+                self.targets[target]['library'].addRules(newRules)
+            ## taking care of data elements
+            existingDataElements = [de['id'] for de in self.targets[target]['library'].relationships['data_elements'] if de['id'] in [d['id'] for d in self.targets[target]['libraryStack']['dataElements']]]
+            newDataElements = [de['id'] for de in self.targets[target]['libraryStack']['dataElements'] if de['id'] not in existingDataElements]
+            if len(existingDataElements) > 0:
+                self.targets[target]['library'].updateDataElements(existingDataElements)
+            if len(newDataElements)>0:
+                self.targets[target]['library'].addDataElements(newDataElements)
 
-
-            
-
-        
-        
         

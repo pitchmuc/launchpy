@@ -2,6 +2,14 @@
 
 This page gathered the changes made between version of the launchpy module.\
 This has been started after the 0.3.0 release.
+## 0.3.9
+
+* adding a `syncComponents` method in `Synchronizer` class
+* adding a `createTargetsLibrary` method `Synchronizer` class
+* improving the `Library` class for fetching libraries with pagination.
+* update name of method `updateDataElement` to `updateDataElements` as it takes a list of data element ids
+* adding the `getLatestPublishedVersion` method in `Property` class to find the latest published version of a component
+* adding "enabled" attribute in rule `copySetting` method
 
 ## 0.3.8
 

@@ -375,6 +375,7 @@ def copySettings(data: dict=None)->object:
         obj['extension'] = data['relationships']['extension']['data']
     elif data['type'] == 'rules':
         obj['name'] = data['attributes']['name']
+        obj['enabled'] = data['attributes']['enabled']
     elif data['type'] == 'rule_components':
         obj['name'] = data['attributes']['name']
         obj['order'] = data['attributes']['order']
