@@ -39,9 +39,13 @@ class Library:
         self._environments = {}
         self._dev_env = ''
 
-    def getDataElements(self,page:int=0,pageSize:int=50)->list:
+    def getDataElements(self,page:int=0,pageSize:int=50,origin:bool=True)->list:
         """
         retrieve the list of Data Elements attached to this library
+        Arguments:
+            page : OPTIONAL : the page to start the request
+            pageSize : OPTIONAL : How many result per page
+            origin : OPTIONAL : If you want to list the original data element ID and not the revision
         """
         params = {"page[number]":page,"page[size]":pageSize}
         res = self.connector.getData(self._DataElements,params=params)
@@ -53,12 +57,27 @@ class Library:
             data += res.get('data',[])
             next = res.get('meta',{}).get('pagination',{}).get('next_page',None)
         # assign the list to its dict value
+        if origin:
+            dataOrigin = []
+            for de in data:
+                id = de.get('links',{}).get('origin',de['id'])
+                if '/' in id:
+                    id = id.split("/").pop()
+                origin = {**de}
+                origin['id'] = id
+                dataOrigin.append(origin)
+            self.relationships['data_elements'] = dataOrigin
+            return dataOrigin
         self.relationships['data_elements'] = data
         return data
 
-    def getExtensions(self,page:int=0,pageSize:int=50)->list:
+    def getExtensions(self,page:int=0,pageSize:int=50,origin:bool=True)->list:
         """
         retrieve the list of Extensions attached to this library
+        Arguments:
+            page : OPTIONAL : the page to start the request
+            pageSize : OPTIONAL : How many result per page
+            origin : OPTIONAL : If you want to list the original extension ID and not the revision
         """
         params = {"page[number]":page,"page[size]":pageSize}
         res = self.connector.getData(self._Extensions,params=params)
@@ -69,12 +88,27 @@ class Library:
             res = self.connector.getData(self._Extensions,params=params)
             data += res.get('data',[])
             next = res.get('meta',{}).get('pagination',{}).get('next_page',None)
+        if origin:
+            dataOrigin = []
+            for ext in data:
+                id = ext.get('links',{}).get('origin',ext['id'])
+                if '/' in id:
+                    id = id.split("/").pop()
+                origin = {**ext}
+                origin['id'] = id
+                dataOrigin.append(origin)
+            self.relationships['extensions'] = dataOrigin
+            return dataOrigin
         self.relationships['extensions'] = data
         return data
 
-    def getRules(self,page:int=0,pageSize:int=50)->list:
+    def getRules(self,page:int=0,pageSize:int=50,origin:bool=True)->list:
         """
         retrieve the list of rules attached to this library
+        Arguments:
+            page : OPTIONAL : the page to start the request
+            pageSize : OPTIONAL : How many result per page
+            origin : OPTIONAL : If you want to list the original rule ID and not the revision
         """
         params = {"page[number]":page,"page[size]":pageSize}
         res = self.connector.getData(self._Rules,params=params)
@@ -85,6 +119,17 @@ class Library:
             res = self.connector.getData(self._Rules,params=params)
             data += res.get('data',[])
             next = res.get('meta',{}).get('pagination',{}).get('next_page',None)
+        if origin:
+            dataOrigin = []
+            for rule in data:
+                id = rule.get('links',{}).get('origin',rule['id'])
+                if '/' in id:
+                    id = id.split("/").pop()
+                origin = {**rule}
+                origin['id'] = id
+                dataOrigin.append(origin)
+            self.relationships['rules'] = dataOrigin
+            return dataOrigin
         self.relationships['rules'] = data
         return data
 

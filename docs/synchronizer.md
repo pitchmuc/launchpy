@@ -53,6 +53,8 @@ Example:
 synchronizor.syncComponent('my Component Name')
 ## or
 synchronizor.syncComponent(componentId='myComponentId')
+## or for publishedVersion
+synchronizor.syncComponent('my Component Name',publishedVersion=True)
 
 ```
 ### syncComponent behavior
@@ -83,6 +85,7 @@ The library will be available within all of your synch properties.
 
 You can pass a name to define the library name that is created.\
 The name is then used to match if a library already exist with that name, in the case it exists, it will use this library name.\
-Note that the match looked for is a partial match (no regular expression supported).\
+Note that the match looked for is using regular expression (`re.search`) to find a match in the existing libraries name.\
 Arguments:
 * name : Name of the library to create or to use.
+

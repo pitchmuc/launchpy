@@ -532,6 +532,8 @@ class Property:
             settings : REQUIRED: string that define the setting to set in the extension. Usually, it can be empty.
             delegate_descriptor_id : REQUIRED : delegate descriptor id (set in name)
         """
+        if extension_id is None:
+            raise ValueError("Require an extension ID")
         obj = {
             "data": {
                 "attributes": {
@@ -563,7 +565,8 @@ class Property:
         Arguments:
             name : REQUIRED : name of your rule. 
         """
-
+        if name is None:
+            raise ValueError("Require a name for the rule")
         obj = {
             "data": {
                 "attributes": {
@@ -596,6 +599,12 @@ class Property:
         possible kwargs:
             order : the order of the rule component        
         """
+        if name is None:
+            raise ValueError("A name must be specified")
+        if descriptor is None:
+            raise ValueError("A delegate_descriptor_id must be specified in the descriptor argument")
+        if extension_infos is None:
+            raise ValueError("Extension configuration should be provided")
         obj = {
             "data": {
                 "attributes": {
@@ -899,23 +908,22 @@ class Property:
             attr_dict : REQUIRED : dictionary that will be passed to Launch for update
         documentation : https://developer.adobelaunch.com/api/reference/1.0/rules/update/
         """
+        if rule_id is None:
+            raise ValueError('Require a rule ID')
         obj = {
             "data": {
                 "attributes": attr_dict,
-                "meta": {
-                    "action": "revise"
-                },
                 "id": rule_id,
                 "type": "rules"
             }
         }
-        path = '/rules/'+rule_id
-        rules = self.connector.patchData(
+        path = f'/rules/{rule_id}'
+        res = self.connector.patchData(
             self.endpoint+path, data=obj)
         try:
-            data = rules['data']
+            data = res['data']
         except:
-            data = rules
+            data = res
         return data
 
     def updateRuleComponent(self, rc_id: str, attr_dict: object, **kwargs)->object:
