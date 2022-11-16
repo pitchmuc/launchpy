@@ -247,18 +247,21 @@ class Property:
             data = rules
         return data
 
-    def searchRules(self, name: str = None, enabled: bool = None, published: bool = None, dirty: bool = None, verbose:bool = False, **kwargs)->object:
+    def searchRules(self, name: str = None,name_contains:str=None, enabled: bool = None, published: bool = None, dirty: bool = None, verbose:bool = False, **kwargs)->object:
         """
         Returns the rules searched through the different operator. One argument is required in order to return a result. 
         Arguments: 
-            name : OPTIONAL : string of what is searched (used as "contains")
+            name : OPTIONAL : string of what is searched (used as "EQUALS")
+            name_contains : OPTIONAL : string of what is searched (used as "CONTAINS")
             enabled : OPTIONAL : boolean if search for enabled rules or not
             published : OPTIONAL : boolean if search for published rules or not
             dirty : OPTIONAL : boolean if search for dirty rules or not
         """
         filters = {}
         if name != None:
-            filters['filter[name]=CONTAINS '] = f"CONTAINS {name}"
+            filters['filter[name]=CONTAINS '] = f"EQ {name}"
+        if name_contains != None:
+            filters['filter[name]=CONTAINS '] = f"CONTAINS {name_contains}"
         if dirty != None:
             filters['filter[dirty]'] = f"EQ {str(dirty).lower()}"
         if enabled != None:
@@ -623,7 +626,7 @@ class Property:
         if settings is not None:
             obj['data']['attributes']['settings'] = settings
         if 'order' in kwargs:
-            obj['data']['attributes']['order'] = kwargs.get('order')
+            obj['data']['attributes']['rule_order'] = kwargs.get('order')
         rc = self.connector.postData(self._RuleComponents, data=obj)
         try:
             data = rc['data']
@@ -631,7 +634,7 @@ class Property:
             data = rc
         return data
 
-    def createDataElement(self, name: str, settings: str = None, descriptor: str = None, extension: dict = None, **kwargs: dict)->object:
+    def createDataElement(self, name: str, descriptor: str = None, settings: str = None, extension: dict = None, **kwargs: dict)->object:
         """
         Create Data Elements following the usage of required arguments. 
         Arguments: 
@@ -639,7 +642,13 @@ class Property:
             descriptor : REQUIRED : delegate_descriptor_id for the data element
             extension : REQUIRED : extension id used for the data element. (dictionary)
             settings : OPTIONAL : settings for the data element
+        possible kwargs:
+            any attributes key you want to set.
         """
+        if name is None:
+            raise ValueError("Require a name")
+        if descriptor is None:
+            raise ValueError("Require a delegate_descriptor_id")
         obj = {
             "data": {
                 "attributes": {
@@ -655,11 +664,10 @@ class Property:
                 "type": "data_elements"
             }
         }
-        try:
-            if settings is not None:
-                obj['data']['attributes']['settings'] = settings
-        except:
-            pass
+        if settings is not None:
+            obj['data']['attributes']['settings'] = settings
+        for kwarg in kwargs:
+            obj['data']['attributes'][kwarg] = kwargs[kwarg]
         dataElements = self.connector.postData(self._DataElement, data=obj)
         try:
             data = dataElements['data']
@@ -900,7 +908,7 @@ class Property:
             self.endpoint+path)
         return rule
 
-    def updateRule(self, rule_id: str, attr_dict: object)->object:
+    def updateRule(self, rule_id: str, attr_dict: dict)->dict:
         """
         Update the rule based on elements passed in attr_dict. 
         arguments: 
@@ -926,7 +934,7 @@ class Property:
             data = res
         return data
 
-    def updateRuleComponent(self, rc_id: str, attr_dict: object, **kwargs)->object:
+    def updateRuleComponent(self, rc_id: str, attr_dict: dict, **kwargs)->dict:
         """
         Update the ruleComponents based on the information provided.
         arguments: 

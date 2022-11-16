@@ -9,7 +9,10 @@ This has been started after the 0.3.0 release.
 * improving the `Library` class for fetching libraries with pagination.
 * update name of method `updateDataElement` to `updateDataElements` as it takes a list of data element ids
 * adding the `getLatestPublishedVersion` method in `Property` class to find the latest published version of a component
-* adding "enabled" attribute in rule `copySetting` method
+* adding "enabled" attribute in rule `copySetting` method\
+Patch:
+* adding the copySetting `enabled` attribute 
+
 
 ## 0.3.8
 

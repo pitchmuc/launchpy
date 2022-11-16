@@ -373,6 +373,7 @@ def copySettings(data: dict=None)->object:
         obj['default_value'] = data['attributes']['default_value']
         obj['clean_text'] = data['attributes']['clean_text']
         obj['extension'] = data['relationships']['extension']['data']
+        obj['enabled'] = data['attributes']['enabled']
     elif data['type'] == 'rules':
         obj['name'] = data['attributes']['name']
         obj['enabled'] = data['attributes']['enabled']

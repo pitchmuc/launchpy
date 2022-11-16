@@ -13,21 +13,39 @@ class Admin:
         self.connector = connector.AdobeRequest(
             config_object=config_object, header=header)
         self.header = self.connector.header
-        self.COMPANY_ID = {}
+        self.COMPANY_ID = ""
+        self.COMPANY_NAME  = ""
         self.properties = []
         self.endpoint = config.endpoints['global']
         
 
-    def getCompanyId(self)->object:
+    def getCompanyId(self)->str:
         """
-        Retrieve the company id for later call for the properties
+        Returns the company id for later call for the properties.
+        companyId is also saved in attribute COMPANY_ID
+        companyName is also saved in attribute COMPANY_NAME
         """
         path =  "/companies"
         companies = self.connector.getData(self.endpoint + path)
         companyID = companies['data'][0]['id']
+        companyName = companies['data'][0]['attributes']['name']
+        self.COMPANY_NAME = companyName
         self.COMPANY_ID = companyID
         return companyID
 
+    def getCompanyName(self) -> dict:
+        """
+        Returns the company name.
+        companyName is also saved in attribute COMPANY_NAME
+        companyId is also saved in attribute COMPANY_ID
+        """
+        path = "/companies"
+        companies = self.connector.getData(self.endpoint + path)
+        companyName = companies['data'][0]['attributes']['name']
+        companyID = companies['data'][0]['id']
+        self.COMPANY_ID = companyID
+        self.COMPANY_NAME = companyName
+        return companyName
 
     def getProperties(self,companyID: str)->list:
         """

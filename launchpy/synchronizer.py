@@ -91,7 +91,6 @@ class Synchronizer:
             raise KeyError("The component ID or component Name cannot be matched in your template property")
         ## Here creating a dictionary that provide all information related to your component 
         cmp_baseDict = {'id':cmp_base['id'],'name':cmp_base['attributes']['name'],'component':cmp_base,'copy':copySettings(cmp_base)}
-
         if publishedVersion:
             data = self.base['api'].getRevisions(cmp_baseDict['component'])
             publishedVersion = self.base['api'].getLatestPublishedVersion(data)
@@ -104,21 +103,41 @@ class Synchronizer:
                 translatedComponent = self.translator.translate(target,data_element=cmp_baseDict['copy'])
                 ## if it does not exist
                 if cmp_baseDict['name'] not in [de['attributes']['name'] for de in self.targets[target]['dataElements']]:
-                    res = self.targets[target]['api'].createDataElement(
+                    comp = self.targets[target]['api'].createDataElement(
                         name=cmp_baseDict['name'],
                         descriptor= translatedComponent['descriptor'],
                         settings=translatedComponent['settings'],
-                        extension=translatedComponent['extension']
+                        extension=translatedComponent['extension'],
+                        storage_duration = translatedComponent["storage_duration"],
+                        force_lower_case = translatedComponent["force_lower_case"],
+                        clean_text = translatedComponent["clean_text"],
                         )
-                    self.targets[target]['libraryStack']['dataElements'].append(res)
-                    self.targets[target]['dataElements'].append(res)
+                    if cmp_baseDict['component']['attributes']['enabled'] != comp['attributes']['enabled']:
+                        updateDE = self.targets[target]['api'].updateDataElement(
+                            dataElement_id=comp['id'],
+                            attr_dict=translatedComponent)
+                    self.targets[target]['libraryStack']['dataElements'].append(comp)
+                    self.targets[target]['dataElements'].append(comp)
                 else:
-                    old_component = [de for de in self.targets[target]['dataElements'] if de['attributes']['name'] == cmp_baseDict['name']][0]
-                    res = self.targets[target]['api'].updateDataElement(
+                    index,old_component = [(index,de) for index,de in enumerate(self.targets[target]['dataElements']) if de['attributes']['name'] == cmp_baseDict['name']][0]
+                    attributes = {
+                        "name" : translatedComponent['name'],
+                        "enabled" : translatedComponent["enabled"],
+                        "delegate_descriptor_id" : translatedComponent["descriptor"],
+                        "storage_duration" : translatedComponent["storage_duration"],
+                        "force_lower_case" : translatedComponent["force_lower_case"],
+                        "clean_text" : translatedComponent["clean_text"],
+                        "settings" : translatedComponent["settings"]
+                    }
+                    comp = self.targets[target]['api'].updateDataElement(
                         dataElement_id=old_component['id'],
-                        attr_dict=translatedComponent,
+                        attr_dict=attributes,
                         )
-                    self.targets[target]['libraryStack']['dataElements'].append(res)
+                    del self.targets[target]['dataElements'][index]
+                    self.targets[target]['dataElements'].append(comp)
+                    self.targets[target]['libraryStack']['dataElements'].append(comp)
+                
+
         if cmp_baseDict['component']['type'] == 'rules':
             latestCompVersion = self.base['api'].getRule(cmp_base['id']).get('data',cmp_baseDict['component'])
             cmp_baseDict = {'id':latestCompVersion['id'],'name':latestCompVersion['attributes']['name'],'component':latestCompVersion,'copy':copySettings(latestCompVersion)}
@@ -149,9 +168,8 @@ class Synchronizer:
                             rule_infos = translatedComponent['rule_setting'],
                             order=translatedComponent['order']
                         )
-                    
                 else: ## if a rule exist with the same name
-                    targetRule = [rule for rule in self.targets[target]['rules'] if rule['attributes']['name'] == cmp_baseDict['name']][0]
+                    index, targetRule = [(index,rule) for index, rule in enumerate(self.targets[target]['rules']) if rule['attributes']['name'] == cmp_baseDict['name']][0]
                     self.targets[target]['libraryStack']['rules'].append(targetRule)
                     targetRuleId = targetRule['id']
                     rcsLinkTarget = targetRule.get('relationships',{}).get('rule_components',{}).get('links',{}).get('related')
@@ -176,8 +194,10 @@ class Synchronizer:
                 ## updating rule attribute if difference between base and target
                 if cmp_baseDict['component']['attributes']['enabled'] != targetRule['attributes']['enabled']:
                     baseRuleAttr = copySettings(cmp_baseDict['component'])
-                    res = self.targets[target]['api'].updateRule(rule_id=targetRuleId,attr_dict=baseRuleAttr) ## keeping in a var for debug
-        
+                    targetRule = self.targets[target]['api'].updateRule(rule_id=targetRuleId,attr_dict=baseRuleAttr) ## keeping in a var for debug
+                    del self.targets[target]['rules'][index]
+                    self.targets[target]['rules'].append(targetRule)
+
     def syncComponents(self,componentsName:list=None,componentsId:list=None,publishedVersion:bool=False)->None:
         """
         Sync multiple components by looping through the list of name passed.
@@ -188,10 +208,10 @@ class Synchronizer:
         """
         if componentsName is not None:
             for component in componentsName:
-                self.syncComponents(componentName=component,publishedVersion=publishedVersion)
+                self.syncComponent(componentName=component,publishedVersion=publishedVersion)
         if componentsId is not None:
             for component in componentsId:
-                self.syncComponents(componentId=component,publishedVersion=publishedVersion)
+                self.syncComponent(componentId=component,publishedVersion=publishedVersion)
     
     def createTargetsLibrary(self,name:str="syncComponents")->None:
         """
