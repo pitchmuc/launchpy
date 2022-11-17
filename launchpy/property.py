@@ -600,7 +600,11 @@ class Property:
             (can be found from translator)
             settings : OPTIONAL : settings for that rule component
         possible kwargs:
-            order : the order of the rule component        
+            order : the order of the rule component
+            negate : if the component is a negation
+            rule_order : the priority of the rule
+            timeout : the associated timeout with the rule component
+            delay_next : if we should delay the next action
         """
         if name is None:
             raise ValueError("A name must be specified")
@@ -626,7 +630,15 @@ class Property:
         if settings is not None:
             obj['data']['attributes']['settings'] = settings
         if 'order' in kwargs:
-            obj['data']['attributes']['rule_order'] = kwargs.get('order')
+            obj['data']['attributes']['order'] = kwargs.get('order')
+        if 'rule_order' in kwargs:
+            obj['data']['attributes']['rule_order'] = kwargs.get('rule_order')
+        if 'negate' in kwargs:
+            obj['data']['attributes']['negate'] = kwargs.get('negate')
+        if 'delay_next' in kwargs:
+            obj['data']['attributes']['delay_next'] = kwargs.get('delay_next')
+        if 'timeout' in kwargs:
+            obj['data']['attributes']['timeout'] = kwargs.get('timeout')
         rc = self.connector.postData(self._RuleComponents, data=obj)
         try:
             data = rc['data']

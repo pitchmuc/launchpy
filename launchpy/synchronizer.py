@@ -157,7 +157,7 @@ class Synchronizer:
                     targetRuleId = targetRule['id']
                     self.targets[target]['rules'].append(targetRule)
                     self.targets[target]['libraryStack']['rules'].append(targetRule)
-                    for rc in template_ruleComponents:
+                    for rc in template_ruleComponents.reverse():
                         translatedComponent = self.translator.translate(target,rule_component=copySettings(rc))
                         translatedComponent['rule_setting']['data'][0]['id'] = targetRuleId
                         targetRuleComponent = self.targets[target]['api'].createRuleComponent(
@@ -166,7 +166,11 @@ class Synchronizer:
                             descriptor = translatedComponent['descriptor'],
                             extension_infos = translatedComponent['extension'],
                             rule_infos = translatedComponent['rule_setting'],
-                            order=translatedComponent['order']
+                            rule_order=translatedComponent['rule_order'],
+                            order=translatedComponent['order'],
+                            negate=translatedComponent['negate'],
+                            delay_next=translatedComponent['delay_next'],
+                            timeout=translatedComponent['timeout'],
                         )
                 else: ## if a rule exist with the same name
                     index, targetRule = [(index,rule) for index, rule in enumerate(self.targets[target]['rules']) if rule['attributes']['name'] == cmp_baseDict['name']][0]
@@ -183,13 +187,17 @@ class Synchronizer:
                     for rc in template_ruleComponents:
                         translatedComponent = self.translator.translate(target,rule_component=copySettings(rc))
                         translatedComponent['rule_setting']['data'][0]['id'] = targetRuleId
-                        res = self.targets[target]['api'].createRuleComponent(
+                        targetRuleComponent = self.targets[target]['api'].createRuleComponent(
                             name=translatedComponent['name'],
                             settings = translatedComponent['settings'],
                             descriptor = translatedComponent['descriptor'],
                             extension_infos = translatedComponent['extension'],
                             rule_infos = translatedComponent['rule_setting'],
-                            order=translatedComponent['order']
+                            rule_order=translatedComponent['rule_order'],
+                            order=translatedComponent['order'],
+                            negate=translatedComponent['negate'],
+                            delay_next=translatedComponent['delay_next'],
+                            timeout=translatedComponent['timeout'],
                         )
                 ## updating rule attribute if difference between base and target
                 if cmp_baseDict['component']['attributes']['enabled'] != targetRule['attributes']['enabled']:

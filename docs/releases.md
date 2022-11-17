@@ -12,7 +12,7 @@ This has been started after the 0.3.0 release.
 * adding "enabled" attribute in rule `copySetting` method\
 Patch:
 * adding the copySetting `enabled` attribute 
-
+* adding `negate`, `delay_next` and `timeout` in copySetting method.
 
 ## 0.3.8
 
