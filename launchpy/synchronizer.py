@@ -157,7 +157,7 @@ class Synchronizer:
                     targetRuleId = targetRule['id']
                     self.targets[target]['rules'].append(targetRule)
                     self.targets[target]['libraryStack']['rules'].append(targetRule)
-                    for rc in template_ruleComponents.reverse():
+                    for rc in template_ruleComponents:
                         translatedComponent = self.translator.translate(target,rule_component=copySettings(rc))
                         translatedComponent['rule_setting']['data'][0]['id'] = targetRuleId
                         targetRuleComponent = self.targets[target]['api'].createRuleComponent(
