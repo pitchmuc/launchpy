@@ -94,10 +94,13 @@ class Synchronizer:
         if publishedVersion:
             data = self.base['api'].getRevisions(cmp_baseDict['component'])
             publishedVersion = self.base['api'].getLatestPublishedVersion(data)
+            cmp_baseDict['id'] = publishedVersion['id']
+            cmp_baseDict['name'] = publishedVersion['attributes']['name']
             cmp_baseDict['component'] = publishedVersion
+            cmp_baseDict['copy'] = copySettings(publishedVersion)
         ## handling the data element
         if cmp_baseDict['component']['type'] == 'data_elements':
-            latestCompVersion = self.base['api'].getDataElement(cmp_base['id']).get('data',cmp_baseDict['component'])
+            latestCompVersion = self.base['api'].getDataElement(cmp_baseDict['id']).get('data',cmp_baseDict['component'])
             cmp_baseDict = {'id':latestCompVersion['id'],'name':latestCompVersion['attributes']['name'],'component':latestCompVersion,'copy':copySettings(latestCompVersion)}
             for target in list(self.targets.keys()):
                 translatedComponent = self.translator.translate(target,data_element=cmp_baseDict['copy'])
@@ -136,10 +139,9 @@ class Synchronizer:
                     del self.targets[target]['dataElements'][index]
                     self.targets[target]['dataElements'].append(comp)
                     self.targets[target]['libraryStack']['dataElements'].append(comp)
-                
-
+        ## Rules part
         if cmp_baseDict['component']['type'] == 'rules':
-            latestCompVersion = self.base['api'].getRule(cmp_base['id']).get('data',cmp_baseDict['component'])
+            latestCompVersion = self.base['api'].getRule(cmp_baseDict['id']).get('data',cmp_baseDict['component'])
             cmp_baseDict = {'id':latestCompVersion['id'],'name':latestCompVersion['attributes']['name'],'component':latestCompVersion,'copy':copySettings(latestCompVersion)}
             ## fetching all rule components associated with a rule.
             rcsLink = cmp_baseDict['component'].get('relationships',{}).get('rule_components',{}).get('links',{}).get('related')

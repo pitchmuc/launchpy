@@ -13,6 +13,7 @@ This has been started after the 0.3.0 release.
 Patch:
 * adding the copySetting `enabled` attribute 
 * adding `negate`, `delay_next` and `timeout` in copySetting method.
+* Published version edge-case & typo fix issue.
 
 ## 0.3.8
 
