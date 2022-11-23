@@ -453,13 +453,30 @@ class Translator:
             property_name : REQUIRED : name of your base property.
         """
         if rules is None or type(rules)!= list:
-            raise ValueError("Require a list of extensions to be loaded")
+            raise ValueError("Require a list of rules to be loaded")
         if property_name is None:
             raise ValueError("Require the main property name")
         df = pd.DataFrame(rulesInfo(rules)).T
         df = pd.DataFrame(df['id'])
         df.columns = [property_name]
         self.rules = df
+    
+    def extendBaseRules(self,ruleName:str=None,ruleId:str=None,property_name: str=None)->None:
+        """
+        Add a new rule name in the translator mapping table.
+        In case you have created the rule after instantiation of the Translator.
+        Arguments:
+            ruleName : REQUIRED : the name of the rule to create
+            ruleId : REQUIRED : The ID of the rule to create
+            property_name : REQUIRED : The base property used.
+        """
+        if ruleName is None:
+            raise ValueError("Require a rule name to be loaded")
+        if property_name is None:
+            raise ValueError("Require the main property name")
+        temp_df = pd.DataFrame.from_dict({property_name:{ruleName:ruleId}})
+        self.rules = self.rules.append(temp_df)
+        
 
     def extendRules(self, rules: list=None, property_name: str=None):
         """
@@ -472,6 +489,23 @@ class Translator:
         df = pd.DataFrame(df['id'])
         self.rules[property_name] = df
         return self.rules
+    
+    def extendTargetRules(self,ruleName:str=None,ruleId:str=None,property_name: str=None)->None:
+        """
+        Add a new rule name in the translator mapping table for the target property.
+        In case you have created the rule after instantiation of the Translator.
+        If the rule name is not present in the base property, the update will not happen.
+        Arguments:
+            ruleName : REQUIRED : the name of the rule to create
+            ruleId : REQUIRED : The ID of the rule to create
+            property_name : REQUIRED : The base property used.
+        """
+        if ruleName is None:
+            raise ValueError("Require a rule name to be loaded")
+        if property_name is None:
+            raise ValueError("Require the main property name")
+        temp_df = pd.DataFrame.from_dict({property_name:{ruleName:ruleId}})
+        self.rules.update(temp_df)
 
     def translate(self, target_property: str=None, data_element: dict = None, rule_component: dict = None)->dict:
         """

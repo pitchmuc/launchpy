@@ -1,7 +1,16 @@
 # Release for launchpy
 
 This page gathered the changes made between version of the launchpy module.\
-This has been started after the 0.3.0 release.
+This has been started after the 0.3.0 release.\
+
+## 0.4.0
+* Improve `getLatestPublishedVersion` as API response may not be consistent.
+* Extending the `Translator` class with 
+  * `extendBaseRules` & `extendTargetRules` for adding new rules in the mapping table.
+* Fixing issue when synchronizing properties and creating a new rule that is not enabled.
+* Taking care of `default_value` parameter for Data Element in synchronizer
+* Adding the `renameComponent` method in the `Synchronizer`
+
 ## 0.3.9
 
 * adding a `syncComponents` method in `Synchronizer` class

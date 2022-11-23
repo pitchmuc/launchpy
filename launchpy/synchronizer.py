@@ -93,7 +93,17 @@ class Synchronizer:
         cmp_baseDict = {'id':cmp_base['id'],'name':cmp_base['attributes']['name'],'component':cmp_base,'copy':copySettings(cmp_base)}
         if publishedVersion:
             data = self.base['api'].getRevisions(cmp_baseDict['component'])
-            publishedVersion = self.base['api'].getLatestPublishedVersion(data)
+            publishedVersion = self.base['api'].getLatestPublishedVersion(data) 
+            if publishedVersion['attributes']['name'] != cmp_baseDict['name']:
+                ## Updating mapping table with old name when published version name diff than last versio name.
+                if cmp_baseDict['component']['type'] == 'rules':
+                    self.translator.extendBaseRules(
+                    ruleName=publishedVersion['attributes']['name'],
+                    ruleId=publishedVersion['id'],
+                    property_name=self.base["name"])
+                    self.base['rules'].append(publishedVersion)
+                if cmp_baseDict['component']['type'] == 'data_elements':
+                    self.base['dataElements'].append(publishedVersion)
             cmp_baseDict['id'] = publishedVersion['id']
             cmp_baseDict['name'] = publishedVersion['attributes']['name']
             cmp_baseDict['component'] = publishedVersion
@@ -114,6 +124,7 @@ class Synchronizer:
                         storage_duration = translatedComponent["storage_duration"],
                         force_lower_case = translatedComponent["force_lower_case"],
                         clean_text = translatedComponent["clean_text"],
+                        default_value= translatedComponent["default_value"]
                         )
                     if cmp_baseDict['component']['attributes']['enabled'] != comp['attributes']['enabled']:
                         updateDE = self.targets[target]['api'].updateDataElement(
@@ -130,7 +141,8 @@ class Synchronizer:
                         "storage_duration" : translatedComponent["storage_duration"],
                         "force_lower_case" : translatedComponent["force_lower_case"],
                         "clean_text" : translatedComponent["clean_text"],
-                        "settings" : translatedComponent["settings"]
+                        "settings" : translatedComponent["settings"],
+                        "default_value": translatedComponent["default_value"]
                     }
                     comp = self.targets[target]['api'].updateDataElement(
                         dataElement_id=old_component['id'],
@@ -157,7 +169,9 @@ class Synchronizer:
                         name=cmp_baseDict['name']
                         )
                     targetRuleId = targetRule['id']
+                    self.translator.extendTargetRules(ruleName=cmp_baseDict['name'],ruleId=targetRuleId,property_name=target)
                     self.targets[target]['rules'].append(targetRule)
+                    index = len(self.targets[target]['rules'])-1
                     self.targets[target]['libraryStack']['rules'].append(targetRule)
                     for rc in template_ruleComponents:
                         translatedComponent = self.translator.translate(target,rule_component=copySettings(rc))
@@ -255,4 +269,41 @@ class Synchronizer:
             if len(newDataElements)>0:
                 self.targets[target]['library'].addDataElements(newDataElements)
 
-        
+    def renameComponent(self,old_name:str=None,new_name:str=None)->None:
+        """
+        Passing the old and new name of a component, it will rename the component in the different target properties.
+        If the old name cannot be found in the target properties, nothing is done.
+        Arguments
+            old_name : REQUIRED : The name of the component that you would like to rename
+            new_name : REQUIRED : The new name to be given to that component.
+        """
+        if old_name is None:
+            raise ValueError("Require the old name to be passed")
+        if new_name is None:
+            raise ValueError("Require the new name to be passed")        
+        for target in self.targets:
+            if old_name in [de['attributes']['name'] for de in self.targets[target]['dataElements']]:
+                component = [de for de in self.targets[target]['dataElements'] if de['attributes']['name']== old_name][0]
+                copy = copySettings(component)
+                attributes = {
+                    "name" : new_name,
+                    "enabled" : copy["enabled"],
+                    "delegate_descriptor_id" : copy["descriptor"],
+                    "storage_duration" : copy["storage_duration"],
+                    "force_lower_case" : copy["force_lower_case"],
+                    "clean_text" : copy["clean_text"],
+                    "default_value": copy['default_value'],
+                    "settings" : copy["settings"]
+                    }
+                comp = self.targets[target]['api'].updateDataElement(
+                    dataElement_id=component['id'],
+                    attr_dict=attributes,
+                    )
+                self.targets[target]['libraryStack']['dataElements'].append(comp)
+            if old_name in [rule['attributes']['name'] for rule in self.targets[target]['rules']]:
+                component = [rule for rule in self.targets[target]['rules'] if rule['attributes']['name']== old_name][0]
+                copy = copySettings(component)
+                copy['name'] = new_name
+                comp = self.targets[target]['api'].updateRule(rule_id=component['id'],attr_dict=copy)
+                self.targets[target]['libraryStack']['rules'].append(comp)
+

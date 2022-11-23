@@ -876,11 +876,8 @@ class Property:
         publishedIndexVersions:dict = {index:rev['attributes']['revision_number'] for index, rev in enumerate(revisions) if rev['attributes']['published'] == True}
         if len(publishedIndexVersions) == 0:
             raise IndexError("You want to retrieve a published version of the component.\nBut no published version can be found. Please check if your component has been published")
-        if 0 in list(publishedIndexVersions.values()):
-            return revisions[0]
-        else:
-            maxRevisionIndex = [index for index,value in publishedIndexVersions.items() if value == max(list(publishedIndexVersions.values()))][0]
-            return revisions[maxRevisionIndex]
+        maxRevisionIndex = [index for index,value in publishedIndexVersions.items() if value == max(list(publishedIndexVersions.values()))][0]
+        return revisions[maxRevisionIndex]
 
 
     def reviseDataElement(self, dataElement_id: str)->dict:
