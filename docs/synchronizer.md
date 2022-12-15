@@ -87,5 +87,13 @@ You can pass a name to define the library name that is created.\
 The name is then used to match if a library already exist with that name, in the case it exists, it will use this library name.\
 Note that the match looked for is using regular expression (`re.search`) to find a match in the existing libraries name.\
 Arguments:
-* name : Name of the library to create or to use.
+* name : REQUIRED : Name of the library to create or to use.
 
+## renameComponent
+
+You can use the `renameComponent` method before you synchronize a renamed component in the base property.\ This way the name will be equals in all of the properties and the synchronization can happen.\
+The Synchronizer can only use the name as common key between properties, therefore, if you need to change the name of a component in the base property, you would need to change that name as well in all of the target properties as well before doing the sync.
+Otherwise, the component will not be recognized and the sync will not happen.
+Arguments:
+* old_name : REQUIRED :The name you want to replace.
+* new_name : REQUIRED : The new name to be given to that component.
