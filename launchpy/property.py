@@ -456,7 +456,7 @@ class Property:
             data = data + append_data
         return data
 
-    def getLibraries(self, state: str = None)->object:
+    def getLibraries(self, state: str = None,**kwargs)->object:
         """
         Retrieve libraries of the property.
         Returns a list.
@@ -468,12 +468,24 @@ class Property:
                 - approved
                 - rejected
                 - published
+        possible kwargs: 
+            - published_at : it will be greater that this date ('2022-12-12T10:19:20.867Z')
+            - name : it will be matching the name as equals
+            - created_at : it will be greater that this date ('2022-12-12T10:19:20.867Z')
+            - updated_at : it will be greater that this date ('2022-12-12T10:19:20.867Z')
         """
         params = {}
         if state is not None:
             if state not in ['development', "submitted", "approved", "rejected", "published"]:
                 raise KeyError("State provided didn't match possible state.")
             params['filter[state]'] = f"EQ {state}"
+        listOfParams=["published_at","name","created_at","updated_at"]
+        for key in kwargs:
+            if key in listOfParams:
+                if key == 'name':
+                    params[f'filter[{key}]'] = f"EQ {kwargs[key]}"
+                else:
+                    params[f'filter[{key}]'] = f"GT {kwargs[key]}"
         libs = self.connector.getData(self._Libraries, params=params)
         data = libs['data']  # dat for page 1
         pagination = libs['meta']['pagination']

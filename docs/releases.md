@@ -9,7 +9,9 @@ This has been started after the 0.3.0 release.\
   * `extendBaseRules` & `extendTargetRules` for adding new rules in the mapping table.
 * Fixing issue when synchronizing properties and creating a new rule that is not enabled.
 * Taking care of `default_value` parameter for Data Element in synchronizer
-* Adding the `renameComponent` method in the `Synchronizer`
+* Adding the `renameComponent` method in the `Synchronizer`\
+Patch:
+* adding support for additional parameter for `getLibraries` method.
 
 ## 0.3.9
 
