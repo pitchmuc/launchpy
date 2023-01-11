@@ -50,9 +50,11 @@ class Synchronizer:
             self.targets[target]['extensions'] = self.targets[target]['api'].getExtensions()
             self.targets[target]['dataElements'] = self.targets[target]['api'].getDataElements()
             self.targets[target]['libraryStack'] = {'dataElements':[],'rules':[]}
-            #self.targets[target]['rcs'] = self.targets[target]['api'].getRuleComponents()
             self.translator.extendExtensions(self.targets[target]['extensions'],self.targets[target]['name'])
-            self.translator.extendRules(self.targets[target]['rules'],self.targets[target]['name'])
+            if len(self.targets[target]['rules']) > 0:
+                self.translator.extendRules(self.targets[target]['rules'],self.targets[target]['name'])
+            else:
+                self.translator.rules[self.targets[target]['name']] = None
 
     def syncComponent(self,componentName:str=None,componentId:str=None,publishedVersion:bool=False)->None:
         """
