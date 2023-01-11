@@ -12,6 +12,7 @@ This has been started after the 0.3.0 release.\
 * Adding the `renameComponent` method in the `Synchronizer`\
 Patch:
 * adding support for additional parameter for `getLibraries` method.
+* supporting when synchronizer is used as duplicator 
 
 ## 0.3.9
 
