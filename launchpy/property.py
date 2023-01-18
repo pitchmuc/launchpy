@@ -539,7 +539,7 @@ class Property:
             data = data + append_data
         return data
 
-    def createExtensions(self, extension_id: str, settings: str = None, descriptor: str = None, **kwargs)-> object:
+    def createExtension(self, extension_id: str, settings: str = None, descriptor: str = None, **kwargs)-> object:
         """
         Create an extension in your property. Your extension_id argument should be the latest one extension id available.
         Arguments : 
@@ -801,7 +801,7 @@ class Property:
         """
         update the extension with the information provided in the argument.
         argument: 
-            attr_dict : REQUIRED : dictionary that will be passed to Launch for update
+            attr_dict : REQUIRED : attribute dictionary/object that will be passed to Launch for update
         """
         obj = {
             "data": {
@@ -897,7 +897,7 @@ class Property:
         Update the data element information based on the information provided.
         arguments: 
             dataElement_id : REQUIRED : Data Element ID
-            attr_dict : REQUIRED : dictionary that will be passed to Launch for update
+            attr_dict : REQUIRED : attributes dictionary/object that will be passed to Launch for update
         """
         obj = {
             "data": {
@@ -979,13 +979,13 @@ class Property:
     
     def updateCustomCode(self,rc_id:str=None,customCode:Union[str,IO]=None,encoding:str='utf-8')->dict:
         """
-        Update the custom code of a rule (analytics or core)
+        Update the custom code of a component (analytics action or core action or data element).
         Arguments:
-            rc_id : REQUIRED : Rule Component ID
-            customCode : REQUIRED : code to be updated in the ruleComponent.2 options:
-                javaScript file; example : "myCode.js" -> ".js" suffix is important
+            comp_id : REQUIRED : Component ID
+            customCode : REQUIRED : code to be updated in the component.2 options:
+                javaScript file; example : "myCode.js" -> ".js" suffix is required.
                 string; the code you want to write as a string.
-            encoding: OPTIONAL : encoding to read the JS file. Default (utf-16)
+            encoding: OPTIONAL : encoding to read the JS file. Default (utf-8)
         """
         if rc_id is None:
             raise ValueError('Require a ruleComponent ID')
@@ -1056,7 +1056,7 @@ class Property:
             data = env
         return data
 
-    def updateExtensions(self, extension_id, attr_dict: dict, **kwargs)-> object:
+    def updateExtension(self, extension_id, attr_dict: dict, **kwargs)-> object:
         """
         update the extension with the information provided in the argument.
         argument: 
@@ -1118,7 +1118,7 @@ class Property:
             'https://reactor.adobe.io/rule_components/'+rc_id)
         return data
 
-    def deleteEnvironments(self, env_id: str)->str:
+    def deleteEnvironment(self, env_id: str)->str:
         """
         Delete the environment based on the id.  
         Arguments: 
@@ -1132,7 +1132,7 @@ def extensionsInfo(data: list)->dict:
     """
     Return a dictionary from the list provided from the extensions request.
     Arguments: 
-        - data : REQUIRED : list information returned by the getExtension method. 
+        data : REQUIRED : list information returned by the getExtension method. 
     """
     extensions = {}
     for extension in data:
@@ -1159,7 +1159,7 @@ def rulesInfo(data: list)-> dict:
     """
     Return a dictionary from the list provided from the rules request.
     Arguments : 
-        - data : REQUIRED : list information returned by the getRules method. 
+        data : REQUIRED : list information returned by the getRules method. 
     """
     rules = defaultdict(None)
     for rule in data:
@@ -1182,7 +1182,7 @@ def ruleComponentInfo(data: list)->dict:
     """
     Return a dictionary from the list provided from the rules component request.
     Arguments : 
-        - data : REQUIRED : list information returned by the getRuleComponent method. 
+        data : REQUIRED : list information returned by the getRuleComponent method. 
     """
     components = {}
     for component in data:
@@ -1206,7 +1206,7 @@ def dataElementInfo(data: list)->dict:
     """
     return information about data elements as dictionary.
     arguments : 
-        - data : list return by the getDataElement value
+        data : list return by the getDataElement value
     """
     elements = defaultdict(None)
     for element in data:

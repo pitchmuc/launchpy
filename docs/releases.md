@@ -13,6 +13,7 @@ This has been started after the 0.3.0 release.\
 Patch:
 * adding support for additional parameter for `getLibraries` method.
 * supporting when synchronizer is used as duplicator 
+* changing methods name from `updateEnvironments` to `updateEnvironment` and `createExtensions` to `createExtension`
 
 ## 0.3.9
 
