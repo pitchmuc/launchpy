@@ -23,7 +23,6 @@ class Library:
         self.name = data['attributes']['name']
         self.state = data['attributes']['state']
         self.build_required = data['attributes']['build_required']
-        self.builds = data['relationships']['builds']['links']['related']
         self._DataElements = config.endpoints['global'] + \
             '/libraries/'+data['id']+'/data_elements'
         self._Extensions = config.endpoints['global'] + \
@@ -376,9 +375,9 @@ class Library:
         If no action is provided, it would automatically go to the next state. 
         Arguments : 
             action : OPTIONAL : action to do on the library. Possible values: 
-                - 'submit' : if state == development
-                - 'approve' : if state == submitted
-                - 'reject' : if state == submitted
+                - 'submit' : if current state == development
+                - 'approve' : if current state == submitted
+                - 'reject' : if current state == submitted
         """
         path = f'/libraries/{self.id}'
         if action == None:
@@ -397,5 +396,5 @@ class Library:
         transition = self.connector.patchData(self.endpoint+path, data=obj)
         data = transition
         self.state = data['data']['attributes']['state']
-        self.build_required = data['data']['attributes']['build_required']
+        self.build_required = True
         return data
