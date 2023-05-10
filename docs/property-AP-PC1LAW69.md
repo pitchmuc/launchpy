@@ -22,7 +22,7 @@ Here are shortlinks to the different methods explanation.
 
 ## Get methods
 
-When you have your property instance created, the methods that you may want to call first are the get methods. They never take any argument, they don't actually need any argument.\
+When you have your property instance created, the methods that you may want to call first are the get methods. They never take any argument, they don’t actually need any argument.\
 The only thing important to know is that you must run the getRules() method before the getRuleComponents() method.
 
 The different get methods are the following :

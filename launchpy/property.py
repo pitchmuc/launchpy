@@ -247,18 +247,21 @@ class Property:
             data = rules
         return data
 
-    def searchRules(self, name: str = None, enabled: bool = None, published: bool = None, dirty: bool = None, verbose:bool = False, **kwargs)->object:
+    def searchRules(self, name: str = None,name_contains:str=None, enabled: bool = None, published: bool = None, dirty: bool = None, verbose:bool = False, **kwargs)->object:
         """
         Returns the rules searched through the different operator. One argument is required in order to return a result. 
         Arguments: 
-            name : OPTIONAL : string of what is searched (used as "contains")
+            name : OPTIONAL : string of what is searched (used as "EQUALS")
+            name_contains : OPTIONAL : string of what is searched (used as "CONTAINS")
             enabled : OPTIONAL : boolean if search for enabled rules or not
             published : OPTIONAL : boolean if search for published rules or not
             dirty : OPTIONAL : boolean if search for dirty rules or not
         """
         filters = {}
         if name != None:
-            filters['filter[name]=CONTAINS '] = f"CONTAINS {name}"
+            filters['filter[name]=CONTAINS '] = f"EQ {name}"
+        if name_contains != None:
+            filters['filter[name]=CONTAINS '] = f"CONTAINS {name_contains}"
         if dirty != None:
             filters['filter[dirty]'] = f"EQ {str(dirty).lower()}"
         if enabled != None:
@@ -410,6 +413,8 @@ class Property:
             raise ValueError('Require a Data Element ID')
         path = f"/data_elements/{dataElementId}"
         res = self.connector.getData(self.endpoint+path)
+        if 'data' in res.keys():
+            return res['data']
         return res
 
     def searchDataElements(self, name: str = None, enabled: bool = None, published: bool = None, dirty: bool = None, **kwargs)->object:
@@ -453,7 +458,7 @@ class Property:
             data = data + append_data
         return data
 
-    def getLibraries(self, state: str = None)->object:
+    def getLibraries(self, state: str = None,**kwargs)->object:
         """
         Retrieve libraries of the property.
         Returns a list.
@@ -465,12 +470,24 @@ class Property:
                 - approved
                 - rejected
                 - published
+        possible kwargs: 
+            - published_at : it will be greater that this date ('2022-12-12T10:19:20.867Z')
+            - name : it will be matching the name as equals
+            - created_at : it will be greater that this date ('2022-12-12T10:19:20.867Z')
+            - updated_at : it will be greater that this date ('2022-12-12T10:19:20.867Z')
         """
         params = {}
         if state is not None:
             if state not in ['development', "submitted", "approved", "rejected", "published"]:
                 raise KeyError("State provided didn't match possible state.")
             params['filter[state]'] = f"EQ {state}"
+        listOfParams=["published_at","name","created_at","updated_at"]
+        for key in kwargs:
+            if key in listOfParams:
+                if key == 'name':
+                    params[f'filter[{key}]'] = f"EQ {kwargs[key]}"
+                else:
+                    params[f'filter[{key}]'] = f"GT {kwargs[key]}"
         libs = self.connector.getData(self._Libraries, params=params)
         data = libs['data']  # dat for page 1
         pagination = libs['meta']['pagination']
@@ -524,7 +541,7 @@ class Property:
             data = data + append_data
         return data
 
-    def createExtensions(self, extension_id: str, settings: str = None, descriptor: str = None, **kwargs)-> object:
+    def createExtension(self, extension_id: str, settings: str = None, descriptor: str = None, **kwargs)-> object:
         """
         Create an extension in your property. Your extension_id argument should be the latest one extension id available.
         Arguments : 
@@ -532,6 +549,8 @@ class Property:
             settings : REQUIRED: string that define the setting to set in the extension. Usually, it can be empty.
             delegate_descriptor_id : REQUIRED : delegate descriptor id (set in name)
         """
+        if extension_id is None:
+            raise ValueError("Require an extension ID")
         obj = {
             "data": {
                 "attributes": {
@@ -563,7 +582,8 @@ class Property:
         Arguments:
             name : REQUIRED : name of your rule. 
         """
-
+        if name is None:
+            raise ValueError("Require a name for the rule")
         obj = {
             "data": {
                 "attributes": {
@@ -594,8 +614,18 @@ class Property:
             (can be found from translator)
             settings : OPTIONAL : settings for that rule component
         possible kwargs:
-            order : the order of the rule component        
+            order : the order of the rule component
+            negate : if the component is a negation
+            rule_order : the priority of the rule
+            timeout : the associated timeout with the rule component
+            delay_next : if we should delay the next action
         """
+        if name is None:
+            raise ValueError("A name must be specified")
+        if descriptor is None:
+            raise ValueError("A delegate_descriptor_id must be specified in the descriptor argument")
+        if extension_infos is None:
+            raise ValueError("Extension configuration should be provided")
         obj = {
             "data": {
                 "attributes": {
@@ -615,6 +645,14 @@ class Property:
             obj['data']['attributes']['settings'] = settings
         if 'order' in kwargs:
             obj['data']['attributes']['order'] = kwargs.get('order')
+        if 'rule_order' in kwargs:
+            obj['data']['attributes']['rule_order'] = kwargs.get('rule_order')
+        if 'negate' in kwargs:
+            obj['data']['attributes']['negate'] = kwargs.get('negate')
+        if 'delay_next' in kwargs:
+            obj['data']['attributes']['delay_next'] = kwargs.get('delay_next')
+        if 'timeout' in kwargs:
+            obj['data']['attributes']['timeout'] = kwargs.get('timeout')
         rc = self.connector.postData(self._RuleComponents, data=obj)
         try:
             data = rc['data']
@@ -622,7 +660,7 @@ class Property:
             data = rc
         return data
 
-    def createDataElement(self, name: str, settings: str = None, descriptor: str = None, extension: dict = None, **kwargs: dict)->object:
+    def createDataElement(self, name: str, descriptor: str = None, settings: str = None, extension: dict = None, **kwargs: dict)->object:
         """
         Create Data Elements following the usage of required arguments. 
         Arguments: 
@@ -630,7 +668,13 @@ class Property:
             descriptor : REQUIRED : delegate_descriptor_id for the data element
             extension : REQUIRED : extension id used for the data element. (dictionary)
             settings : OPTIONAL : settings for the data element
+        possible kwargs:
+            any attributes key you want to set.
         """
+        if name is None:
+            raise ValueError("Require a name")
+        if descriptor is None:
+            raise ValueError("Require a delegate_descriptor_id")
         obj = {
             "data": {
                 "attributes": {
@@ -646,11 +690,10 @@ class Property:
                 "type": "data_elements"
             }
         }
-        try:
-            if settings is not None:
-                obj['data']['attributes']['settings'] = settings
-        except:
-            pass
+        if settings is not None:
+            obj['data']['attributes']['settings'] = settings
+        for kwarg in kwargs:
+            obj['data']['attributes'][kwarg] = kwargs[kwarg]
         dataElements = self.connector.postData(self._DataElement, data=obj)
         try:
             data = dataElements['data']
@@ -756,11 +799,11 @@ class Property:
         except:
             return lib
 
-    def reviseExtensions(self, extension_id, attr_dict: dict, **kwargs)-> object:
+    def reviseExtension(self, extension_id, attr_dict: dict, **kwargs)-> object:
         """
         update the extension with the information provided in the argument.
         argument: 
-            attr_dict : REQUIRED : dictionary that will be passed to Launch for update
+            attr_dict : REQUIRED : attribute dictionary/object that will be passed to Launch for update
         """
         obj = {
             "data": {
@@ -778,7 +821,7 @@ class Property:
         data = extensions['data']
         return data
 
-    def reviseRules(self, rule_id: str)->object:
+    def reviseRule(self, rule_id: str)->object:
         """
         Update the rule.
         arguments: 
@@ -836,14 +879,27 @@ class Property:
                 lastPage=True
         return data
 
+    def getLatestPublishedVersion(self,revisions:list=None)->dict:
+        """
+        Find the latest published version of a component based on the list of revisions retrieved via getRevisions methods.
+        Arguments:
+            revisions : REQUIRED : list of revisions
+        """
+        if revisions is None:
+            raise ValueError('Require a list of revisions')
+        publishedIndexVersions:dict = {index:rev['attributes']['revision_number'] for index, rev in enumerate(revisions) if rev['attributes']['published'] == True}
+        if len(publishedIndexVersions) == 0:
+            raise IndexError("You want to retrieve a published version of the component.\nBut no published version can be found. Please check if your component has been published")
+        maxRevisionIndex = [index for index,value in publishedIndexVersions.items() if value == max(list(publishedIndexVersions.values()))][0]
+        return revisions[maxRevisionIndex]
 
 
-    def reviseDataElements(self, dataElement_id: str)->dict:
+    def reviseDataElement(self, dataElement_id: str)->dict:
         """
         Update the data element information based on the information provided.
         arguments: 
             dataElement_id : REQUIRED : Data Element ID
-            attr_dict : REQUIRED : dictionary that will be passed to Launch for update
+            attr_dict : REQUIRED : attributes dictionary/object that will be passed to Launch for update
         """
         obj = {
             "data": {
@@ -860,7 +916,7 @@ class Property:
         data = dataElements
         return data
 
-    def getRule(self, rule_id: str=None)->object:
+    def getRule(self, rule_id: str=None)->dict:
         """
         Update the rule based on elements passed in attr_dict. 
         arguments: 
@@ -873,9 +929,11 @@ class Property:
         path = f'/rules/{rule_id}'
         rule = self.connector.getData(
             self.endpoint+path)
+        if 'data' in rule.keys():
+            return rule['data']
         return rule
 
-    def updateRule(self, rule_id: str, attr_dict: object)->object:
+    def updateRule(self, rule_id: str, attr_dict: dict)->dict:
         """
         Update the rule based on elements passed in attr_dict. 
         arguments: 
@@ -883,26 +941,25 @@ class Property:
             attr_dict : REQUIRED : dictionary that will be passed to Launch for update
         documentation : https://developer.adobelaunch.com/api/reference/1.0/rules/update/
         """
+        if rule_id is None:
+            raise ValueError('Require a rule ID')
         obj = {
             "data": {
                 "attributes": attr_dict,
-                "meta": {
-                    "action": "revise"
-                },
                 "id": rule_id,
                 "type": "rules"
             }
         }
-        path = '/rules/'+rule_id
-        rules = self.connector.patchData(
+        path = f'/rules/{rule_id}'
+        res = self.connector.patchData(
             self.endpoint+path, data=obj)
         try:
-            data = rules['data']
+            data = res['data']
         except:
-            data = rules
+            data = res
         return data
 
-    def updateRuleComponent(self, rc_id: str, attr_dict: object, **kwargs)->object:
+    def updateRuleComponent(self, rc_id: str, attr_dict: dict, **kwargs)->dict:
         """
         Update the ruleComponents based on the information provided.
         arguments: 
@@ -926,13 +983,13 @@ class Property:
     
     def updateCustomCode(self,rc_id:str=None,customCode:Union[str,IO]=None,encoding:str='utf-8')->dict:
         """
-        Update the custom code of a rule (analytics or core)
+        Update the custom code of a component (analytics action or core action or data element).
         Arguments:
-            rc_id : REQUIRED : Rule Component ID
-            customCode : REQUIRED : code to be updated in the ruleComponent.2 options:
-                javaScript file; example : "myCode.js" -> ".js" suffix is important
+            comp_id : REQUIRED : Component ID
+            customCode : REQUIRED : code to be updated in the component.2 options:
+                javaScript file; example : "myCode.js" -> ".js" suffix is required.
                 string; the code you want to write as a string.
-            encoding: OPTIONAL : encoding to read the JS file. Default (utf-16)
+            encoding: OPTIONAL : encoding to read the JS file. Default (utf-8)
         """
         if rc_id is None:
             raise ValueError('Require a ruleComponent ID')
@@ -955,7 +1012,7 @@ class Property:
         return res
 
 
-    def updateDataElement(self, dataElement_id: str, attr_dict: object, **kwargs)->object:
+    def updateDataElement(self, dataElement_id: str, attr_dict: object, **kwargs)->dict:
         """
         Update the data element information based on the information provided.
         arguments: 
@@ -978,7 +1035,21 @@ class Property:
             data = dataElements
         return data
 
-    def updateEnvironment(self, name: str, env_id: str, **kwargs)->object:
+    def updateDataElementCode(self,dataElementId:str=None,code:str=None)->dict:
+        """
+        Update a data element custom code by passing the data element ID and the code as strng you want to upload.
+        Arguments:
+            dataElementId : REQUIRED : The data element ID
+            code : REQUIED : The code stringify
+        """
+        de = self.getDataElement(dataElementId)
+        attr = deepcopy(de['attributes'])
+        attr['settings'] = json.dumps({'source' : code})
+        print(json.dumps(attr,indent=2))
+        newDE = self.updateDataElement(dataElementId,attr)
+        return newDE
+
+    def updateEnvironment(self, name: str, env_id: str, **kwargs)->dict:
         """
         Update an environment. Note :only support name change.
         Arguments:
@@ -1003,7 +1074,7 @@ class Property:
             data = env
         return data
 
-    def updateExtensions(self, extension_id, attr_dict: dict, **kwargs)-> object:
+    def updateExtension(self, extension_id, attr_dict: dict, **kwargs)-> object:
         """
         update the extension with the information provided in the argument.
         argument: 
@@ -1065,7 +1136,7 @@ class Property:
             'https://reactor.adobe.io/rule_components/'+rc_id)
         return data
 
-    def deleteEnvironments(self, env_id: str)->str:
+    def deleteEnvironment(self, env_id: str)->str:
         """
         Delete the environment based on the id.  
         Arguments: 
@@ -1079,7 +1150,7 @@ def extensionsInfo(data: list)->dict:
     """
     Return a dictionary from the list provided from the extensions request.
     Arguments: 
-        - data : REQUIRED : list information returned by the getExtension method. 
+        data : REQUIRED : list information returned by the getExtension method. 
     """
     extensions = {}
     for extension in data:
@@ -1106,7 +1177,7 @@ def rulesInfo(data: list)-> dict:
     """
     Return a dictionary from the list provided from the rules request.
     Arguments : 
-        - data : REQUIRED : list information returned by the getRules method. 
+        data : REQUIRED : list information returned by the getRules method. 
     """
     rules = defaultdict(None)
     for rule in data:
@@ -1129,7 +1200,7 @@ def ruleComponentInfo(data: list)->dict:
     """
     Return a dictionary from the list provided from the rules component request.
     Arguments : 
-        - data : REQUIRED : list information returned by the getRuleComponent method. 
+        data : REQUIRED : list information returned by the getRuleComponent method. 
     """
     components = {}
     for component in data:
@@ -1153,7 +1224,7 @@ def dataElementInfo(data: list)->dict:
     """
     return information about data elements as dictionary.
     arguments : 
-        - data : list return by the getDataElement value
+        data : list return by the getDataElement value
     """
     elements = defaultdict(None)
     for element in data:
