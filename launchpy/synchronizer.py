@@ -139,20 +139,21 @@ class Synchronizer:
             cmp_baseDict['copy'] = copySettings(publishedVersion)
         ## handling the data element
         if cmp_baseDict['component']['type'] == 'data_elements':
-            latestCompVersion = self.base['api'].getDataElement(cmp_baseDict['id'],cmp_baseDict['component'])
+            latestCompVersion = self.base['api'].getDataElement(cmp_baseDict['id']).get('data',cmp_baseDict['component'])
             cmp_baseDict = {'id':latestCompVersion['id'],'name':latestCompVersion['attributes']['name'],'component':latestCompVersion,'copy':copySettings(latestCompVersion)}
             for target in list(self.targets.keys()):
                 flagAllowList = False
                 ## check if the component is in the exclComponentList
                 if any([bool(re.search(key,cmp_baseDict['name'])) for key in self.target_configs.get(target,{}).get('exclComponents',[])]):
                     return {cmp_baseDict['name']:False}
-                translatedComponent = self.translator.translate(target,data_element=cmp_baseDict['copy'])
                 ## if there is an allow list for that property
                 if len(self.target_configs.get(target,{}).get('inclComponents',[]))>0:
                     if any([bool(re.search(key,cmp_baseDict['name'])) for key in self.target_configs.get(target,{}).get('inclComponents',[])]):
                         flagAllowList = True
                 ## if there is no allow list for that property, or no match in the list of target properties, or component was allow
                 if len(self.target_configs.get(target,{}).get('inclComponents',[]))==0 or flagAllowList:
+                    translatedComponent = self.translator.translate(target,data_element=cmp_baseDict['copy'])
+                    ## if it does not exist
                     if cmp_baseDict['name'] not in [de['attributes']['name'] for de in self.targets[target]['dataElements']]:
                         comp = self.targets[target]['api'].createDataElement(
                             name=cmp_baseDict['name'],
@@ -191,7 +192,7 @@ class Synchronizer:
                         self.targets[target]['libraryStack']['dataElements'].append(comp)
         ## Rules part
         if cmp_baseDict['component']['type'] == 'rules':
-            latestCompVersion = self.base['api'].getRule(cmp_baseDict['id'],cmp_baseDict['component'])
+            latestCompVersion = self.base['api'].getRule(cmp_baseDict['id']).get('data',cmp_baseDict['component'])
             cmp_baseDict = {'id':latestCompVersion['id'],'name':latestCompVersion['attributes']['name'],'component':latestCompVersion,'copy':copySettings(latestCompVersion)}
             ## fetching all rule components associated with a rule.
             rcsLink = cmp_baseDict['component'].get('relationships',{}).get('rule_components',{}).get('links',{}).get('related')

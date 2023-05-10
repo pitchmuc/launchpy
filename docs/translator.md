@@ -13,13 +13,15 @@ What is really required is the base property extensions and rules. The id of the
 This is an assumption that I have when I created this facilitator, you would have a blueprint that you will use to copy elements from.
 The translator class provide 2 methods to add base rule and base extension ids:
 
-* setBaseExtensions
-* setBaseRules
+* **setBaseExtensions** : Pass all the extensions from the base property to start building the table. 
+  Arguments: 
+  * base_property : REQUIRED : list of all extensions retrieve through getExtensions method
+  * property_name : REQUIRED : name of your base property.
 
-Both elements are taking the 2 same arguments:
-
-* base_property : list of all of the extensions or rules that you want to remember for matching.
-* property_name : name to establish the matching.
+* **setBaseRules**: Pass all the rules from the base property to start building the table. 
+  Arguments: 
+  * base_property : REQUIRED : list of all rules retrieve through getExtensions method
+  * property_name : REQUIRED : name of your base property.
 
 ## Set Target Rule and Extensions ids
 
