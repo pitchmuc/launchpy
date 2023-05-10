@@ -151,7 +151,7 @@ class Synchronizer:
                 if len(self.target_configs.get(target,{}).get('inclComponents',[]))>0:
                     if any([bool(re.search(key,cmp_baseDict['name'])) for key in self.target_configs.get(target,{}).get('inclComponents',[])]):
                         flagAllowList = True
-                ## if there is no allow list for that property
+                ## if there is no allow list for that property, or no match in the list of target properties, or component was allow
                 if len(self.target_configs.get(target,{}).get('inclComponents',[]))==0 or flagAllowList:
                     if cmp_baseDict['name'] not in [de['attributes']['name'] for de in self.targets[target]['dataElements']]:
                         comp = self.targets[target]['api'].createDataElement(
@@ -209,7 +209,7 @@ class Synchronizer:
                 if len(self.target_configs.get(target,{}).get('inclComponents',[]))>0:
                     if any([bool(re.search(key,cmp_baseDict['name'])) for key in self.target_configs.get(target,{}).get('inclComponents',[])]):
                         flagAllowList = True
-                ## if there is no allow list for that property or component was allow
+                ## if there is no allow list for that property, or no match in the list of target properties, or component was allow
                 if len(self.target_configs.get(target,{}).get('inclComponents',[]))==0 or flagAllowList:
                     ## if rule does not exist
                     if cmp_baseDict['name'] not in [rule['attributes']['name'] for rule in self.targets[target]['rules']]:
