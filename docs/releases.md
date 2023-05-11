@@ -6,7 +6,7 @@ This has been started after the 0.3.0 release.\
 ### 0.4.1
 * single component methods (getDataElement, getRule) will now return the definition directly and avoid that you need to access the `data` attibute.
 * introducing the `updateDataElementCode` method that update directly the code from a custom code data element based on the stringify code passed.
-* provide a possible configuration via Data Element in Synchronizer.
+* provide a possible configuration for Synchronizer via a Data Element name. (Link)[./synchronizer.md#dynamic-component-filter]
 
 ## 0.4.0
 * Improve `getLatestPublishedVersion` as API response may not be consistent.
