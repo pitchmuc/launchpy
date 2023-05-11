@@ -100,17 +100,14 @@ Arguments:
 
 ## Dynamic Component filter
 
-You could use a data element to store some rule on how the synchronization can be done. This can serve as a configuration file for your synchronization. 
-This Data Element is expected to follow a particular data structure.
+You could use a data element to store some rule on how the synchronization can be done. This can serve as a configuration file for your synchronization.This Data Element is expected to follow a particular data structure.
 
 The data element is an array of objects, each object should contain these keys: 
 
-The elements you can use are:
-
 * name : name of the rule
-* targetProperties : string (can be a VALID regular expression) that wil look at the target property
-* exclComponents : the list of component to exclude during the sync (can be empty)
-* inclComponents : the list of components to include (can be empty)
+* targetProperties : string (can be a **VALID** regular expression) that will look at the target property. _It must be unique_.
+* exclComponents : the list of component to exclude during the sync (can be empty, can use regular expression)
+* inclComponents : the list of components to include (can be empty, can use regular expression)
                   If the list is not empty, then the list is the only source of truth for syncing the component.
                   If the list is empty, everything that is not in the exclComponent list will be synced
 
@@ -132,3 +129,38 @@ An example on how the data element looks like:
   }
 ]
 ```
+**NOTE** : The JSON representation should be flawless and the regular expression used as well, otherwise the script can break trying to decrypting it. 
+
+### Usage of Dynamic Component filter
+
+You would use that data element name during the instantiation of the synchronizer such as: 
+
+```python 
+synchronizor = lp.Synchronizer(base='BaseProperty',targets=['Target Property 1',
+                                                         'Target Property 2',
+                                                         'Target Property  3'],
+                               dynamicRuleComponent='syncFilter')
+```
+In this example above, `syncFilter` is the name of the data element containing that configuration.\
+Once your Synchronizer class has been instanciated, you can access 2 attributes in it to verify the correct setup.
+
+* `dict_config` 
+The `dict_config` attribute will be a copy of your data element setup, but a dictionary instead of an array where all of the target properties rule will be a key.\
+These keys containing the include and exclude components to be deal with. 
+
+* `target_configs`
+The `target_configs` attribute will show you how the configuration you have passed is being applied to each of the target properties you want to sync to.
+It basically merge all rules and components depending on the targetProperties rules or name you have passed.
+
+### Logic of that Dynamic Component filter
+
+The logic that will be applied during the sync is the following:
+
+* IF there is a `target_configs` setup, we will use it to verify that the component can be sync.
+* IF the Target property that is currently being sync is in the list:
+  * IF the component is in the `exclComponents` list: It will **not** be synced
+  * IF there is a list of `inclComponents` for that target property (and not empty)
+    * IF the component name is in that list, **and not** in the `exclComponents` list, it will be sync
+    * IF the component name is in that list **and** in the `exclComponents` list, it will **NOT** be sync
+  * IF there is no list of `inclComponents` for that target property (or empty list), **and not** in the `exclComponents` list, the component will be synced
+* ELSE: it will be sync

@@ -4,6 +4,8 @@ from .admin import Admin
 from .property import Property
 from .library import Library
 from .launchpy import Translator, copySettings
+from collections import defaultdict
+from copy import deepcopy
 
 class Synchronizer:
     """
@@ -49,13 +51,13 @@ class Synchronizer:
                 configRules = configRules[0]
             else:
                 raise ValueError("The dynamicRuleComponent is using a value that does not match any data element.")
-            codeConfig = json.loads(json.loads(configRules['attributes']['settings'])['source'])
+            codeConfig:list = json.loads(json.loads(configRules['attributes']['settings'])['source'])## list expected from the code
             for rule in codeConfig:
                 self.dict_config[rule['targetProperties']] = {'inclComponents':[],'exclComponents':[]}
                 if 'inclComponents' in rule.keys():
-                    self.dict_config[rule['targetProperties']]['inclComponents'] = rule['inclComponents']
+                    self.dict_config[rule['targetProperties']]['inclComponents'] += rule['inclComponents']
                 if 'exclComponents' in rule.keys():
-                    self.dict_config[rule['targetProperties']]['exclComponents'] = rule['exclComponents']
+                    self.dict_config[rule['targetProperties']]['exclComponents'] += rule['exclComponents']
         self.targets = {}
         for target in targets:
             tmp_target = [prop for prop in properties if prop['attributes']['name'] == target]
@@ -72,15 +74,18 @@ class Synchronizer:
             else:
                 self.translator.rules[self.targets[target]['name']] = None
         self.target_configs = {}
-        if len(self.dict_config)>0:
-            for target in self.targets.keys():
-                for rule in self.dict_config.keys():
+        if len(self.dict_config)>0: ## verify that there are rules
+            for rule in self.dict_config.keys():
+                for target in self.targets.keys():
                     if re.search(rule,target) is not None:
-                        self.target_configs[target] = {
-                            'exclComponents': self.dict_config[rule]['exclComponents'],
-                            'inclComponents': self.dict_config[rule]['inclComponents']
-                        }
-
+                        if target in self.target_configs.keys():
+                            self.target_configs[target]['exclComponents'] += deepcopy(self.dict_config[rule]['exclComponents'])
+                            self.target_configs[target]['inclComponents'] += deepcopy(self.dict_config[rule]['inclComponents'])
+                        else:
+                            self.target_configs[target] = {
+                                'exclComponents': deepcopy(self.dict_config[rule]['exclComponents']),
+                                'inclComponents': deepcopy(self.dict_config[rule]['inclComponents'])
+                            }
 
     def syncComponent(self,componentName:str=None,componentId:str=None,publishedVersion:bool=False,**kwargs)->None:
         """
