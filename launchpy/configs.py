@@ -22,7 +22,7 @@ def find_path(path: str) -> Optional[Path]:
         return None
 
 
-def createConfigFile(scope: str = "https://ims-na1.adobelogin.com/s/ent_reactor_admin_sdk", verbose: object = False)->None:
+def createConfigFile(scope: str = "https://ims-na1.adobelogin.com/s/ent_reactor_admin_sdk",auth_type: str = "oauthV2", verbose: object = False)->None:
     """
     This function will create a 'config_launch_admin.json' file where you can store your access data. 
     Arguments:
@@ -30,34 +30,40 @@ def createConfigFile(scope: str = "https://ims-na1.adobelogin.com/s/ent_reactor_
             scope="https://ims-na1.adobelogin.com/s/ent_reactor_admin_sdk"
             or 
             scope="https://ims-na1.adobelogin.com/s/ent_reactor_sdk"
+        auth_type : OPTIONAL : The type of Oauth type you want to use for your config file. Possible value: "jwt" or "oauthV2"
     """
     json_data = {
         'org_id': '<orgID>',
         'client_id': "<client_id>",
-        'tech_id': "<something>@techacct.adobe.com",
         'secret': "<YourSecret>",
-        'pathToKey': '<path/to/your/privatekey.key>',
         'scope': scope
     }
+    if auth_type == 'oauthV2':
+        json_data['scopes'] = "<scopes>"
+    elif auth_type == 'jwt':
+        json_data["tech_id"] = "<something>@techacct.adobe.com"
+        json_data["pathToKey"] = "<path/to/your/privatekey.key>"
     with open('config_launch_admin.json', 'w') as cf:
         cf.write(json.dumps(json_data, indent=4))
     if verbose:
         print(
             f" file created at this location : {os.getcwd()}{os.sep}config_launch_admin.json")
 
-def importConfigFile(path: str) -> None:
+def importConfigFile(path: str = None,auth_type:str=None) -> None:
     """Reads the file denoted by the supplied `path` and retrieves the configuration information
     from it.
 
     Arguments:
         path: REQUIRED : path to the configuration file. Can be either a fully-qualified or relative.
-
+        auth_type : OPTIONAL : The type of Auth to be used by default. Detected if none is passed, OauthV2 takes precedence.
+                        Possible values: "jwt" or "oauthV2"
     Example of path value.
     "config.json"
     "./config.json"
     "/my-folder/config.json"
     """
-
+    if path is None:
+        raise ValueError("a path must be provided")
     config_file_path: Optional[Path] = find_path(path)
     if config_file_path is None:
         raise FileNotFoundError(
@@ -73,14 +79,23 @@ def importConfigFile(path: str) -> None:
             client_id = provided_config['client_id']
         else:
             raise RuntimeError(f"Either an `api_key` or a `client_id` should be provided.")
-        configure(
-            org_id=provided_config['org_id'],
-            tech_id=provided_config['tech_id'],
-            secret=provided_config['secret'],
-            path_to_key=provided_config['pathToKey'],
-            client_id=client_id
-
-        )
+        if auth_type is None:
+            if 'scopes' in provided_keys:
+                auth_type = 'oauthV2'
+            elif 'tech_id' in provided_keys and "pathToKey" in provided_keys:
+                auth_type = 'jwt'
+        args = {
+            "org_id" : provided_config['org_id'],
+            "secret" : provided_config['secret'],
+            "client_id" : client_id,
+            "scope" : provided_config['scope']
+        }
+        if auth_type == 'oauthV2':
+            args["scopes"] = provided_config["scopes"].replace(' ','')
+        if auth_type == 'jwt':
+            args["tech_id"] = provided_config["tech_id"]
+            args["path_to_key"] = provided_config["pathToKey"]
+        configure(**args)
 
 
 def saveFile(data:str,filename:str=None,type:str='txt',encoding:str='utf-8')->None:
@@ -114,6 +129,7 @@ def configure(org_id: str = None,
               client_id: str = None,
               path_to_key: str=None,
               private_key: str = None,
+              scopes : str= None,
               scope: str="https://ims-na1.adobelogin.com/s/ent_reactor_admin_sdk",
               ):
     """Performs programmatic configuration of the API using provided values.
@@ -131,12 +147,12 @@ def configure(org_id: str = None,
         raise ValueError("`org_id` must be specified in the configuration.")
     if not client_id:
         raise ValueError("`client_id` must be specified in the configuration.")
-    if not tech_id:
+    if not tech_id and not scopes:
         raise ValueError("`tech_id` must be specified in the configuration.")
     if not secret:
         raise ValueError("`secret` must be specified in the configuration.")
-    if not path_to_key and not private_key:
-        raise ValueError("`pathToKey` or `private_key` must be specified in the configuration.")
+    if not path_to_key and not private_key and not scopes:
+        raise ValueError("`scopes` must be specified if Oauth setup.\n `pathToKey` or `private_key` must be specified in the configuration if JWT setup.")
     config_object["org_id"] = org_id
     header["x-gw-ims-org-id"] = org_id
     config_object["client_id"] = client_id
@@ -146,6 +162,7 @@ def configure(org_id: str = None,
     config_object["pathToKey"] = path_to_key
     config_object["private_key"] = private_key
     config_object["official_scope"] = scope
+    config_object["scopes"] = scopes
     # ensure the reset of the state by overwriting possible values from previous import.
     config_object["date_limit"] = 0
     config_object["token"] = ""

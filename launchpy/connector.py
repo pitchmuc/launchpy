@@ -2,7 +2,7 @@ import os
 import json
 import time
 from typing import Dict, Union
-
+from copy import deepcopy
 # Non standard libraries
 import jwt
 import requests
@@ -30,21 +30,24 @@ class AdobeRequest:
         if config_object['org_id'] == '':
             raise Exception(
                 'You have to upload the configuration file with importConfigFile method.')
-        self.config = config_object
+        self.config = deepcopy(config_object)
         self.header = header
         self.retry = retry
         if self.config['token'] == '' or time.time() > self.config['date_limit']:
-            token_and_expiry = self.get_token_and_expiry_for_config(config=self.config, verbose=verbose)
+            if 'scopes' in self.config.keys() and self.config.get('scopes',None) is not None:
+                self.connectionType = 'oauthV2'
+                token_and_expiry = self.get_oauth_token_and_expiry_for_config(config=self.config, verbose=verbose)
+            elif self.config.get("private_key",None) is not None or self.config.get("pathToKey",None) is not None:
+                self.connectionType = 'jwt'
+                token_and_expiry = self.get_jwt_token_and_expiry_for_config(config=self.config, verbose=verbose)
             token = token_and_expiry['token']
             expiry = token_and_expiry['expiry']
             self.token = token
             self.config['token'] = token
-            self.config['date_limit'] = time.time() + expiry / 1000 - 500
+            self.config['date_limit'] = time.time() + expiry - 500
             self.header.update({'Authorization': f'Bearer {token}'})
 
-    
-
-    def get_token_and_expiry_for_config(self,config: dict, verbose: bool = False, save: bool = False, *args, **kwargs) -> Dict[str, str]:
+    def get_jwt_token_and_expiry_for_config(self,config: dict, verbose: bool = False, save: bool = False, *args, **kwargs) -> Dict[str, str]:
         """
         Retrieve the token by using the information provided by the user during the import importConfigFile function.
         Arguments :
@@ -86,12 +89,12 @@ class AdobeRequest:
             'client_secret': config['secret'],
             'jwt_token': encoded_jwt_dev
         }
-        response = requests.post(config['tokenEndpoint'], headers=header_jwt, data=payload_admin)
+        response = requests.post(config['jwtTokenEndpoint'], headers=header_jwt, data=payload_admin)
         json_response = response.json()
         if 'error' in json_response.keys():
             if json_response['error'] == "invalid_scope":
                 try:
-                    response = requests.post(config['tokenEndpoint'], headers=header_jwt, data=payload_dev)
+                    response = requests.post(config['jwtTokenEndpoint'], headers=header_jwt, data=payload_dev)
                     json_response = response.json()
                 except Exception as e:
                     print(json.dumps(json_response, indent=4))
@@ -101,13 +104,45 @@ class AdobeRequest:
         except KeyError:
             print('Issue retrieving token')
             print(json_response)
-        expiry = json_response['expires_in']
+        expiry = json_response['expires_in'] / 1000
         if save:
             with open('token.txt', 'w') as f:
                 f.write(token)
             print(f'token has been saved here: {os.getcwd()}{os.sep}token.txt')
         if verbose:
             print('token valid till : ' + time.ctime(time.time() + expiry / 1000))
+        return {'token': token, 'expiry': expiry}
+    
+    def get_oauth_token_and_expiry_for_config(self,config:dict,verbose:bool=False,save:bool=False)->Dict[str,str]:
+        """
+        Retrieve the access token by using the OAuth information provided by the user
+        during the import importConfigFile function.
+        Arguments :
+            config : REQUIRED : Configuration object.
+            verbose : OPTIONAL : Default False. If set to True, print information.
+            save : OPTIONAL : Default False. If set to True, save the toke in the .
+        """
+        if config is None:
+            raise ValueError("config dictionary is required")
+        oauth_payload = {
+            "grant_type": "client_credentials",
+            "client_id": config["client_id"],
+            "client_secret": config["secret"],
+            "scope": config["scopes"]
+        }
+        response = requests.post(
+            config["oauthTokenEndpointV2"], data=oauth_payload)
+        json_response = response.json()
+        if 'access_token' in json_response.keys():
+            token = json_response['access_token']
+            expiry = json_response["expires_in"]
+        else:
+            return json.dumps(json_response,indent=2)
+        if save:
+            with open('token.txt', 'w') as f:
+                f.write(token)
+        if verbose:
+            print('token valid till : ' + time.ctime(time.time() + expiry))
         return {'token': token, 'expiry': expiry}
 
 
@@ -126,10 +161,13 @@ class AdobeRequest:
         """
         now = time.time()
         if now > self.config['date_limit']:
-            token_with_expiry = self.get_token_and_expiry_for_config(config=self.config)
-            token = token_with_expiry['token']
+            if self.connectionType =='oauthV2':
+                token_and_expiry = self.get_oauth_token_and_expiry_for_config(config=self.config)
+            elif self.connectionType == 'jwt':
+                token_and_expiry = self.get_jwt_token_and_expiry_for_config(config=self.config)
+            token = token_and_expiry['token']
             self.config['token'] = token
-            self.config['date_limit'] = time.time() + token_with_expiry['expiry'] / 1000 - 500
+            self.config['date_limit'] = time.time() + token_and_expiry['expiry'] - 500
             self.header.update({'Authorization': f'Bearer {token}'})
 
     def getData(self, endpoint: str, params: dict = None, data: dict = None, headers: dict = None, *args, **kwargs):

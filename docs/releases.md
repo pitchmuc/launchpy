@@ -3,6 +3,9 @@
 This page gathered the changes made between version of the launchpy module.\
 This has been started after the 0.3.0 release.\
 
+## 0.4.2
+* Supporting the Oauth Token V2 authentication
+
 ### 0.4.1
 * single component methods (getDataElement, getRule) will now return the definition directly and avoid that you need to access the `data` attibute.
 * introducing the `updateDataElementCode` method that update directly the code from a custom code data element based on the stringify code passed.
