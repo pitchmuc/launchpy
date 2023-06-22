@@ -24,12 +24,10 @@ This module is built around 5 main parts:
 - Translator functionationality [Translator Class](./docs/translator.md)
 - Synchronizer [Synchronizer Class](./docs/synchronizer.md)
 
-## Get Stated
+## Get Started
 
 A [get started guide](./docs/getstarted.md) has been created to explain the different functionality.
 You can find a more detail description functionalities at [datanalyst.info](https://datanalyst.info).
-
-~~A Jupyter notebook is also available in the github for demo.~~ To be updated.
 
 ## Main documentation
 
