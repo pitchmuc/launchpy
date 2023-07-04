@@ -88,7 +88,7 @@ def importConfigFile(path: str = None,auth_type:str=None) -> None:
             "org_id" : provided_config['org_id'],
             "secret" : provided_config['secret'],
             "client_id" : client_id,
-            "scope" : provided_config['scope']
+            "scope" : provided_config.get('scope')
         }
         if auth_type == 'oauthV2':
             args["scopes"] = provided_config["scopes"].replace(' ','')
