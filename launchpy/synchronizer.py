@@ -159,7 +159,7 @@ class Synchronizer:
                 if len(self.target_configs.get(target,{}).get('inclComponents',[]))==0 or flagAllowList:
                     translatedComponent = self.translator.translate(target,data_element=cmp_baseDict['copy'])
                     ## if it does not exist
-                    if cmp_baseDict['name'] not in [de['attributes']['name'] for de in self.targets[target]['dataElements']]:
+                    if cmp_baseDict['name'] not in [de.get('attributes',{}).get('name') for de in self.targets[target]['dataElements']]:
                         comp = self.targets[target]['api'].createDataElement(
                             name=cmp_baseDict['name'],
                             descriptor= translatedComponent['descriptor'],

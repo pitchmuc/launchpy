@@ -410,56 +410,42 @@ class Translator:
     """
 
     def __init__(self):
-        self.rules = pd.DataFrame()
-        self.extensions = pd.DataFrame()
+        self.rules = {}
+        self.baseRuleIdName = {}
+        self.extensions = {}
+        self.baseExtensionIdName = {}
 
-    def setBaseExtensions(self, extensions: list=None, property_name: str=None)->None:
+    def setBaseExtensions(self, base_property_extensions: list, property_name: str):
         """
         Pass all the extensions from the base property to start building the table. 
         Arguments: 
-            extensions_base : REQUIRED : list of all extensions retrieve through getExtensions method
+            base_property_extensions : REQUIRED : list of all extensions retrieve through getExtensions method
             property_name : REQUIRED : name of your base property.
         """
-        if extensions is None or type(extensions)!= list:
-            raise ValueError("Require a list of extensions to be loaded")
-        if property_name is None:
-            raise ValueError("Require the main property name")
-        df = pd.DataFrame(extensionsInfo(extensions)).T
-        df = pd.DataFrame(df['id'])
-        df.columns = [property_name]
-        self.extensions = df
+        self.baseExtensionIdName = {ext['id'] : ext['attributes']['name'] for ext in base_property_extensions}
+        self.extensions = {ext['attributes']['name']:{property_name:ext['id']} for ext in base_property_extensions}
 
-    def extendExtensions(self, extensions: list=None, property_name: str=None)-> None:
+    def extendExtensions(self, new_property_extensions: list, new_prop_name: str)-> None:
         """
         Add the extensions id from a target property.
         Arguments: 
-            extensions: REQUIRED : the extension list from your target property. 
-            property_name : REQUIRED : target property name. 
+            new_property_extensions: REQUIRED : the extension list from your target property. 
+            new_prop_name : REQUIRED : target property name. 
         """
-        if extensions is None or type(extensions)!= list:
-            raise ValueError("Require a list of extensions to be loaded")
-        if property_name is None:
-            raise ValueError("Require the main property name")
-        df = pd.DataFrame(extensionsInfo(extensions)).T
-        df = pd.DataFrame(df['id'])
-        self.extensions[property_name] = df
+        for ext in new_property_extensions:
+            if ext['attributes']['name'] in list(self.extensions.keys()):
+                self.extensions[ext['attributes']['name']][new_prop_name] = ext['id']
         return self.extensions
 
-    def setBaseRules(self, rules: list=None, property_name: str=None)->None:
+    def setBaseRules(self, base_property_rules: list, property_name: str):
         """
         Pass all the rules from the base property to start building the table. 
         Arguments: 
-            rules : REQUIRED : list of all rules retrieve through getExtensions method
+            base_property : REQUIRED : list of all rules retrieve through getExtensions method
             property_name : REQUIRED : name of your base property.
         """
-        if rules is None or type(rules)!= list:
-            raise ValueError("Require a list of rules to be loaded")
-        if property_name is None:
-            raise ValueError("Require the main property name")
-        df = pd.DataFrame(rulesInfo(rules)).T
-        df = pd.DataFrame(df['id'])
-        df.columns = [property_name]
-        self.rules = df
+        self.baseRuleIdName = {rule['id']:rule['attributes']['name'] for rule in base_property_rules}
+        self.rules = {rule['attributes']['name']:{property_name:rule['id']} for rule in base_property_rules}
     
     def extendBaseRules(self,ruleName:str=None,ruleId:str=None,property_name: str=None)->None:
         """
@@ -474,20 +460,20 @@ class Translator:
             raise ValueError("Require a rule name to be loaded")
         if property_name is None:
             raise ValueError("Require the main property name")
-        temp_df = pd.DataFrame.from_dict({property_name:{ruleName:ruleId}})
-        self.rules = self.rules.append(temp_df)
+        self.baseRuleIdName[ruleId] = ruleName
+        self.rules[ruleName][property_name] = ruleId
         
 
-    def extendRules(self, rules: list=None, property_name: str=None):
+    def extendRules(self, new_property_rules: list, new_prop_name: str):
         """
-        Add the rule id from a target property.
+        Add the extensions id from a target property.
         Arguments: 
-            rules: REQUIRED : the rules list from your target property. 
-            property_name : REQUIRED : target property name. 
+            new_property_rules: REQUIRED : the rules list from your target property. 
+            new_prop_name : REQUIRED : target property name. 
         """
-        df = pd.DataFrame(rulesInfo(rules)).T
-        df = pd.DataFrame(df['id'])
-        self.rules[property_name] = df
+        for rule in new_property_rules:
+            if rule['attributes']['name'] in list(self.rules.keys()):
+                self.rules[rule['attributes']['name']][new_prop_name] = rule['id']
         return self.rules
     
     def extendTargetRules(self,ruleName:str=None,ruleId:str=None,property_name: str=None)->None:
@@ -504,10 +490,9 @@ class Translator:
             raise ValueError("Require a rule name to be loaded")
         if property_name is None:
             raise ValueError("Require the main property name")
-        temp_df = pd.DataFrame.from_dict({property_name:{ruleName:ruleId}})
-        self.rules.update(temp_df)
+        self.rules[ruleName][property_name] = ruleId
 
-    def translate(self, target_property: str=None, data_element: dict = None, rule_component: dict = None)->dict:
+    def translate(self, target_property: str, data_element: dict = None, rule_component: dict = None)->dict:
         """
         change the id from the base element to the new property. 
         Pre checked should be done beforehands (updating Extension & Rules elements)
@@ -516,39 +501,32 @@ class Translator:
             data_element : OPTIONAL : if the elements passed are data elements
             rule_component : OPTIONAL : if the elements passed are rule components
         """
-        if target_property is None:
-            raise ValueError("Require the target property name")
-        if data_element is None and rule_component is None:
-            raise AttributeError("Require at least data element or rule component to be passed")
-        if self.extensions.empty == True:
+        if len(self.extensions) == 0:
             raise AttributeError(
                 "You didn't import the base extensions or the target extensions")
         if data_element is not None:
             new_de = deepcopy(data_element)
             base_id = new_de['extension']['id']
-            row = self.extensions[self.extensions.iloc[:, 0]
-                                  == base_id].index.values[0]
-            new_value = self.extensions.loc[row, target_property]
-            new_de['extension']['id'] = new_value
+            based_ext_name = self.baseExtensionIdName[base_id]
+            new_extension_id = self.extensions[based_ext_name][target_property]
+            new_de['extension']['id'] = new_extension_id
             return new_de
         elif rule_component is not None:
-            if self.rules.empty == True:
+            if len(self.rules) == 0:
                 raise AttributeError(
                     "The rules have not been imported, the rule id needs to be changed")
             new_rc = deepcopy(rule_component)
             base_id = new_rc['extension']['id']
-            row = self.extensions[self.extensions.eq(
-                base_id).any(1)].index.values[0]
-            new_value = self.extensions.loc[row, target_property]
-            new_rc['extension']['id'] = new_value
-            if self.rules.empty == False:
+            based_ext_name = self.baseExtensionIdName[base_id]
+            new_extension_id = self.extensions[based_ext_name][target_property]
+            new_rc['extension']['id'] = new_extension_id
+            if len(self.rules) > 0:
                 new_rc['rule_setting'] = {
                     'data': [{
-                        'id': self.rules.loc[rule_component['rule_name'], target_property],
+                        'id': self.rules[rule_component['rule_name']][target_property],
                         'type':'rules'}
                     ]}
-                new_rc['rule_id'] = self.rules.loc[rule_component['rule_name'],
-                                                   target_property]
+                new_rc['rule_id'] = self.rules[rule_component['rule_name']][target_property]
             else:
                 print(
                     "You didn't load the rules. Please use setExtensions and setRules, and extendExtensions and extendRules")

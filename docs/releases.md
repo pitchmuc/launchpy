@@ -3,6 +3,9 @@
 This page gathered the changes made between version of the launchpy module.\
 This has been started after the 0.3.0 release.\
 
+## 0.4.3
+* Refactor `Translator` class for removing `pandas` dependency
+
 ## 0.4.2
 * Supporting the Oauth Token V2 authentication
 

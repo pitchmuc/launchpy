@@ -9,7 +9,7 @@ Also it is possible to use it not only between 2 properties but between 2 Organi
 ## Starting with translator class
 
 The instantiation of the translator class is very basic as you would just need to call for it.
-What is really required is the base property extensions and rules. The id of the elements from your “mother” property.
+What is really required is the base property extensions and rules. The id of the elements from your "mother" property.
 This is an assumption that I have when I created this facilitator, you would have a blueprint that you will use to copy elements from.
 The translator class provide 2 methods to add base rule and base extension ids:
 
@@ -25,7 +25,7 @@ The translator class provide 2 methods to add base rule and base extension ids:
 
 ## Set Target Rule and Extensions ids
 
-Once you have loaded the base Extension and Rules ids, the method will start to expand the table into multiple columns for matching. Underlying is the use of pandas dataframe to realize that matching.
+Once you have loaded the base Extension and Rules ids, the method will start to expand the table into multiple columns for matching.
 You will need to be consistent with the naming of your target in order for the method to work properly.
 The methods that allow extension of your table are the following:
 
