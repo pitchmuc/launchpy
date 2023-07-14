@@ -3,7 +3,6 @@ from collections import defaultdict
 from concurrent import futures
 from copy import deepcopy
 # Non standard libraries
-import pandas as pd
 from launchpy import config, connector
 from typing import IO, Union
 from .library import Library

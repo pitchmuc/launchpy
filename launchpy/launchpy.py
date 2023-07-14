@@ -2,7 +2,6 @@ import json
 from collections import defaultdict
 from copy import deepcopy
 # Non standard libraries
-import pandas as pd
 from pathlib import Path
 from typing import IO, Union
 from .configs import saveFile
