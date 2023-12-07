@@ -144,8 +144,6 @@ class Synchronizer:
             cmp_baseDict['copy'] = copySettings(publishedVersion)
         ## handling the data element
         if cmp_baseDict['component']['type'] == 'data_elements':
-            latestCompVersion = self.base['api'].getDataElement(cmp_baseDict['id']).get('data',cmp_baseDict['component'])
-            cmp_baseDict = {'id':latestCompVersion['id'],'name':latestCompVersion['attributes']['name'],'component':latestCompVersion,'copy':copySettings(latestCompVersion)}
             for target in list(self.targets.keys()):
                 flagAllowList = False
                 ## check if the component is in the exclComponentList
@@ -197,8 +195,6 @@ class Synchronizer:
                         self.targets[target]['libraryStack']['dataElements'].append(comp)
         ## Rules part
         if cmp_baseDict['component']['type'] == 'rules':
-            latestCompVersion = self.base['api'].getRule(cmp_baseDict['id']).get('data',cmp_baseDict['component'])
-            cmp_baseDict = {'id':latestCompVersion['id'],'name':latestCompVersion['attributes']['name'],'component':latestCompVersion,'copy':copySettings(latestCompVersion)}
             ## fetching all rule components associated with a rule.
             rcsLink = cmp_baseDict['component'].get('relationships',{}).get('rule_components',{}).get('links',{}).get('related')
             resResource = self.base['api'].getRessource(rcsLink)
@@ -228,7 +224,10 @@ class Synchronizer:
                         index = len(self.targets[target]['rules'])-1
                         self.targets[target]['libraryStack']['rules'].append(targetRule)
                         for rc in template_ruleComponents:
-                            translatedComponent = self.translator.translate(target,rule_component=copySettings(rc))
+                            try:
+                                translatedComponent = self.translator.translate(target,rule_component=copySettings(rc))
+                            except:
+                                raise KeyError("Could not translate the component. Please check if your extensions are aligned in the properties.")
                             translatedComponent['rule_setting']['data'][0]['id'] = targetRuleId
                             targetRuleComponent = self.targets[target]['api'].createRuleComponent(
                                 name=translatedComponent['name'],
@@ -255,7 +254,10 @@ class Synchronizer:
                                 self.targets[target]['api'].deleteRuleComponent(component['id'])
                         ## creating the new version of the old version
                         for rc in template_ruleComponents:
-                            translatedComponent = self.translator.translate(target,rule_component=copySettings(rc))
+                            try:
+                                translatedComponent = self.translator.translate(target,rule_component=copySettings(rc))
+                            except:
+                                raise KeyError("Could not translate the component. Please check if your extensions are aligned in the properties.")
                             translatedComponent['rule_setting']['data'][0]['id'] = targetRuleId
                             targetRuleComponent = self.targets[target]['api'].createRuleComponent(
                                 name=translatedComponent['name'],
@@ -361,3 +363,130 @@ class Synchronizer:
                 comp = self.targets[target]['api'].updateRule(rule_id=component['id'],attr_dict=copy)
                 self.targets[target]['libraryStack']['rules'].append(comp)
 
+
+    def checkComponentSync(self,componentName:str=None,componentId:str=None,publishedVersion:bool=False,**kwargs)->bool:
+        """
+        Check if the component,from the base property, is synced to the different target properties.
+        It can also check for the Extensions.
+        It will returned {targetProperty: True} when component have same settings or {targetPropery : False} when component do not have same settings.
+        Arguments:
+            componentName : REQUIRED : the name of the component to compare
+            componentID : REQUIRED : the id of the component to compare
+            publishedVersion : OPTIONAL : if you want to compare to the version that has been published in your base
+        """
+        if componentName is None and componentId is None:
+            raise ValueError('Require a component Name of a component ID')
+        cmp_base=None
+        if componentId is not None:
+            if componentId.startswith('DE'): ## if data element
+                componentBase = [de for de in self.base['dataElements'] if de['id'] == componentId]
+                if len(componentBase)==0:
+                    raise KeyError("Component ID cannot be found")
+                cmp_base = componentBase[0]
+            elif componentId.startswith('RL'): ## if a rule
+                componentBase = [de for de in self.base['rules'] if de['id'] == componentId]
+                if len(componentBase)==0:
+                    raise KeyError("Component ID cannot be found")
+                cmp_base = componentBase[0]
+            elif componentId.startswith('EX'): ## if an extension
+                componentBase = [ext for ext in self.base['extensions'] if ext['id'] == componentId]
+                if len(componentBase)==0:
+                    raise KeyError("Component ID cannot be found")
+                cmp_base = componentBase[0]
+        if componentId is None and componentName is not None: ## If only componentName
+            for rule in self.base['rules']:
+                if componentName == rule['attributes']['name']:
+                    cmp_base = rule
+            if cmp_base is None: ## data elements
+                for de in self.base['dataElements']:
+                    if componentName == de['attributes']['name']:
+                        cmp_base = de
+            if cmp_base is None: ## extensions
+                for ext in self.base['extensions']:
+                    if componentName == ext['attributes']['name']:
+                        cmp_base = ext
+        ## In case we do not find any match
+        if cmp_base is None:
+            raise KeyError("The component ID or component Name cannot be matched in your template property")
+        ## Here creating a dictionary that provide all information related to your component 
+        cmp_baseDict = {'id':cmp_base['id'],'name':cmp_base['attributes']['name'],'component':cmp_base,'copy':copySettings(cmp_base)}
+        if publishedVersion:
+            data = self.base['api'].getRevisions(cmp_baseDict['component'])
+            publishedVersion = self.base['api'].getLatestPublishedVersion(data) 
+            if publishedVersion['attributes']['name'] != cmp_baseDict['name']:
+                ## Updating mapping table with old name when published version name diff than last version name.
+                if cmp_baseDict['component']['type'] == 'rules':
+                    self.translator.extendBaseRules(
+                    ruleName=publishedVersion['attributes']['name'],
+                    ruleId=publishedVersion['id'],
+                    property_name=self.base["name"])
+                    self.base['rules'].append(publishedVersion)
+                if cmp_baseDict['component']['type'] == 'data_elements':
+                    self.base['dataElements'].append(publishedVersion)
+                if cmp_baseDict['component']['type'] == 'extensions':
+                    self.base['extensions'].append(publishedVersion)
+            cmp_baseDict['id'] = publishedVersion['id']
+            cmp_baseDict['name'] = publishedVersion['attributes']['name']
+            cmp_baseDict['component'] = publishedVersion
+            cmp_baseDict['copy'] = copySettings(publishedVersion)
+        dict_result = {tar:False for tar in self.targets.keys()}
+        if cmp_baseDict['component']['type'] == 'data_elements':
+            for target in list(self.targets.keys()):
+                ## if it does not exist
+                    if cmp_baseDict['name'] not in [de.get('attributes',{}).get('name') for de in self.targets[target]['dataElements']]:
+                        dict_result[target] = False
+                    else:
+                        index,old_component = [(index,de) for index,de in enumerate(self.targets[target]['dataElements']) if de['attributes']['name'] == cmp_baseDict['name']][0]
+                        if old_component['attributes']['settings'] == cmp_baseDict['component']['attributes']['settings']:
+                            dict_result[target] = True
+                        else:
+                            dict_result[target] = False
+        if cmp_baseDict['component']['type'] == 'rules':
+            rcsLink = cmp_baseDict['component'].get('relationships',{}).get('rule_components',{}).get('links',{}).get('related')
+            resResource = self.base['api'].getRessource(rcsLink)
+            template_ruleComponents:list = resResource['data']
+            for rc in template_ruleComponents:
+                rc['rule_name'] = cmp_baseDict['name']
+                rc['rule_id'] = cmp_baseDict['id']
+            for target in list(self.targets.keys()):
+                ## if rule does not exist
+                if cmp_baseDict['name'] not in [rule['attributes']['name'] for rule in self.targets[target]['rules']]:
+                    dict_result[target] = False
+                else:
+                    index, targetRule = [(index,rule) for index, rule in enumerate(self.targets[target]['rules']) if rule['attributes']['name'] == cmp_baseDict['name']][0]
+                    targetRuleId = targetRule['id']
+                    rcsLinkTarget = targetRule.get('relationships',{}).get('rule_components',{}).get('links',{}).get('related')
+                    resResource = self.targets[target]['api'].getRessource(rcsLinkTarget)
+                    old_components:list = resResource['data']
+                    #if not same amunt of rule component 
+                    if len(template_ruleComponents) != len(old_components):
+                        dict_result[target] = False
+                    dict_result[target] = False ## bydefault, there is a difference
+                    componentsDifferences = [] ## array of compontent for rule to check difference
+                    for base_comp in template_ruleComponents:
+                        checkExist = False
+                        for old_comp in old_components:
+                            if old_comp['attributes']['name'] == base_comp['attributes']['name']:
+                                checkExist = True
+                                if old_comp['attributes']['settings'] == base_comp['attributes']['settings']:
+                                    componentsDifferences.append(True)
+                                else:
+                                    componentsDifferences.append(False)
+                        if checkExist == False:
+                            componentsDifferences.append(False)
+                    if all(componentsDifferences):
+                        dict_result[target] = True
+        if cmp_baseDict['component']['type'] == 'extensions':
+            for target in list(self.targets.keys()):
+                if cmp_baseDict['name'] not in [ext['attributes']['name'] for ext in self.targets[target]['extensions']]:
+                    dict_result[target] = False
+                else:
+                    index, extensionTarget = [(index,ext) for index, ext in enumerate(self.targets[target]['extensions']) if ext['attributes']['name'] == cmp_baseDict['name']][0]
+                    if extensionTarget['attributes']['version'] != cmp_baseDict['component']['attributes']['version']:
+                        dict_result[target] = False
+                    else:
+                        if extensionTarget['attributes']['settings'] != cmp_baseDict['component']['attributes']['settings']:
+                            dict_result[target] = False
+                        else:
+                            dict_result[target] = True
+        return dict_result

@@ -6,6 +6,8 @@ You can recreate a (more advanced) version that supports additional methods or e
 
 The Synchronizer will allow you to specify a template property and target property **within the same organization** in order to sync these properties rules and data elements.
 
+
+
 ## PRE REQUISITE
 
 This class is currently requiring the following elements on your side:
@@ -95,8 +97,36 @@ You can use the `renameComponent` method before you synchronize a renamed compon
 The Synchronizer can only use the name as common key between properties, therefore, if you need to change the name of a component in the base property, you would need to change that name as well in all of the target properties as well before doing the sync.
 Otherwise, the component will not be recognized and the sync will not happen.
 Arguments:
-* old_name : REQUIRED :The name you want to replace.
+* old_name : REQUIRED : The name you want to replace.
 * new_name : REQUIRED : The new name to be given to that component.
+
+## checkComponentSync
+
+This method will allow you to check if a component is the same in the target properties, when compare to the base.
+It works on Rules, Data Elements, Extensions, with their name or ID.
+It is returning a dictionary with the name of the target properties as keys and `True` when the component is the same, `False` when the component is **not** the same.
+Arguments:
+* componentName : REQUIRED : The name of the component to compare (can be replaced by componentId)
+* componentId : OPTIONAL : The ID of the component to compare
+* publishedVersion : OPTIONAL : if you want to compare to the version that has been published in your base.
+
+### Check realised for component
+
+The script will provide these evaluations:
+For Extensions: 
+* It will check if the same version of the extension is used (return `False` in case different versions)
+* It will check if the same settings has been applied (return `False` else `True`)
+
+For Rules:
+* It will check if the rules contain the same number of ruleComponents (return `False` in case different numbers)
+* It will check each ruleComponent if it can be found (based on Name)
+  * If the ruleComponent name cannot be found in the target property : return `False`
+  * If the ruleComponent name is found and the settings are different : return `False`
+  * If all ruleComponent names have been found and their settings are identical : return `True` 
+
+For Data Elements:
+* It will check if the Data Element name can be found : return `False` if not found
+* If component Name is found and settings are the same : return `True`, else return `False`
 
 ## Dynamic Component filter
 
