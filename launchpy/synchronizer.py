@@ -469,10 +469,21 @@ class Synchronizer:
                             if old_comp['attributes']['name'] == base_comp['attributes']['name']:
                                 checkExist = True
                                 if old_comp['attributes']['settings'] == base_comp['attributes']['settings']:
-                                    componentsDifferences.append(True)
-                                else:
+                                    if '::events::' in base_comp['attributes']['delegate_descriptor_id']:
+                                        if old_comp['attributes']['rule_order'] == base_comp['attributes']['rule_order']:
+                                            componentsDifferences.append(True)
+                                        else:
+                                            componentsDifferences.append(False)
+                                    elif '::actions::' in base_comp['attributes']['delegate_descriptor_id']:
+                                        if old_comp['attributes']['timeout'] == base_comp['attributes']['timeout']:
+                                            componentsDifferences.append(True)
+                                        else:
+                                            componentsDifferences.append(False)
+                                    else: ## no action no event but same settings
+                                        componentsDifferences.append(True)
+                                else: ## settings not the same
                                     componentsDifferences.append(False)
-                        if checkExist == False:
+                        if checkExist == False: ## does not exist
                             componentsDifferences.append(False)
                     if all(componentsDifferences):
                         dict_result[target] = True

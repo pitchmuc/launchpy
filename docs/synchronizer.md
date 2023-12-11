@@ -108,7 +108,7 @@ It is returning a dictionary with the name of the target properties as keys and 
 Arguments:
 * componentName : REQUIRED : The name of the component to compare (can be replaced by componentId)
 * componentId : OPTIONAL : The ID of the component to compare
-* publishedVersion : OPTIONAL : if you want to compare to the version that has been published in your base.
+* publishedVersion : OPTIONAL : if you want to compare to the version that has been published in your base to your target latest version.
 
 ### Check realised for component
 
@@ -122,7 +122,12 @@ For Rules:
 * It will check each ruleComponent if it can be found (based on Name)
   * If the ruleComponent name cannot be found in the target property : return `False`
   * If the ruleComponent name is found and the settings are different : return `False`
-  * If all ruleComponent names have been found and their settings are identical : return `True` 
+  * If all ruleComponent names have been found and their settings are identical : 
+    * If ruleComponent is an event :
+      * If the rule_order attribute is the same return `True` else return `False`
+    * If the ruleComponent is an action : 
+      * If the timeout attribute is the same return `True` else return `False`
+    * neither an action or event ruleComponent : return `True` as settings are identical.
 
 For Data Elements:
 * It will check if the Data Element name can be found : return `False` if not found
