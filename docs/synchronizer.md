@@ -38,6 +38,8 @@ synchronizor = lp.Synchronizer(base='Prop1',targets=['Prop2'])
 
 ```
 
+There is a possibility to setup some rules so you can filter when migrating from one property to another. See [dynamic Filtering](#dynamic-component-filter)
+
 ## SyncComponent Method
 
 The `syncComponent` method can take 3 arguments.
@@ -165,6 +167,55 @@ An example on how the data element looks like:
 ]
 ```
 **NOTE** : The JSON representation should be flawless and the regular expression used as well, otherwise the script can break trying to decrypting it. 
+
+### Dynamic Component Filtering options
+
+#### Data Elements
+
+You can pass a Data Element name during the instanciation of the `Synchronizer`. This data element needs to resides in the base property and it will contain a valid JSON that will describe the different rules that will apply during the synchronization.\
+The format of the JSON representation for the data element is [explained above](#dynamic-component-filter)\
+The data element name needs to be passed in the `dynamicRuleComponent` parameter.
+
+Hence the code would look like this for instantiation:
+```python
+
+import launchpy as lp
+
+lp.importConfigFile('config.json')
+synchronizor = lp.Synchronizer(base='Prop1',targets=['Prop2'],dynamicRuleComponent='dataElementName')
+
+```
+
+#### Code
+
+You can also provide the JSON representation of the filter used for synchronization via a dictionary, directly in your notebook.\
+A method called `dynamicFiltering` allows you to load a dynamic filter directly within the python application and do not require the creation of data element for it.
+
+So after instantiation, you can now pass the rule such as: 
+
+```python
+import launchpy as lp
+
+lp.importConfigFile('config.json')
+synchronizor = lp.Synchronizer(base='Prop1',targets=['Prop2'])
+myRules = [
+  {
+    'name':'myName',
+    'targetProperties':'.+ some condition .+ ',
+    'exclComponents':[
+        'DE - My Data Element',
+        'RL - My Rule'
+      ],
+    'inclComponents':[
+        'somecomponent name'
+      ]
+  }
+]
+
+synchronizor.dynamicFiltering(myRules)
+
+```
+
 
 ### Usage of Dynamic Component filter
 

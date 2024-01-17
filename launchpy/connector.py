@@ -283,7 +283,7 @@ class AdobeRequest:
             status_code = {'error': 'Request Error'}
         return status_code
 
-    def deleteData(self, endpoint: str, params: dict = None, headers: dict = None, *args, **kwargs):
+    def deleteData(self, endpoint: str, params: dict = None, data=None, headers: dict = None, *args, **kwargs):
         """
         Abstraction for deleting data
         """
@@ -294,6 +294,10 @@ class AdobeRequest:
             res = requests.delete(endpoint, headers=headers)
         elif params is not None:
             res = requests.delete(endpoint, headers=headers, params=params)
+        elif params is None and data is not None:
+            res = requests.delete(endpoint, headers=headers, data=json.dumps(data))
+        elif params is not None and data is not None:
+            res = requests.delete(endpoint, headers=headers, params=params, data=json.dumps(data))
         try:
             status_code = res.status_code
         except:

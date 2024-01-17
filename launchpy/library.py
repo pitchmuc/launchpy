@@ -176,6 +176,24 @@ class Library:
         res = self.connector.patchData(self.endpoint +url, data=obj)
         return res
 
+    def removeDataElements(self,data_element_ids:list)->dict:
+        """
+        Take a list of data elements and remove them from the library.
+        Arguments:
+            data_element_ids: REQUIRED : list of data elements id
+        """
+        if self.state != 'development':
+            print('State is not development, cannot update relationships')
+            return None
+        obj = {'data': []}
+        if type(data_element_ids) == str:
+            data_element_ids = data_element_ids.split(' ')
+        for ids in data_element_ids:
+            obj['data'].append({"id": ids,"type": "data_elements"})
+        url =  f'/libraries/{self.id}/relationships/data_elements'
+        print(obj)
+        res = self.connector.deleteData(self.endpoint +url, data=obj)
+        return res
 
     def addRules(self, rules_ids: list)->dict:
         """
@@ -215,6 +233,25 @@ class Library:
         url = f'/libraries/{self.id}/relationships/rules'
         res = self.connector.patchData(self.endpoint + url, data=obj)
         return res
+
+    def removeRules(self,rules_ids:list)->dict:
+        """
+        Remove the rules that are passed. 
+        Arguments:
+            rules_ids: REQUIRED : list of rules id
+        """
+        if self.state != 'development':
+            print('State is not development, cannot add relationships')
+            return None
+        obj = {'data': []}
+        if type(rules_ids) == str:
+            rules_ids = rules_ids.split(' ')
+        for ids in rules_ids:
+            obj['data'].append({"id": ids, "type": "rules"})
+        url = f'/libraries/{self.id}/relationships/rules'
+        res = self.connector.deleteData(self.endpoint + url, data=obj)
+        return res
+
 
     def addExtensions(self, extensions_ids: list)->object:
         """
@@ -291,9 +328,11 @@ class Library:
         new_env = self.connector.getData(self.endpoint+path) 
         return new_env
     
-    def updateLibrary(self)->dict:
+    def updateLibrary(self,empty:bool=False)->dict:
         """
         Update the library
+        Arguments:
+            empty : OPTIONAL : You want to empty the library.
         """
         path = f'/libraries/{self.id}'
         data = {
@@ -305,6 +344,21 @@ class Library:
                     }
                 }
                 }
+        if True:
+            data['relationships'] = {
+                "data_elements": {
+                    "data": []
+                },
+                "rules": {
+                    "data": []
+                },
+                "extensions": {
+                    "data": []
+                },
+                "environment":{
+                    "data":{},
+                }
+            }
         res = self.connector.patchData(self.endpoint+path,data=data)
         return res
 

@@ -48,7 +48,7 @@ class Property:
         self._Rules = data['links']['rules']
         self._RuleComponents = 'https://reactor.adobe.io/properties/' + \
             self.id + '/rule_components'
-        self._Host = 'https://reactor.adobe.io//properties/' + \
+        self._Host = 'https://reactor.adobe.io/properties/' + \
             data['id']+'/hosts'
         self._Note = 'https://reactor.adobe.io/notes/'
         self._Environments = data['links']['environments']
@@ -506,6 +506,20 @@ class Property:
                                                for data in res] for val in sublist]
             data = data + append_data
         return data
+
+    def getLibrary(self,libraryId:str=None)->dict:
+        """
+        get a library based on its ID.
+        Arguments:
+            libraryId : REQUIRED : Library ID to be retrieved
+        """
+        if libraryId is None:
+            raise ValueError("Require a library ID")
+        path = f"/libraries/{libraryId}"
+        res = self.connector.getData(self.endpoint+path)
+        if 'data' in res.keys():
+            return res['data']
+        return res
 
     def getNotes(self, data: object)->list:
         """
@@ -1144,6 +1158,35 @@ class Property:
         data = self.connector.deleteData(
             'https://reactor.adobe.io/environments/'+env_id)
         return data
+
+    def deleteLibrary(self,library:str=None,components:bool=False)->str:
+        """
+        Delete a Library based on its name or ID.
+        Arguments:
+            library : REQUIRED : Either the ID of the library or the name of the library.
+            components : OPTIONAL : If set to True, it will try to delete all components inside that library.
+        """
+        if library is None:
+            raise ValueError("Require at least library ID")
+        libraries = self.getLibraries()
+        librariesIds = [lib['id'] for lib in libraries]
+        librariesNameId = {lib['attributes']['name']:lib['id'] for lib in libraries}
+        if library in librariesIds:
+            libraryId = library
+        else:
+            libraryId = librariesNameId[library]
+        path = f"/libraries/{libraryId}"
+        if components==True:  
+            myLib = self.getLibrary(libraryId)
+            libClass = Library(myLib)
+            rules = libClass.getRules()
+            dataelements = libClass.getDataElements()
+        res = self.connector.deleteData('https://reactor.adobe.io/'+path)
+        for rule in rules:
+            self.deleteRule(rule['id'])
+        for de in dataelements:
+            self.deleteDataElement(de['id'])
+        return res
 
 def extensionsInfo(data: list)->dict:
     """

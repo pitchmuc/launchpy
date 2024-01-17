@@ -44,20 +44,6 @@ class Synchronizer:
         self.translator = Translator()
         self.translator.setBaseExtensions(self.base['extensions'],self.base['name'])
         self.translator.setBaseRules(self.base['rules'],self.base['name'])
-        self.dict_config = {}
-        if kwargs.get("dynamicRuleComponent",None) is not None:
-            configRules = [de for de in self.base['dataElements'] if de['attributes']['name'] == kwargs.get("dynamicRuleComponent",None)]
-            if len(configRules)==1:
-                configRules = configRules[0]
-            else:
-                raise ValueError("The dynamicRuleComponent is using a value that does not match any data element.")
-            codeConfig:list = json.loads(json.loads(configRules['attributes']['settings'])['source'])## list expected from the code
-            for rule in codeConfig:
-                self.dict_config[rule['targetProperties']] = {'inclComponents':[],'exclComponents':[]}
-                if 'inclComponents' in rule.keys():
-                    self.dict_config[rule['targetProperties']]['inclComponents'] += rule['inclComponents']
-                if 'exclComponents' in rule.keys():
-                    self.dict_config[rule['targetProperties']]['exclComponents'] += rule['exclComponents']
         self.targets = {}
         for target in targets:
             tmp_target = [prop for prop in properties if prop['attributes']['name'] == target]
@@ -73,19 +59,60 @@ class Synchronizer:
                 self.translator.extendRules(self.targets[target]['rules'],self.targets[target]['name'])
             else:
                 self.translator.rules[self.targets[target]['name']] = None
-        self.target_configs = {}
-        if len(self.dict_config)>0: ## verify that there are rules
-            for rule in self.dict_config.keys():
-                for target in self.targets.keys():
-                    if re.search(rule,target) is not None:
-                        if target in self.target_configs.keys():
+        if kwargs.get("dynamicRuleComponent",None) is not None:
+            configRules = [de for de in self.base['dataElements'] if de['attributes']['name'] == kwargs.get("dynamicRuleComponent",None)]
+            if len(configRules)==1:
+                configRules = configRules[0]
+            else:
+                raise ValueError("The dynamicRuleComponent is using a value that does not match any data element.")
+            codeConfig:list = json.loads(json.loads(configRules['attributes']['settings'])['source'])## list expected from the code
+            self.dynamicFiltering(codeConfig)
+
+    def dynamicFiltering(self,dynamicFilterJSON:dict,override:bool=True)->None:
+        """
+        Building the dynamic rule filtering for each of the target properties.
+        Base on this code format
+        [
+            {
+                'name':'myName',
+                'targetProperties':'.+ some condition .+ ',
+                'exclComponents':[
+                    'DE - My Data Element',
+                    'RL - My Rule'
+                ],
+                'inclComponents':[
+                    'somecomponent name'
+                ]
+            }
+        ]
+        Arguments: 
+            dynamicFilterJSON : REQUIRED : The JSON representation of your rules.
+            override : OPTIONAL : Replace the existing dynamic filtering. Default True.
+                If set to False, apply the logic on top of the existing one loaded before.
+        """
+        if override == True:
+            self.dict_config = {} ## global dynamic rule filtering
+            self.target_configs = {} ## dynamic rule filtering apply to target
+        for rule in dynamicFilterJSON:
+            self.dict_config[rule['targetProperties']] = {'inclComponents':[],'exclComponents':[]}
+            if 'inclComponents' in rule.keys():
+                self.dict_config[rule['targetProperties']]['inclComponents'] += rule['inclComponents']
+            if 'exclComponents' in rule.keys():
+                self.dict_config[rule['targetProperties']]['exclComponents'] += rule['exclComponents']
+        for rule in self.dict_config.keys():
+            for target in self.targets.keys():
+                if re.search(rule,target) is not None:
+                    if target in self.target_configs.keys():
+                        if self.dict_config[rule]['exclComponents'] not in self.target_configs[target]['exclComponents']:
                             self.target_configs[target]['exclComponents'] += deepcopy(self.dict_config[rule]['exclComponents'])
+                        if self.dict_config[rule]['inclComponents'] not in self.target_configs[target]['inclComponents']:
                             self.target_configs[target]['inclComponents'] += deepcopy(self.dict_config[rule]['inclComponents'])
-                        else:
-                            self.target_configs[target] = {
-                                'exclComponents': deepcopy(self.dict_config[rule]['exclComponents']),
-                                'inclComponents': deepcopy(self.dict_config[rule]['inclComponents'])
-                            }
+                    else:
+                        self.target_configs[target] = {
+                            'exclComponents': deepcopy(self.dict_config[rule]['exclComponents']),
+                            'inclComponents': deepcopy(self.dict_config[rule]['inclComponents'])
+                        }
+    
 
     def syncComponent(self,componentName:str=None,componentId:str=None,publishedVersion:bool=False,**kwargs)->None:
         """

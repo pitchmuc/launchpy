@@ -22,7 +22,7 @@ Here are shortlinks to the different methods explanation.
 
 ## Get methods
 
-When you have your property instance created, the methods that you may want to call first are the get methods. They never take any argument, they don’t actually need any argument.
+When you have your property instance created, the methods that you may want to call first are the get methods. They never take any argument, they don't actually need any argument.
 The only thing important to know is that you must run the getRules() method before the getRuleComponents() method.
 
 The different get methods are the following :
@@ -81,6 +81,10 @@ The different get methods are the following :
     - name : it will be matching the name as equals
     - created_at : it will be greater that this date ('2022-12-12T10:19:20.867Z')
     - updated_at : it will be greater that this date ('2022-12-12T10:19:20.867Z')
+
+* **getLibrary** : Retrieve a specific library.
+  Argument:
+  * library : REQUIRED : Either the library name or the library ID
 
 * **getNotes** : Retrieve the note associated with the object pass to the method. Returns list.
   Arguments:
@@ -190,6 +194,11 @@ The different delete methods are:
 * **deleteDataElement** : Delete a data element.  
   Arguments: 
   * dataElement_id : REQUIRED : Data Element ID that needs to be deleted
+
+* **deleteLibrary** : Delete a specific library. It only works for library in development state.
+  Arguments:
+  * library : REQUIRED : Either the library ID or the library Name
+  * components : OPTIONAL : Boolean, if set to `True`, it will try to delete the different components in that library afterwards. Only rules and data elements would be deleted, no extension.
 
 ## Update methods
 
