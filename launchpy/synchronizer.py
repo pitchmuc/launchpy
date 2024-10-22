@@ -45,6 +45,7 @@ class Synchronizer:
         self.translator.setBaseExtensions(self.base['extensions'],self.base['name'])
         self.translator.setBaseRules(self.base['rules'],self.base['name'])
         self.targets = {}
+        self.target_configs = {}
         for target in targets:
             tmp_target = [prop for prop in properties if prop['attributes']['name'] == target]
             if len(tmp_target) == 0:
