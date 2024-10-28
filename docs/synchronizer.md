@@ -241,3 +241,11 @@ The logic that will be applied during the sync is the following:
     * IF the component name is in that list **and** in the `exclComponents` list, it will **NOT** be sync
   * IF there is no list of `inclComponents` for that target property (or empty list), **and not** in the `exclComponents` list, the component will be synced
 * ELSE: it will be sync
+
+### Regular expression in Python
+
+One common issue seeing the pattern used in Regular Expression is the use of the quantifier `*` without any character before.\
+This can lead to some errors when using the following regular expression: `*some pattern*`\
+This type of pattern needs to be replaced by `.*some pattern.*`\
+
+The `*` is a quantifier that needs to have a character before it so it can know which character or pattern to repeat (or not).
