@@ -33,10 +33,10 @@ The different attributes are the following:
 
 * id : id of the library
 * name : name of the library
-* state : is it “development”, “staging” or “production” environment
+* state : is it "development", "staging" or "production" environment
 * build_required : is a build required or not (Boolean)
 * builds : The build attache to this library
-* buid_status : Is the last build has been “successful” ?
+* buid_status : Is the last build has been "successful" ?
 * relationships : the different element attached to this Library
 * _environments = a dictionary of the different environment possible.
 
@@ -45,10 +45,11 @@ The different attributes are the following:
 The get methods will enable you to retrieve the elements that have been attached to this library.
 The different get methods are the followings:
 
-* getDataElements
-* getExtensions
-* getRules
+* getDataElements : get the data element in that library
+* getExtensions : get the Extension in that library
+* getRules : get the rules in the library
 * getFullLibrary : It is a combinaison of all of the 3 above.
+* getBuilds : Retrieve the builds of that library
 
 ## Adding element to a library
 
@@ -62,7 +63,7 @@ They are the following:
 
 ## Environments settings
 
-Before you can actually start building the library and pass it from one state to another (“development” -> “staging”). You would need to set the different environments.
+Before you can actually start building the library and pass it from one state to another ("development" -> "staging"). You would need to set the different environments.
 
 The method used for that is : setEnvironments().
 It takes 2 arguments:
@@ -90,7 +91,7 @@ myLib.build() # require that you have set your environment.
 As it is your goal to publish your library, you want to transition it from the dev to the staging environment and so forth.
 In order to do that, you can use the transition() method.
 ***Note*** : You would need to build your library between 2 transition.
-At the end of the funnel, you just need to build your library when you are in the “approved” state.
+At the end of the funnel, you just need to build your library when you are in the "approved" state.
 The transition method takes 1 argument:
 
 * action : it can be either

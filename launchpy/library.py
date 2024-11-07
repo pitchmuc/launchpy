@@ -1,13 +1,14 @@
 import time
 # Non standard libraries
 from launchpy import config, connector
+from typing import Union
 
 class Library:
     """
     A class that handle the library in a Launch environment.
     """
 
-    def __init__(self, data: dict,config_object:dict=config.config_object,header:dict=config.header):
+    def __init__(self, data: Union[str,dict],config_object:dict=config.config_object,header:dict=config.header):
         """
         The instantiator for the library.
         Arguments:
@@ -19,6 +20,8 @@ class Library:
             config_object=config_object, header=header)
         self.header = self.connector.header
         self.endpoint = config.endpoints['global']
+        if type(data) == str:
+            data = self.connector.getData("https://reactor.adobe.io/libraries/"+data).get('data')
         self.id = data['id']
         self.name = data['attributes']['name']
         self.state = data['attributes']['state']
@@ -100,6 +103,23 @@ class Library:
             return dataOrigin
         self.relationships['extensions'] = data
         return data
+    
+    def getBuilds(self)->list:
+        """
+        Retrieve the last builds.
+        Return a list of build
+        """
+        params = {'page[number]':1}
+        res = self.connector.getData(self._Builds,params=params)
+        builds = res.get('data',[])
+        next_page = res.get('meta',{}).get('pagination',{}).get('next_page',None)
+        while next_page is not None:
+            params['page[number]'] +=1
+            res = self.connector.getData(self._Builds,params=params)
+            builds += res.get('data',[])
+            next_page = res.get('meta',{}).get('pagination',{}).get('next_page',None)
+        return builds
+
 
     def getRules(self,page:int=0,pageSize:int=50,origin:bool=True)->list:
         """
@@ -296,7 +316,7 @@ class Library:
         Save the different environments ids available. 
         It is required to use the library class.
         Arguments : 
-            environments_list : REQUIRED : list of environment retrieved by the getEnvironment method
+            environments_list : REQUIRED : list of environment retrieved by the getEnvironments method
             dev_name : OPTIONAL : Name of your dev environment. If not defined, will take the first dev environment.
         """
         for env in environments_list:

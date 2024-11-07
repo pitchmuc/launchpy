@@ -99,8 +99,15 @@ class Property:
         """
         Retrieve the environment sets for this property
         """
+        params = {"page[number]":1}
         env = self.connector.getData(self._Environments)
         data = env['data']  # skip meta for now
+        next_page = env.get('meta',{}).get('pagination',{}).get('next_page',None)
+        while next_page is not None:
+            params['page[number]'] = next_page
+            env = self.connector.getData(self._Environments,params=params)
+            data += env.get('data',[])
+            next_page = env.get('meta',{}).get('pagination',{}).get('next_page',None)
         return data
 
     def getHost(self)->object:
@@ -1187,6 +1194,22 @@ class Property:
         for de in dataelements:
             self.deleteDataElement(de['id'])
         return res
+    
+    def getProductionEndpoint(self)->dict:
+        """
+        Returns the production library URL to use on the website
+        """
+        envs = self.getEnvironments()
+        prod = [env for env in envs if env['attributes']['stage'] == 'production'][0]
+        return prod['meta']['script_sources'][0]["license_path"]
+
+    def getStagingEndpoint(self)->dict:
+        """
+        Returns the staging library URL to use on the website
+        """
+        envs = self.getEnvironments()
+        staging = [env for env in envs if env['attributes']['stage'] == 'staging'][0]
+        return staging['meta']['script_sources'][0]["license_path"]
 
 def extensionsInfo(data: list)->dict:
     """

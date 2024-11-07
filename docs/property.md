@@ -98,6 +98,10 @@ The different get methods are the following :
   Arguments:
   * element : REQUIRED : the element definition dictionary
 
+* **getProductionEndpoint** : Get the URL for the production library
+
+* **getStagingEndpoint** : Get the URL for the staging library
+
 
 ## Create methods
 
