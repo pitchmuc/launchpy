@@ -265,9 +265,9 @@ class Property:
         """
         filters = {}
         if name != None:
-            filters['filter[name]=CONTAINS '] = f"EQ {name}"
+            filters['filter[name]'] = f"EQ {name}"
         if name_contains != None:
-            filters['filter[name]=CONTAINS '] = f"CONTAINS {name_contains}"
+            filters['filter[name]'] = f"CONTAINS {name_contains}"
         if dirty != None:
             filters['filter[dirty]'] = f"EQ {str(dirty).lower()}"
         if enabled != None:
