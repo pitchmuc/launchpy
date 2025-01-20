@@ -37,7 +37,7 @@ class Synchronizer:
             raise KeyError("The base property name has not been found in your account")
         self.base = {}
         self.base["name"] = base
-        self.base["api"] = Property(base_property[0])
+        self.base["api"]:Property = Property(base_property[0])
         self.base['rules'] = self.base['api'].getRules()
         self.base['dataElements'] = self.base['api'].getDataElements()
         self.base['extensions'] = self.base['api'].getExtensions()
@@ -352,6 +352,26 @@ class Synchronizer:
                 self.targets[target]['library'].updateDataElements(existingDataElements)
             if len(newDataElements)>0:
                 self.targets[target]['library'].addDataElements(newDataElements)
+
+    def upgradeTargetExtension(self,extensionName:str=None,platform:str="web")->dict:
+        """
+        Upgrade the name extension in the target properties.
+        Arguments:
+            extensionName : REQUIRED : The name of the extension to upgrade.
+                                        ex : "core" or "adobe-analytics"
+            platform : OPTIONAL : If you want to update the extension of a specific platform (default "web")
+        """
+        if extensionName is None:
+            raise ValueError("Require an extension name")
+        for prop, target in self.targets:
+            try:
+                extensionUpdate = target['api'].checkExtensionUpdate(extensionName)
+            except:
+                raise ValueError(f"Could not find an extension name: {extensionName}")
+            
+
+
+
 
     def renameComponent(self,old_name:str=None,new_name:str=None)->None:
         """
