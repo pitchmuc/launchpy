@@ -326,6 +326,10 @@ They are not propertly defined by the Launch API, they have some business logic 
   * save : OPTIONAL : bool, if you want to save the setting in a JS or JSON file, set it to true. (default False)
   * encoding : OPTIONAL : encoding to be used for saving the file.
 
+* **extractRuleComponents** : Extract the ruleComponents reference URL from the rule definition. It can be useful for extracting rule components from the last published rule.
+  Arguments:
+  * rule : REQUIRED : A dictionary that provide the definition of the rule.
+
 * **findRuleComponentSettingsFileName** : Return the filename use to save your custom code of your ruleComponent in a file using the extractSettings method.\
   Returns None when this is not a Custom code from CORE or Adobe Analytics. \
   Argument:
