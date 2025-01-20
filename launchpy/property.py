@@ -146,13 +146,14 @@ class Property:
             data = extensions
         return data
 
-    def checkExtensionUpdate(self, platform: str = "web", verbose: bool = False):
+    def checkExtensionUpdate(self, name:str=None, platform: str = "web", verbose: bool = False):
         """
         Returns a dictionary of extensions with their names, ids and if there is an update. 
         If there is an update available, the id returned is the latest id (to be used for installation). 
         It can be re-use for installation and for checking for update. 
         Arguments:
-            platform : REQUIRED : if you need to look for extension on a specific platform (default web).
+            name : OPTIONAL : If you want to check for a specific extension
+            platform : OPTIONAL : if you need to look for extension on a specific platform (default web).
             verbose: OPTIONAL : if set to True, will print the different name and id of the extensions checked.
         Dictionary example: 
         {'adobe-mcid':
@@ -162,13 +163,18 @@ class Property:
         }
         """
         extensions = self.getExtensions()
-        dict_extensions = {ext['attributes']['name']: {'package_id': ext['relationships']['extension_package']['data']['id'],
+        if name is None:
+            dict_extensions = {ext['attributes']['name']: {'package_id': ext['relationships']['extension_package']['data']['id'],
                                                        'update': False,
                                                        'internal_id': ext['id']
                                                        } for ext in extensions}
+        else:
+            dict_extensions = {ext['attributes']['name']: {'package_id': ext['relationships']['extension_package']['data']['id'],
+                                                       'update': False,
+                                                       'internal_id': ext['id']
+                                                       } for ext in extensions if ext['attributes']['name'] == name}
         for name in dict_extensions:
-            new_id = self._getExtensionPackage(
-                name, platform=platform, verbose=verbose)
+            new_id = self._getExtensionPackage(name, platform=platform, verbose=verbose)
             if new_id != dict_extensions[name]['package_id']:
                 dict_extensions[name]['package_id'] = new_id
                 dict_extensions[name]['update'] = True
