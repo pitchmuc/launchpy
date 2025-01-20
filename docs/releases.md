@@ -7,7 +7,11 @@ This has been started after the 0.3.0 release.\
 * adding a `getBuilds` method on the `Library` class instance
 * extend support for pagination on `getEnvironments`
 * adding `getProductionEndpoint` and `getStagingEndpoint` to retrieve the URL to use on websites
-* support the instantiation of the `Library` class via a single libraryId string. 
+* support the instantiation of the `Library` class via a single libraryId string.\
+Patch:
+* adding a name parameter for the `checkExtensionUpdate` method
+* adding the `extractRuleComponents` method in property.
+
 
 ## 0.4.3
 * Refactor `Translator` class for removing `pandas` dependency\

@@ -310,6 +310,27 @@ class Property:
                 'url': rule['links']['rule_components']
             }
         return data
+    
+    def extractRuleComponents(self,rule:dict=None)->list:
+        """
+        Extract the rule component based on the rule definition.
+        Arguments:
+            rule : REQUIRED : The rule definition
+        """
+        if rule is None:
+            raise ValueError("No rule definition provided")
+        params={'page[number]':0}
+        rc_endpoint = rule['relationships']['rule_components']['links']['related']
+        page1 = self.getRessource(rc_endpoint)
+        data = page1.get('data',{})
+        next_page = page1.get('meta',{}).get('pagination',{}).get('next_page',None)
+        while next_page is not None:
+            params['page[number]'] = next_page
+            pageN = self.connector.getData(rc_endpoint,params=params)
+            data += pageN.get('data',[])
+            next_page = pageN.get('meta',{}).get('pagination',{}).get('next_page',None)
+        return data
+
 
     def getRuleComponents(self, verbose:bool=False,**kwargs)->dict:
         """
