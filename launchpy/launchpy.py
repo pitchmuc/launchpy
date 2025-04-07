@@ -460,7 +460,7 @@ class Translator:
         if property_name is None:
             raise ValueError("Require the main property name")
         self.baseRuleIdName[ruleId] = ruleName
-        self.rules[ruleName][property_name] = ruleId
+        self.rules[ruleName] = {property_name : ruleId}
         
 
     def extendRules(self, new_property_rules: list, new_prop_name: str):
