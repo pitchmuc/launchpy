@@ -12,6 +12,7 @@ Patch:
 * adding a name parameter for the `checkExtensionUpdate` method
 * adding the `extractRuleComponents` method in property.
 * Fixing `syncComponent` method when published version name is different than live version.
+* Supporting `timeout` on synchronizer to override the existing setup during synchronization.
 
 
 ## 0.4.3

@@ -125,7 +125,10 @@ class Synchronizer:
             componentName : REQUIRED : the name of the component to sync
             componentID : REQUIRED : the id of the component to sync
             publishedVersion : OPTIONAL : if you want to take the version that has been published
+        possible kwargs:
+            timeout : OPTIONAL : The timeout to be used for the rule component. If not provided, the existing timeout will be used.
         """
+        timeout = kwargs.get('timeout',None)
         if componentName is None and componentId is None:
             raise ValueError('Require a component Name of a component ID')
         cmp_base=None
@@ -257,6 +260,8 @@ class Synchronizer:
                             except:
                                 raise KeyError("Could not translate the component. Please check if your extensions are aligned in the properties.")
                             translatedComponent['rule_setting']['data'][0]['id'] = targetRuleId
+                            if timeout is not None:
+                                translatedComponent['timeout'] = timeout
                             targetRuleComponent = self.targets[target]['api'].createRuleComponent(
                                 name=translatedComponent['name'],
                                 settings = translatedComponent['settings'],
@@ -287,6 +292,8 @@ class Synchronizer:
                             except:
                                 raise KeyError("Could not translate the component. Please check if your extensions are aligned in the properties.")
                             translatedComponent['rule_setting']['data'][0]['id'] = targetRuleId
+                            if timeout is not None:
+                                translatedComponent['timeout'] = timeout
                             targetRuleComponent = self.targets[target]['api'].createRuleComponent(
                                 name=translatedComponent['name'],
                                 settings = translatedComponent['settings'],
