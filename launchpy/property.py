@@ -63,7 +63,7 @@ class Property:
         return str(json.dumps(self.definition, indent=4))
     
 
-    def _getExtensionPackage(self, ext_name: str, platform: str = "web", verbose: bool = False)->dict:
+    def _getExtensionPackageIdByName(self, ext_name: str, platform: str = "web", verbose: bool = False)->dict:
         """
         Retrieve extension id of the catalog from an extension name.
         It will be used later on to check for available updates. 
@@ -82,6 +82,23 @@ class Property:
             print('extension name : ' + str(data['attributes']['name']))
             print('extension id : ' + str(data['id']))
         return extension_id
+    
+    def getExtensionPackage(self, extension_id: str = None, verbose: bool = False)->dict:
+        """
+        Retrieve the extension package information based on the extension id.
+        Arguments:
+            extension_id : REQUIRED : ID of the extension package to retrieve
+            verbose : OPTIONAL : if set to True, will print the extension name and id.
+        """
+        if extension_id is None:
+            raise ValueError("You must provide an extension id")
+        path = f'/extension_packages/{extension_id}'
+        res_ext = self.connector.getData(self.endpoint+path)
+        data = res_ext['data']
+        if verbose:
+            print('extension name : ' + str(data['attributes']['name']))
+            print('extension id : ' + str(data['id']))
+        return data
 
     def getRessource(self,res_url: str = None, params: dict = None):
         """
@@ -145,6 +162,16 @@ class Property:
         except:
             data = extensions
         return data
+    
+    def getExtension(self,extensionId:str=None)-> object:
+        """
+        Retrieve the definiton of the extension based on its ID.
+        Arguments:
+            extensionId : REQUIRED : ID of the extension to retrieve
+        """
+        path = f"/extensions/{extensionId}"
+        extensions = self.connector.getData(self.endpoint+path)
+        return extensions['data']
 
     def checkExtensionUpdate(self, name:str=None, platform: str = "web", verbose: bool = False):
         """
@@ -174,7 +201,7 @@ class Property:
                                                        'internal_id': ext['id']
                                                        } for ext in extensions if ext['attributes']['name'] == name}
         for name in dict_extensions:
-            new_id = self._getExtensionPackage(name, platform=platform, verbose=verbose)
+            new_id = self._getExtensionPackageIdByName(name, platform=platform, verbose=verbose)
             if new_id != dict_extensions[name]['package_id']:
                 dict_extensions[name]['package_id'] = new_id
                 dict_extensions[name]['update'] = True
@@ -188,24 +215,55 @@ class Property:
             extension_id : REQUIRED : Your internal ID for this extension in your property (EX....)
             package_id : REQUIRED : new extension id for the extension (EP...)
         """
-        data = {'data': {
-            'id': extension_id,
-                "type": "extensions",
-                "relationships": {"extension_package": {
-                    "links": {
-                        "related": "https://reactor.adobe.io/extensions/"+extension_id+"/extension_package"
-                    },
-                    "data": {
-                        "id": package_id,
-                        "type": "extension_packages"
+        if extension_id is None:
+            raise ValueError("You must provide an extension id")
+        if package_id is None:
+            raise ValueError("You must provide a package id")
+        myExtension = self.getExtension(extension_id)
+        latest_package_id = myExtension.get('meta').get('upgrade_extension_package_id',None)
+        current_package_id = myExtension['relationships']['extension_package']['data']['id']
+        if latest_package_id is None:
+            settings = myExtension.get('attributes',{}).get('settings','{}')
+            attributes = {'delegate_descriptor_id': f'{myExtension.get("attributes",{}).get("name")}::extensionConfiguration::config','settings':settings}
+            data = {'data': {
+                    'id': extension_id,
+                        "type": "extensions",
+                        "relationships": {"extension_package": {
+                            "links": {
+                                "related": "https://reactor.adobe.io/extensions/"+extension_id+"/extension_package"
+                            },
+                            "data": {
+                                "id": package_id,
+                                "type": "extension_packages"
+                            }
+                        }
+                        },
+                        'meta': {'upgrade_extension_package_id': package_id}
+                        }
                     }
-                }
-                },
-                'meta': {
-                    'upgrade_extension_package_id': package_id
-                }
-                }
-                }
+        else:
+            if latest_package_id != current_package_id: ##using a different package that the one provided
+                settings = myExtension.get('attributes',{}).get('settings','{}')
+                attributes = {'delegate_descriptor_id': f'{myExtension.get("attributes",{}).get("name")}::extensionConfiguration::config','settings':settings}
+                data = {'data': {
+                    "attributes": attributes,
+                    'id': extension_id,
+                        "type": "extensions",
+                        "relationships": {"extension_package": {
+                            "links": {
+                                "related": "https://reactor.adobe.io/extensions/"+extension_id+"/extension_package"
+                            },
+                            "data": {
+                                "id": latest_package_id,
+                                "type": "extension_packages"
+                            }
+                            }
+                        }
+                        }
+                    }
+            else:
+                raise ValueError("Extension already up to date")
+
         path = f"/extensions/{extension_id}"
         res = self.connector.patchData(
             self.endpoint+path, data=data)
@@ -936,7 +994,7 @@ class Property:
             raise ValueError('Require a list of revisions')
         publishedIndexVersions:dict = {index:rev['attributes']['revision_number'] for index, rev in enumerate(revisions) if rev['attributes']['published'] == True}
         if len(publishedIndexVersions) == 0:
-            raise IndexError("You want to retrieve a published version of the component.\nBut no published version can be found. Please check if your component has been published")
+            raise IndexError(f"You want to retrieve a published version of the component.\nBut no published version can be found in {self.name}. Please check if your component has been published")
         maxRevisionIndex = [index for index,value in publishedIndexVersions.items() if value == max(list(publishedIndexVersions.values()))][0]
         return revisions[maxRevisionIndex]
 
@@ -1127,6 +1185,8 @@ class Property:
         argument: 
             extension_id : REQUIRED : the extension id
             attr_dict : REQUIRED : dictionary that will be passed to Launch for update
+        possible kwargs:
+            upgradeLatest : OPTIONAL : Boolean if you want to update the relationships of the extension to the new version
         """
         obj = {
             "data": {
@@ -1135,8 +1195,7 @@ class Property:
                 "type": "extensions"
             }
         }
-        extensions = self.connector.patchData(
-            config.endpoints['global']+'/extensions/'+extension_id, data=obj)
+        extensions = self.connector.patchData(self.endpoint+'/extensions/'+extension_id, data=obj)
         try:
             data = extensions['data']
         except:

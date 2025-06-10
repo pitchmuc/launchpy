@@ -104,36 +104,44 @@ Arguments:
 
 ## checkComponentSync
 
-This method will allow you to check if a component is the same in the target properties, when compare to the base.
-It works on Rules, Data Elements, Extensions, with their name or ID.
-It is returning a dictionary with the name of the target properties as keys and `True` when the component is the same, `False` when the component is **not** the same.
+Check if the component,from the base property, is synced to the different target properties.
+It can also check for the Extensions.\
+It will return a dictionary with the key being the target property and the value being the result of the evaluation, such as {targetProperty: 'similar'} when component have same settings or {targetPropery : '<difference>'} when component do not have same settings.\
+See below for differences.\
 Arguments:
-* componentName : REQUIRED : The name of the component to compare (can be replaced by componentId)
-* componentId : OPTIONAL : The ID of the component to compare
-* publishedVersion : OPTIONAL : if you want to compare to the version that has been published in your base to your target latest version.
+* componentName : REQUIRED : the name of the component to compare
+* componentID : REQUIRED : the id of the component to compare
+* publishedVersion : OPTIONAL : if you want to compare to the version that has been published in your base vs the published version of your target.
+possible kwargs:
+* action_setting_path : [str,list] : The dot notation of the paths you want to verify for the settings object. ex: ["code","customAttributes"]. If not provided, the complete settings are compared.
+* condition_setting_path : [str,list] : The dot notation of the paths you want to verify for the setting object . ex: ["id",""]. If not provided, the complete settings are compared
+* event_setting_path : [str,list] : The dot notation of the paths you want to verify for the setting object . ex: ["id",""]. If not provided, the complete settings are compared
 
 ### Check realised for component
 
 The script will provide these evaluations:
 For Extensions: 
-* It will check if the same version of the extension is used (return `False` in case different versions)
-* It will check if the same settings has been applied (return `False` else `True`)
+* It will check if the extension is also present in that property. (returns the following sentence `f'Extension "{extension_name}" is not present'` if not the case )
+* It will check if the same version of the extension is used (return the following sentence  `f'Extension version is different: {version_base} vs {version_target}` in case different versions)
+* It will check if the same settings has been applied (return `'Extension settings are different'` if not the same)
 
 For Rules:
-* It will check if the rules contain the same number of ruleComponents (return `False` in case different numbers)
-* It will check each ruleComponent if it can be found (based on Name)
-  * If the ruleComponent name cannot be found in the target property : return `False`
-  * If the ruleComponent name is found and the settings are different : return `False`
-  * If all ruleComponent names have been found and their settings are identical : 
-    * If ruleComponent is an event :
-      * If the rule_order attribute is the same return `True` else return `False`
-    * If the ruleComponent is an action : 
-      * If the timeout attribute is the same return `True` else return `False`
-    * neither an action or event ruleComponent : return `True` as settings are identical.
+* It will check if the rule exist in the target property (if not, returning `"Rule does not exist in Target"`)
+* It will check if the rules contain the same number of ruleComponents (return `"The rule does not have the same number of components"` in case different numbers)
+* It will check each ruleComponent if it can be found (based on name) and generate a list of differences based on each component check:
+  * If the ruleComponent name cannot be found in the target property : return `f'component {rule-component-name} does not exist in Target'`
+  * If the ruleComponent name is found and the settings are different : return `f'<componentType> {rule-component-name} has different settings'`.\
+  ComponentType can be: `event, condition, action`\
+  The settings can be check globally or you can specify a specific part of the setting to be checked (see `possible kwargs`)
+  * if the ruleComponent are all similar, then the result will be `Similar` 
 
 For Data Elements:
-* It will check if the Data Element name can be found : return `False` if not found
-* If component Name is found and settings are the same : return `True`, else return `False`
+* It will check if the Data Element name can be found : return `f'Data Element "{data-element-name}" does not exist in Target'` if not found
+* If Data Element (based on name) is found and settings are the same : return `"Similar"`, else return `"Data Element settings are different"`
+
+#### Similar vs Same
+The idea of checking the similarity of 2 components is partially done as not everything can be tested during the check.\
+For that reason, the wording `Similar` is used and not `Same` as they are not technically the same. (different ids, different things.)
 
 ## Dynamic Component filter
 

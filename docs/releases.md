@@ -3,6 +3,12 @@
 This page gathered the changes made between version of the launchpy module.\
 This has been started after the 0.3.0 release.\
 
+## 0.4.5
+* adding `getExtension` in `Property` class
+* improve `upgradeExtension` in `Property` class
+* improving `checkComponentSync` in `Synchronizer` class
+* improving `getLatestPublishedVersion` with error message defining which property is failing
+
 ## 0.4.4
 * adding a `getBuilds` method on the `Library` class instance
 * extend support for pagination on `getEnvironments`

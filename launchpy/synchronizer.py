@@ -6,6 +6,7 @@ from .library import Library
 from .launchpy import Translator, copySettings
 from collections import defaultdict
 from copy import deepcopy
+from aepp import som
 
 class Synchronizer:
     """
@@ -114,6 +115,68 @@ class Synchronizer:
                             'inclComponents': deepcopy(self.dict_config[rule]['inclComponents'])
                         }
     
+    def __prepareBaseComponent__(self,componentName:str=None,componentId:str=None,publishedVersion:bool=False)->dict:
+        """
+        Prepare the base component to be used in the syncComponent method.
+        Arguments:
+            componentName : REQUIRED : the name of the component to sync
+            componentID : REQUIRED : the id of the component to sync
+            publishedVersion : OPTIONAL : if you want to take the version that has been published
+        """
+        cmp_base=None
+        if componentId is not None:
+            if componentId.startswith('DE'): ## if data element
+                componentBase = [de for de in self.base['dataElements'] if de['id'] == componentId]
+                if len(componentBase)==0:
+                    raise KeyError("Component ID cannot be found")
+                cmp_base = componentBase[0]
+            elif componentId.startswith('RL'): ## if a rule
+                componentBase = [de for de in self.base['rules'] if de['id'] == componentId]
+                if len(componentBase)==0:
+                    raise KeyError("Component ID cannot be found")
+                cmp_base = componentBase[0]
+            elif componentId.startswith('EX'): ## if an extension
+                componentBase = [ext for ext in self.base['extensions'] if ext['id'] == componentId]
+                if len(componentBase)==0:
+                    raise KeyError("Component ID cannot be found")
+                cmp_base = componentBase[0]
+        if componentId is None and componentName is not None: ## If only componentName
+            for rule in self.base['rules']:
+                if componentName == rule['attributes']['name']:
+                    cmp_base = rule
+            if cmp_base is None:
+                for de in self.base['dataElements']:
+                    if componentName == de['attributes']['name']:
+                        cmp_base = de
+            if cmp_base is None:
+                for ext in self.base['extensions']:
+                    if componentName == ext['attributes']['name']:
+                        cmp_base = ext
+        ## In case we do not find any match
+        if cmp_base is None:
+            raise KeyError("The component ID or component Name cannot be matched in your template property")
+        ## Here creating a dictionary that provide all information related to your component 
+        cmp_baseDict = {'id':cmp_base['id'],'name':cmp_base['attributes']['name'],'component':cmp_base,'copy':copySettings(cmp_base)}
+        if cmp_baseDict['component']['type'] == 'extensions':
+            cmp_baseDict['version'] = cmp_base['attributes'].get('version','1.0.0')
+        if publishedVersion and cmp_baseDict['component']['type'] not in ['extensions']:
+            data = self.base['api'].getRevisions(cmp_baseDict['component'])
+            publishedVersion = self.base['api'].getLatestPublishedVersion(data) 
+            if publishedVersion['attributes']['name'] != cmp_baseDict['name']:
+                ## Updating mapping table with old name when published version name diff than last versio name.
+                if cmp_baseDict['component']['type'] == 'rules':
+                    self.translator.extendBaseRules(
+                    ruleName=publishedVersion['attributes']['name'],
+                    ruleId=publishedVersion['id'],
+                    property_name=self.base["name"])
+                    self.base['rules'].append(publishedVersion)
+                if cmp_baseDict['component']['type'] == 'data_elements':
+                    self.base['dataElements'].append(publishedVersion)
+            cmp_baseDict['id'] = publishedVersion['id']
+            cmp_baseDict['name'] = publishedVersion['attributes']['name']
+            cmp_baseDict['component'] = publishedVersion
+            cmp_baseDict['copy'] = copySettings(publishedVersion)
+        return cmp_baseDict
 
     def syncComponent(self,componentName:str=None,componentId:str=None,publishedVersion:bool=False,**kwargs)->None:
         """
@@ -131,48 +194,7 @@ class Synchronizer:
         timeout = kwargs.get('timeout',None)
         if componentName is None and componentId is None:
             raise ValueError('Require a component Name of a component ID')
-        cmp_base=None
-        if componentId is not None:
-            if componentId.startswith('DE'): ## if data element
-                componentBase = [de for de in self.base['dataElements'] if de['id'] == componentId]
-                if len(componentBase)==0:
-                    raise KeyError("Component ID cannot be found")
-                cmp_base = componentBase[0]
-            elif componentId.startswith('RL'): ## if a rule
-                componentBase = [de for de in self.base['rules'] if de['id'] == componentId]
-                if len(componentBase)==0:
-                    raise KeyError("Component ID cannot be found")
-                cmp_base = componentBase[0]
-        if componentId is None and componentName is not None: ## If only componentName
-            for rule in self.base['rules']:
-                if componentName == rule['attributes']['name']:
-                    cmp_base = rule
-            if cmp_base is None:
-                for de in self.base['dataElements']:
-                    if componentName == de['attributes']['name']:
-                        cmp_base = de
-        ## In case we do not find any match
-        if cmp_base is None:
-            raise KeyError("The component ID or component Name cannot be matched in your template property")
-        ## Here creating a dictionary that provide all information related to your component 
-        cmp_baseDict = {'id':cmp_base['id'],'name':cmp_base['attributes']['name'],'component':cmp_base,'copy':copySettings(cmp_base)}
-        if publishedVersion:
-            data = self.base['api'].getRevisions(cmp_baseDict['component'])
-            publishedVersion = self.base['api'].getLatestPublishedVersion(data) 
-            if publishedVersion['attributes']['name'] != cmp_baseDict['name']:
-                ## Updating mapping table with old name when published version name diff than last versio name.
-                if cmp_baseDict['component']['type'] == 'rules':
-                    self.translator.extendBaseRules(
-                    ruleName=publishedVersion['attributes']['name'],
-                    ruleId=publishedVersion['id'],
-                    property_name=self.base["name"])
-                    self.base['rules'].append(publishedVersion)
-                if cmp_baseDict['component']['type'] == 'data_elements':
-                    self.base['dataElements'].append(publishedVersion)
-            cmp_baseDict['id'] = publishedVersion['id']
-            cmp_baseDict['name'] = publishedVersion['attributes']['name']
-            cmp_baseDict['component'] = publishedVersion
-            cmp_baseDict['copy'] = copySettings(publishedVersion)
+        cmp_baseDict = self.__prepareBaseComponent__(componentName=componentName,componentId=componentId,publishedVersion=publishedVersion)
         ## handling the data element
         if cmp_baseDict['component']['type'] == 'data_elements':
             for target in list(self.targets.keys()):
@@ -206,7 +228,7 @@ class Synchronizer:
                         self.targets[target]['libraryStack']['dataElements'].append(comp)
                         self.targets[target]['dataElements'].append(comp)
                     else:
-                        index,old_component = [(index,de) for index,de in enumerate(self.targets[target]['dataElements']) if de['attributes']['name'] == cmp_baseDict['name']][0]
+                        index,old_component = [(index,de) for index,de in enumerate(self.targets[target]['dataElements']) if de.get('attributes',{}).get('name') == cmp_baseDict['name']][0]
                         attributes = {
                             "name" : translatedComponent['name'],
                             "enabled" : translatedComponent["enabled"],
@@ -370,14 +392,17 @@ class Synchronizer:
         """
         if extensionName is None:
             raise ValueError("Require an extension name")
-        for prop, target in self.targets:
+        for prop, target in self.targets.items():
             try:
                 extensionUpdate = target['api'].checkExtensionUpdate(extensionName)
+                for extName, extUpdateDict in extensionUpdate.items():
+                    if extUpdateDict["update"]:
+                        res = target['api'].upgradeExtension(extUpdateDict['internal_id'],extUpdateDict["package_id"])
+                        index = [index for index, ext in enumerate(target['extensions']) if ext['attributes']['name'] == extName]
+                        del self.targets[prop]['extensions'][index]
+                        self.targets[prop]['extensions'].append(res)
             except:
                 raise ValueError(f"Could not find an extension name: {extensionName}")
-            
-
-
 
 
     def renameComponent(self,old_name:str=None,new_name:str=None)->None:
@@ -423,79 +448,34 @@ class Synchronizer:
         """
         Check if the component,from the base property, is synced to the different target properties.
         It can also check for the Extensions.
-        It will returned {targetProperty: True} when component have same settings or {targetPropery : False} when component do not have same settings.
+        It will return a dictionary with the key being the target property and the value being the result of the evaluation, such as {targetProperty: 'similar'} when component have same settings or {targetPropery : False} when component do not have same settings.
         Arguments:
             componentName : REQUIRED : the name of the component to compare
             componentID : REQUIRED : the id of the component to compare
-            publishedVersion : OPTIONAL : if you want to compare to the version that has been published in your base
+            publishedVersion : OPTIONAL : if you want to compare to the version that has been published in your base vs the published version of your target.
+        possible kwargs:
+            action_setting_path : [str,list] : The dot notation of the paths you want to verify for the settings object. ex: ["code","customAttributes"]. If not provided, the complete settings are compared.
+            condition_setting_path : [str,list] : The dot notation of the paths you want to verify for the setting object . ex: ["id",""]. If not provided, the complete settings are compared
+            event_setting_path : [str,list] : The dot notation of the paths you want to verify for the setting object . ex: ["id",""]. If not provided, the complete settings are compared
         """
         if componentName is None and componentId is None:
             raise ValueError('Require a component Name of a component ID')
-        cmp_base=None
-        if componentId is not None:
-            if componentId.startswith('DE'): ## if data element
-                componentBase = [de for de in self.base['dataElements'] if de['id'] == componentId]
-                if len(componentBase)==0:
-                    raise KeyError("Component ID cannot be found")
-                cmp_base = componentBase[0]
-            elif componentId.startswith('RL'): ## if a rule
-                componentBase = [de for de in self.base['rules'] if de['id'] == componentId]
-                if len(componentBase)==0:
-                    raise KeyError("Component ID cannot be found")
-                cmp_base = componentBase[0]
-            elif componentId.startswith('EX'): ## if an extension
-                componentBase = [ext for ext in self.base['extensions'] if ext['id'] == componentId]
-                if len(componentBase)==0:
-                    raise KeyError("Component ID cannot be found")
-                cmp_base = componentBase[0]
-        if componentId is None and componentName is not None: ## If only componentName
-            for rule in self.base['rules']:
-                if componentName == rule['attributes']['name']:
-                    cmp_base = rule
-            if cmp_base is None: ## data elements
-                for de in self.base['dataElements']:
-                    if componentName == de['attributes']['name']:
-                        cmp_base = de
-            if cmp_base is None: ## extensions
-                for ext in self.base['extensions']:
-                    if componentName == ext['attributes']['name']:
-                        cmp_base = ext
-        ## In case we do not find any match
-        if cmp_base is None:
-            raise KeyError("The component ID or component Name cannot be matched in your template property")
-        ## Here creating a dictionary that provide all information related to your component 
-        cmp_baseDict = {'id':cmp_base['id'],'name':cmp_base['attributes']['name'],'component':cmp_base,'copy':copySettings(cmp_base)}
-        if publishedVersion:
-            data = self.base['api'].getRevisions(cmp_baseDict['component'])
-            publishedVersion = self.base['api'].getLatestPublishedVersion(data) 
-            if publishedVersion['attributes']['name'] != cmp_baseDict['name']:
-                ## Updating mapping table with old name when published version name diff than last version name.
-                if cmp_baseDict['component']['type'] == 'rules':
-                    self.translator.extendBaseRules(
-                    ruleName=publishedVersion['attributes']['name'],
-                    ruleId=publishedVersion['id'],
-                    property_name=self.base["name"])
-                    self.base['rules'].append(publishedVersion)
-                if cmp_baseDict['component']['type'] == 'data_elements':
-                    self.base['dataElements'].append(publishedVersion)
-                if cmp_baseDict['component']['type'] == 'extensions':
-                    self.base['extensions'].append(publishedVersion)
-            cmp_baseDict['id'] = publishedVersion['id']
-            cmp_baseDict['name'] = publishedVersion['attributes']['name']
-            cmp_baseDict['component'] = publishedVersion
-            cmp_baseDict['copy'] = copySettings(publishedVersion)
-        dict_result = {tar:False for tar in self.targets.keys()}
+        cmp_baseDict = self.__prepareBaseComponent__(componentName=componentName,componentId=componentId,publishedVersion=publishedVersion)
+        dict_result = {tar:"" for tar in self.targets.keys()}
         if cmp_baseDict['component']['type'] == 'data_elements':
             for target in list(self.targets.keys()):
                 ## if it does not exist
-                    if cmp_baseDict['name'] not in [de.get('attributes',{}).get('name') for de in self.targets[target]['dataElements']]:
-                        dict_result[target] = False
+                if cmp_baseDict['name'] not in [de.get('attributes',{}).get('name') for de in self.targets[target]['dataElements']]:
+                    dict_result[target] = f'Data Element "{cmp_baseDict["name"]}" does not exist in Target'
+                else:
+                    index,target_de = [(index,de) for index,de in enumerate(self.targets[target]['dataElements']) if de['attributes']['name'] == cmp_baseDict['name']][0]
+                    if publishedVersion:
+                        revisions_dataElement = self.targets[target]["api"].getRevisions(target_de)
+                        target_de = self.targets[target]["api"].getLatestPublishedVersion(revisions_dataElement) 
+                    if target_de['attributes']['settings'] == cmp_baseDict['component']['attributes']['settings']:
+                        dict_result[target] = "Similar"
                     else:
-                        index,old_component = [(index,de) for index,de in enumerate(self.targets[target]['dataElements']) if de['attributes']['name'] == cmp_baseDict['name']][0]
-                        if old_component['attributes']['settings'] == cmp_baseDict['component']['attributes']['settings']:
-                            dict_result[target] = True
-                        else:
-                            dict_result[target] = False
+                        dict_result[target] = "Data Element settings are different"
         if cmp_baseDict['component']['type'] == 'rules':
             rcsLink = cmp_baseDict['component'].get('relationships',{}).get('rule_components',{}).get('links',{}).get('related')
             resResource = self.base['api'].getRessource(rcsLink)
@@ -506,53 +486,90 @@ class Synchronizer:
             for target in list(self.targets.keys()):
                 ## if rule does not exist
                 if cmp_baseDict['name'] not in [rule['attributes']['name'] for rule in self.targets[target]['rules']]:
-                    dict_result[target] = False
+                    dict_result[target] = "Rule does not exist in Target"
                 else:
                     index, targetRule = [(index,rule) for index, rule in enumerate(self.targets[target]['rules']) if rule['attributes']['name'] == cmp_baseDict['name']][0]
-                    targetRuleId = targetRule['id']
+                    if publishedVersion:
+                        revisions_targetRule = self.targets[target]["api"].getRevisions(targetRule)
+                        targetRule = self.targets[target]["api"].getLatestPublishedVersion(revisions_targetRule) 
                     rcsLinkTarget = targetRule.get('relationships',{}).get('rule_components',{}).get('links',{}).get('related')
                     resResource = self.targets[target]['api'].getRessource(rcsLinkTarget)
-                    old_components:list = resResource['data']
+                    target_rule_components:list = resResource['data']
                     #if not same amunt of rule component 
-                    if len(template_ruleComponents) != len(old_components):
-                        dict_result[target] = False
-                    dict_result[target] = False ## bydefault, there is a difference
-                    componentsDifferences = [] ## array of compontent for rule to check difference
+                    if len(template_ruleComponents) != len(target_rule_components):
+                        dict_result[target] = "The rule does not have the same number of components"
+                    componentsDifferences = [] ## list of differences for rule components for rule to check difference
                     for base_comp in template_ruleComponents:
                         checkExist = False
-                        for old_comp in old_components:
-                            if old_comp['attributes']['name'] == base_comp['attributes']['name']:
+                        for comp in target_rule_components:
+                            if comp['attributes']['name'] == base_comp['attributes']['name']:
                                 checkExist = True
-                                if old_comp['attributes']['settings'] == base_comp['attributes']['settings']:
-                                    if '::events::' in base_comp['attributes']['delegate_descriptor_id']:
-                                        if old_comp['attributes']['rule_order'] == base_comp['attributes']['rule_order']:
-                                            componentsDifferences.append(True)
-                                        else:
-                                            componentsDifferences.append(False)
-                                    elif '::actions::' in base_comp['attributes']['delegate_descriptor_id']:
-                                        if old_comp['attributes']['timeout'] == base_comp['attributes']['timeout']:
-                                            componentsDifferences.append(True)
-                                        else:
-                                            componentsDifferences.append(False)
-                                    else: ## no action no event but same settings
-                                        componentsDifferences.append(True)
-                                else: ## settings not the same
-                                    componentsDifferences.append(False)
+                                if '::events::' in base_comp['attributes']['delegate_descriptor_id']:
+                                    if comp['attributes']['rule_order'] != base_comp['attributes']['rule_order']:
+                                        componentsDifferences.append("rule_order is different")
+                                    if kwargs.get('event_setting_path',None) is not None:
+                                        list_event_path = kwargs.get('event_setting_path',None)
+                                        if type(list_event_path) == str:
+                                            list_event_path = list(list_event_path)
+                                        mySettings_base = som.Som(json.loads(base_comp['attributes']['settings']))
+                                        mySettings_target = som.Som(json.loads(comp['attributes']['settings']))
+                                        for path in list_event_path:
+                                            tmp_base = mySettings_base.get(path,'')
+                                            tmp_target = mySettings_target.get(path,'')
+                                            if tmp_base != tmp_target:
+                                                componentsDifferences.append(f'event {comp['attributes']['name']} has different settings')
+                                    else:
+                                        if base_comp['attributes']['settings'] != comp['attributes']['settings']:
+                                            componentsDifferences.append(f'event "{comp['attributes']['name']}" has different settings')
+                                elif '::conditions::' in base_comp['attributes']['delegate_descriptor_id']:
+                                    if kwargs.get('condition_setting_path',None) is not None:
+                                        list_event_path = kwargs.get('condition_setting_path',None)
+                                        if type(list_event_path) == str:
+                                            list_event_path = list(list_event_path)
+                                        mySettings_base = som.Som(json.loads(base_comp['attributes']['settings']))
+                                        mySettings_target = som.Som(json.loads(comp['attributes']['settings']))
+                                        for path in list_event_path:
+                                            tmp_base = mySettings_base.get(path,'')
+                                            tmp_target = mySettings_target.get(path,'')
+                                            if tmp_base != tmp_target:
+                                                componentsDifferences.append(f'condition {comp['attributes']['name']} has different settings')
+                                    else:
+                                        if base_comp['attributes']['settings'] != comp['attributes']['settings']:
+                                            componentsDifferences.append(f'condition "{comp['attributes']['name']}" has different settings')
+                                elif '::actions::' in base_comp['attributes']['delegate_descriptor_id']:
+                                    if comp['attributes']['timeout'] != base_comp['attributes']['timeout']:
+                                        componentsDifferences.append(f"action {comp['attributes']['name']} timeout is different")
+                                    if kwargs.get('action_setting_path',None) is not None:
+                                        list_actions_path = kwargs.get('action_setting_path',None)
+                                        if type(list_actions_path) == str:
+                                            list_actions_path = list(list_actions_path)
+                                        mySettings_base = som.Som(json.loads(base_comp['attributes']['settings']))
+                                        mySettings_target = som.Som(json.loads(comp['attributes']['settings']))
+                                        for path in list_actions_path:
+                                            tmp_base = mySettings_base.get(path,'')
+                                            tmp_target = mySettings_target.get(path,'')
+                                            if tmp_base != tmp_target:
+                                                componentsDifferences.append(f'action {comp['attributes']['name']} has different settings')
+                                    else:
+                                        if base_comp['attributes']['settings'] != comp['attributes']['settings']:
+                                            componentsDifferences.append(f'action "{comp['attributes']['name']}" has different settings')
                         if checkExist == False: ## does not exist
-                            componentsDifferences.append(False)
-                    if all(componentsDifferences):
-                        dict_result[target] = True
+                            componentsDifferences.append(f'component {base_comp['attributes']['name']} does not exist in Target')
+                    if len(componentsDifferences)>0:
+                        dict_result[target] = ','.join(componentsDifferences)
+                    else:
+                        dict_result[target] = 'Similar'
         if cmp_baseDict['component']['type'] == 'extensions':
             for target in list(self.targets.keys()):
                 if cmp_baseDict['name'] not in [ext['attributes']['name'] for ext in self.targets[target]['extensions']]:
-                    dict_result[target] = False
+                    dict_result[target] = f'Extension "{cmp_baseDict['name']}" is not present'
                 else:
                     index, extensionTarget = [(index,ext) for index, ext in enumerate(self.targets[target]['extensions']) if ext['attributes']['name'] == cmp_baseDict['name']][0]
                     if extensionTarget['attributes']['version'] != cmp_baseDict['component']['attributes']['version']:
-                        dict_result[target] = False
+                        dict_result[target] = f'Extension version is different: {cmp_baseDict['component']['attributes']['version']} vs {extensionTarget['attributes']['version']} '
                     else:
                         if extensionTarget['attributes']['settings'] != cmp_baseDict['component']['attributes']['settings']:
-                            dict_result[target] = False
+                            dict_result[target] = 'Extension settings are different'
                         else:
-                            dict_result[target] = True
+                            dict_result[target] = 'Same'
         return dict_result
