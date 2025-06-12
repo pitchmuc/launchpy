@@ -444,7 +444,7 @@ class Synchronizer:
                 self.targets[target]['libraryStack']['rules'].append(comp)
 
 
-    def checkComponentSync(self,componentName:str=None,componentId:str=None,publishedVersion:bool=False,**kwargs)->bool:
+    def checkComponentSync(self,componentName:str=None,componentId:str=None,publishedVersion:bool=False,excludeSimilar:bool=False,**kwargs)->bool:
         """
         Check if the component,from the base property, is synced to the different target properties.
         It can also check for the Extensions.
@@ -453,6 +453,7 @@ class Synchronizer:
             componentName : REQUIRED : the name of the component to compare
             componentID : REQUIRED : the id of the component to compare
             publishedVersion : OPTIONAL : if you want to compare to the version that has been published in your base vs the published version of your target.
+            excludeSimilar : OPTIONAL : If you do not want to see the result if the comparison provide a "similar" result. Similar means that the elements are about the same. Default: False. 
         possible kwargs:
             action_setting_path : [str,list] : The dot notation of the paths you want to verify for the settings object. ex: ["code","customAttributes"]. If not provided, the complete settings are compared.
             condition_setting_path : [str,list] : The dot notation of the paths you want to verify for the setting object . ex: ["id",""]. If not provided, the complete settings are compared
@@ -473,7 +474,8 @@ class Synchronizer:
                         revisions_dataElement = self.targets[target]["api"].getRevisions(target_de)
                         target_de = self.targets[target]["api"].getLatestPublishedVersion(revisions_dataElement) 
                     if target_de['attributes']['settings'] == cmp_baseDict['component']['attributes']['settings']:
-                        dict_result[target] = "Similar"
+                        if not excludeSimilar:
+                            dict_result[target] = "Similar"
                     else:
                         dict_result[target] = "Data Element settings are different"
         if cmp_baseDict['component']['type'] == 'rules':
@@ -522,6 +524,8 @@ class Synchronizer:
                                         if base_comp['attributes']['settings'] != comp['attributes']['settings']:
                                             componentsDifferences.append(f'event "{comp['attributes']['name']}" has different settings')
                                 elif '::conditions::' in base_comp['attributes']['delegate_descriptor_id']:
+                                    if comp['attributes']['timeout'] != base_comp['attributes']['timeout']:
+                                        componentsDifferences.append(f"condition {comp['attributes']['name']} timeout is different")
                                     if kwargs.get('condition_setting_path',None) is not None:
                                         list_event_path = kwargs.get('condition_setting_path',None)
                                         if type(list_event_path) == str:
@@ -558,7 +562,8 @@ class Synchronizer:
                     if len(componentsDifferences)>0:
                         dict_result[target] = ','.join(componentsDifferences)
                     else:
-                        dict_result[target] = 'Similar'
+                        if not excludeSimilar:
+                            dict_result[target] = 'Similar'
         if cmp_baseDict['component']['type'] == 'extensions':
             for target in list(self.targets.keys()):
                 if cmp_baseDict['name'] not in [ext['attributes']['name'] for ext in self.targets[target]['extensions']]:
@@ -571,5 +576,6 @@ class Synchronizer:
                         if extensionTarget['attributes']['settings'] != cmp_baseDict['component']['attributes']['settings']:
                             dict_result[target] = 'Extension settings are different'
                         else:
-                            dict_result[target] = 'Same'
+                            if not excludeSimilar:
+                                dict_result[target] = 'Similar'
         return dict_result

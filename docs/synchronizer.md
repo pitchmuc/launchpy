@@ -130,10 +130,13 @@ For Rules:
 * It will check if the rules contain the same number of ruleComponents (return `"The rule does not have the same number of components"` in case different numbers)
 * It will check each ruleComponent if it can be found (based on name) and generate a list of differences based on each component check:
   * If the ruleComponent name cannot be found in the target property : return `f'component {rule-component-name} does not exist in Target'`
+  * If the ruleComponent is an event it will check if the order of the event is different. If different, it will return: `rule_order is different`
+  * If the ruleComponent is an condition or an action it will check if the tiemout is different. If different, it will return: `f"condition|action {name} timeout is different"`
   * If the ruleComponent name is found and the settings are different : return `f'<componentType> {rule-component-name} has different settings'`.\
   ComponentType can be: `event, condition, action`\
   The settings can be check globally or you can specify a specific part of the setting to be checked (see `possible kwargs`)
-  * if the ruleComponent are all similar, then the result will be `Similar` 
+  * If the ruleComponent are all similar, then the result will be `Similar` 
+  
 
 For Data Elements:
 * It will check if the Data Element name can be found : return `f'Data Element "{data-element-name}" does not exist in Target'` if not found
