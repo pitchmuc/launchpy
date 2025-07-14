@@ -267,7 +267,11 @@ class Property:
         path = f"/extensions/{extension_id}"
         res = self.connector.patchData(
             self.endpoint+path, data=data)
-        return res
+        try:
+            data = res['data']  # skip meta for now
+        except:
+            data = res
+        return data
     
     def getProfile(self)->dict:
         """
@@ -984,20 +988,27 @@ class Property:
                 lastPage=True
         return data
 
-    def getLatestPublishedVersion(self,revisions:list=None)->dict:
+    def getLatestPublishedVersion(self,revisions:Union[list,dict]=None)->dict:
         """
         Find the latest published version of a component based on the list of revisions retrieved via getRevisions methods.
         Arguments:
-            revisions : REQUIRED : list of revisions
+            revisions : REQUIRED : list of revisions or dictionary of the component.
         """
         if revisions is None:
-            raise ValueError('Require a list of revisions')
+            raise ValueError('Require a list of revisions at least')
+        if type(revisions) == dict:
+            revisions = self.getRevisions(element=revisions)
         publishedIndexVersions:dict = {index:rev['attributes']['revision_number'] for index, rev in enumerate(revisions) if rev['attributes']['published'] == True}
+        maxVersion = max(e['attributes']['revision_number'] for e in revisions)
         if len(publishedIndexVersions) == 0:
             raise IndexError(f"You want to retrieve a published version of the component.\nBut no published version can be found in {self.name}. Please check if your component has been published")
         maxRevisionIndex = [index for index,value in publishedIndexVersions.items() if value == max(list(publishedIndexVersions.values()))][0]
-        return revisions[maxRevisionIndex]
-
+        publishedVersion = revisions[maxRevisionIndex]
+        if maxVersion == publishedVersion['attributes']['revision_number']:
+            publishedVersion['attributes']['latest'] = True
+        else:
+            publishedVersion['attributes']['latest'] = False
+        return publishedVersion
 
     def reviseDataElement(self, dataElement_id: str)->dict:
         """

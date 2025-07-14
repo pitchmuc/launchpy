@@ -128,23 +128,44 @@ For Extensions:
 For Rules:
 * It will check if the rule exist in the target property (if not, returning `"Rule does not exist in Target"`)
 * It will check if the rules contain the same number of ruleComponents (return `"The rule does not have the same number of components"` in case different numbers)
+* It will check if the enabled state is the same than your base (if not, returning `"Rule enabled status is different"`)
+* It will check if the published state is the same than your base (if not, returning `"Rule published status is different"`)
 * It will check each ruleComponent if it can be found (based on name) and generate a list of differences based on each component check:
   * If the ruleComponent name cannot be found in the target property : return `f'component {rule-component-name} does not exist in Target'`
   * If the ruleComponent is an event it will check if the order of the event is different. If different, it will return: `rule_order is different`
-  * If the ruleComponent is an condition or an action it will check if the tiemout is different. If different, it will return: `f"condition|action {name} timeout is different"`
+  * If the ruleComponent is an condition or an action it will check if the tiemout is different. If different, it will return: `f"condition|action {rule-component-name} timeout is different"`
+  * If the ruleComponent cannot be found in the target rule, it will add the following elements: `'component {rule-component-name} does not exist in Target'`
   * If the ruleComponent name is found and the settings are different : return `f'<componentType> {rule-component-name} has different settings'`.\
   ComponentType can be: `event, condition, action`\
   The settings can be check globally or you can specify a specific part of the setting to be checked (see `possible kwargs`)
   * If the ruleComponent are all similar, then the result will be `Similar` 
-  
+
 
 For Data Elements:
 * It will check if the Data Element name can be found : return `f'Data Element "{data-element-name}" does not exist in Target'` if not found
 * If Data Element (based on name) is found and settings are the same : return `"Similar"`, else return `"Data Element settings are different"`
 
+#### Additional elements
+On top of the different properties check, additional information will be provided for the base component: 
+* `base-publihsed`: If the current component check is published.\
+  **IMPORTANT NOTE**: When you using the `publishedVersion` parameter set to True, most of the element will be set to Published. In reverse, it is not because the component current version is not published that it has never been published. Use the `publishedVersion` to ensure this.
+* `base-enabled`: If the current component check is enabled. 
+* `base-state`: 
+  * `Latest`: If the component retrieved is the latest latest version
+  * `Unknown`: If the component retrieved cannot be evaluated to know if it is the latest.
+  * `Draft` : If the component retrieved is not the latest and it has not yet been published
+  * `Edited`: If the component retrieved is not the latest and has been published before.
+
 #### Similar vs Same
 The idea of checking the similarity of 2 components is partially done as not everything can be tested during the check.\
 For that reason, the wording `Similar` is used and not `Same` as they are not technically the same. (different ids, different things.)
+
+#### publishedVersion for checking
+In the case that you want to compare the published versions, 2 similar problems could occure: 
+- **The base component is not published**. The result of that would be the **failing of the comparison** (an exception will be thrown) because you need to have your base clean to start a comparison with a published version.
+- **One or all the Targets properties do not have the component published**. In that case, I tried to handle that nicely and then try to default to the latest version for comparison. In the result, the following parenthesis would be added `(draft)`
+
+Therefore, the `(draft)` is always referring to the target property.
 
 ## Dynamic Component filter
 
@@ -183,7 +204,7 @@ An example on how the data element looks like:
 
 #### Data Elements
 
-You can pass a Data Element name during the instanciation of the `Synchronizer`. This data element needs to resides in the base property and it will contain a valid JSON that will describe the different rules that will apply during the synchronization.\
+You can pass a Data Element name during the instanciation of the `Synchronizer`. This data element needs to resides in the base property and it will contain a **valid** JSON that will describe the different rules that will apply during the synchronization.\
 The format of the JSON representation for the data element is [explained above](#dynamic-component-filter)\
 The data element name needs to be passed in the `dynamicRuleComponent` parameter.
 

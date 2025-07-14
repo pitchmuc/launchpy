@@ -7,7 +7,12 @@ This has been started after the 0.3.0 release.\
 * adding `getExtension` in `Property` class
 * improve `upgradeExtension` in `Property` class
 * improving `checkComponentSync` in `Synchronizer` class
-* improving `getLatestPublishedVersion` with error message defining which property is failing
+* improving `getLatestPublishedVersion` with error message defining which property is failing\
+Patch:
+* Better support of `publishedVersion` in checkComponentSync
+* Adding more check in the `checkComponentSync` report
+* Documentation improved in synchronizer
+* Support of extension added in `createTargetsLibrary`
 
 ## 0.4.4
 * adding a `getBuilds` method on the `Library` class instance
