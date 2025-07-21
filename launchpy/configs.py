@@ -22,7 +22,7 @@ def find_path(path: str) -> Optional[Path]:
         return None
 
 
-def createConfigFile(scope: str = "https://ims-na1.adobelogin.com/s/ent_reactor_admin_sdk",auth_type: str = "oauthV2", verbose: object = False)->None:
+def createConfigFile(filename:str='config_launch',auth_type: str = "oauthV2", scope: str = "https://ims-na1.adobelogin.com/s/ent_reactor_admin_sdk", verbose: object = False)->None:
     """
     This function will create a 'config_launch_admin.json' file where you can store your access data. 
     Arguments:
@@ -36,18 +36,20 @@ def createConfigFile(scope: str = "https://ims-na1.adobelogin.com/s/ent_reactor_
         'org_id': '<orgID>',
         'client_id': "<client_id>",
         'secret': "<YourSecret>",
-        'scope': scope
     }
     if auth_type == 'oauthV2':
         json_data['scopes'] = "<scopes>"
     elif auth_type == 'jwt':
         json_data["tech_id"] = "<something>@techacct.adobe.com"
         json_data["pathToKey"] = "<path/to/your/privatekey.key>"
-    with open('config_launch_admin.json', 'w') as cf:
+        json_data['scope'] = scope
+    if '.json' not in filename:
+        filename = f"{filename}.json"
+    with open(filename, 'w') as cf:
         cf.write(json.dumps(json_data, indent=4))
     if verbose:
         print(
-            f" file created at this location : {os.getcwd()}{os.sep}config_launch_admin.json")
+            f" file created at this location : {os.getcwd()}{os.sep}{filename}")
 
 def importConfigFile(path: str = None,auth_type:str=None) -> None:
     """Reads the file denoted by the supplied `path` and retrieves the configuration information
