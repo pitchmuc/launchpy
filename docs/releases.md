@@ -13,6 +13,7 @@ Patch:
 * Adding more check in the `checkComponentSync` report
 * Documentation improved in synchronizer
 * Support of extension added in `createTargetsLibrary`
+* Fixing dependency to `aepp` `som` module
 
 ## 0.4.4
 * adding a `getBuilds` method on the `Library` class instance

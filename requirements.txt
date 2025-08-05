@@ -5,3 +5,4 @@ pathlib2>=2.3.5
 requests>=2.25.0
 aepp=>0.3.10
 pandas>=2.1.0
+aepp>=0.3.12

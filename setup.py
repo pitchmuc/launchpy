@@ -43,6 +43,6 @@ setup(
         "Development Status :: 4 - Beta"
     ],
     python_requires='>=3.10',
-    install_requires=["requests",
-                      "PyJWT", "pathlib2", "pathlib", "PyJWT[crypto]","aepp","pandas"],
+    install_requires=["requests","aepp",
+                      "PyJWT", "pathlib2", "pathlib", "PyJWT[crypto]","pandas"],
 )

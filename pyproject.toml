@@ -29,7 +29,8 @@ dependencies = ['pandas',
                 "PyJWT", 
                  "PyJWT[crypto]",
                  "pathlib2", 
-                 "pathlib"]
+                 "pathlib",
+                 "aepp"]
 dynamic = ["version"]
 
 [project.urls]
