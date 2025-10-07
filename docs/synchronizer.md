@@ -47,6 +47,7 @@ Arguments:
  * componentName : The name of the component to sync between template and target properties
  * componentId : The id of the component to sync
  * publishedVersion : Set to `False` by default. If set to True, takes the latest published version of the component.
+ * forceCreation : Set to `True` by default. It will create the element sync if it does not exist in the target property. Set to `False`, it will prevent that behavior.
 
 Either of these 2 can be used, but in the end, the name of the component is used to do the matching between properties.
 A component is either a Data Element or a Rule.

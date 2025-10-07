@@ -178,7 +178,7 @@ class Synchronizer:
             cmp_baseDict['copy'] = copySettings(publishedVersion)
         return cmp_baseDict
 
-    def syncComponent(self,componentName:str=None,componentId:str=None,publishedVersion:bool=False,**kwargs)->None:
+    def syncComponent(self,componentName:str=None,componentId:str=None,publishedVersion:bool=False,forceCreation:bool=True,**kwargs)->None:
         """
         Synchronize a component from the base property to the different target properties.
         It will detect the component with the same name in target properties.
@@ -188,6 +188,7 @@ class Synchronizer:
             componentName : REQUIRED : the name of the component to sync
             componentID : REQUIRED : the id of the component to sync
             publishedVersion : OPTIONAL : if you want to take the version that has been published
+            forceCreation : OPTIONAL : If the component does not exist in the target property, create it. Default: True
         possible kwargs:
             timeout : OPTIONAL : The timeout to be used for the rule component. If not provided, the existing timeout will be used.
         """
@@ -211,22 +212,23 @@ class Synchronizer:
                     translatedComponent = self.translator.translate(target,data_element=cmp_baseDict['copy'])
                     ## if it does not exist
                     if cmp_baseDict['name'] not in [de.get('attributes',{}).get('name') for de in self.targets[target]['dataElements']]:
-                        comp = self.targets[target]['api'].createDataElement(
-                            name=cmp_baseDict['name'],
-                            descriptor= translatedComponent['descriptor'],
-                            settings=translatedComponent['settings'],
-                            extension=translatedComponent['extension'],
-                            storage_duration = translatedComponent["storage_duration"],
-                            force_lower_case = translatedComponent["force_lower_case"],
-                            clean_text = translatedComponent["clean_text"],
-                            default_value= translatedComponent["default_value"]
-                            )
-                        if cmp_baseDict['component']['attributes']['enabled'] != comp['attributes']['enabled']:
-                            updateDE = self.targets[target]['api'].updateDataElement(
-                                dataElement_id=comp['id'],
-                                attr_dict=translatedComponent)
-                        self.targets[target]['libraryStack']['dataElements'].append(comp)
-                        self.targets[target]['dataElements'].append(comp)
+                        if forceCreation:
+                            comp = self.targets[target]['api'].createDataElement(
+                                name=cmp_baseDict['name'],
+                                descriptor= translatedComponent['descriptor'],
+                                settings=translatedComponent['settings'],
+                                extension=translatedComponent['extension'],
+                                storage_duration = translatedComponent["storage_duration"],
+                                force_lower_case = translatedComponent["force_lower_case"],
+                                clean_text = translatedComponent["clean_text"],
+                                default_value= translatedComponent["default_value"]
+                                )
+                            if cmp_baseDict['component']['attributes']['enabled'] != comp['attributes']['enabled']:
+                                updateDE = self.targets[target]['api'].updateDataElement(
+                                    dataElement_id=comp['id'],
+                                    attr_dict=translatedComponent)
+                            self.targets[target]['libraryStack']['dataElements'].append(comp)
+                            self.targets[target]['dataElements'].append(comp)
                     else:
                         index,old_component = [(index,de) for index,de in enumerate(self.targets[target]['dataElements']) if de.get('attributes',{}).get('name') == cmp_baseDict['name']][0]
                         attributes = {
@@ -257,6 +259,7 @@ class Synchronizer:
                 rc['rule_id'] = cmp_baseDict['id']
             for target in list(self.targets.keys()):
                 flagAllowList = False
+                flagSkipCreation = False ## do not check for new rule config if rule has not been created
                 ## check if the component is in the exclComponentList
                 if any([bool(re.search(key,cmp_baseDict['name'])) for key in self.target_configs.get(target,{}).get('exclComponents',[])]):
                     return {cmp_baseDict['name']:False}
@@ -268,34 +271,37 @@ class Synchronizer:
                 if len(self.target_configs.get(target,{}).get('inclComponents',[]))==0 or flagAllowList:
                     ## if rule does not exist
                     if cmp_baseDict['name'] not in [rule['attributes']['name'] for rule in self.targets[target]['rules']]:
-                        targetRule = self.targets[target]['api'].createRule(
-                            name=cmp_baseDict['name']
-                            )
-                        targetRuleId = targetRule['id']
-                        self.translator.extendTargetRules(ruleName=cmp_baseDict['name'],ruleId=targetRuleId,property_name=target)
-                        self.targets[target]['rules'].append(targetRule)
-                        index = len(self.targets[target]['rules'])-1
-                        self.targets[target]['libraryStack']['rules'].append(targetRule)
-                        for rc in template_ruleComponents:
-                            try:
-                                translatedComponent = self.translator.translate(target,rule_component=copySettings(rc))
-                            except:
-                                raise KeyError("Could not translate the component. Please check if your extensions are aligned in the properties.")
-                            translatedComponent['rule_setting']['data'][0]['id'] = targetRuleId
-                            if timeout is not None:
-                                translatedComponent['timeout'] = timeout
-                            targetRuleComponent = self.targets[target]['api'].createRuleComponent(
-                                name=translatedComponent['name'],
-                                settings = translatedComponent['settings'],
-                                descriptor = translatedComponent['descriptor'],
-                                extension_infos = translatedComponent['extension'],
-                                rule_infos = translatedComponent['rule_setting'],
-                                rule_order=translatedComponent['rule_order'],
-                                order=translatedComponent['order'],
-                                negate=translatedComponent['negate'],
-                                delay_next=translatedComponent['delay_next'],
-                                timeout=translatedComponent['timeout'],
-                            )
+                        if forceCreation:## creating the rule
+                            targetRule = self.targets[target]['api'].createRule(
+                                name=cmp_baseDict['name']
+                                )
+                            targetRuleId = targetRule['id']
+                            self.translator.extendTargetRules(ruleName=cmp_baseDict['name'],ruleId=targetRuleId,property_name=target)
+                            self.targets[target]['rules'].append(targetRule)
+                            index = len(self.targets[target]['rules'])-1
+                            self.targets[target]['libraryStack']['rules'].append(targetRule)
+                            for rc in template_ruleComponents:
+                                try:
+                                    translatedComponent = self.translator.translate(target,rule_component=copySettings(rc))
+                                except:
+                                    raise KeyError("Could not translate the component. Please check if your extensions are aligned in the properties.")
+                                translatedComponent['rule_setting']['data'][0]['id'] = targetRuleId
+                                if timeout is not None:
+                                    translatedComponent['timeout'] = timeout
+                                targetRuleComponent = self.targets[target]['api'].createRuleComponent(
+                                    name=translatedComponent['name'],
+                                    settings = translatedComponent['settings'],
+                                    descriptor = translatedComponent['descriptor'],
+                                    extension_infos = translatedComponent['extension'],
+                                    rule_infos = translatedComponent['rule_setting'],
+                                    rule_order=translatedComponent['rule_order'],
+                                    order=translatedComponent['order'],
+                                    negate=translatedComponent['negate'],
+                                    delay_next=translatedComponent['delay_next'],
+                                    timeout=translatedComponent['timeout'],
+                                )
+                        else:
+                            flagSkipCreation = True
                     else: ## if a rule exist with the same name
                         index, targetRule = [(index,rule) for index, rule in enumerate(self.targets[target]['rules']) if rule['attributes']['name'] == cmp_baseDict['name']][0]
                         self.targets[target]['libraryStack']['rules'].append(targetRule)
@@ -329,11 +335,12 @@ class Synchronizer:
                                 timeout=translatedComponent['timeout'],
                             )
                     ## updating rule attribute if difference between base and target
-                    if cmp_baseDict['component']['attributes']['enabled'] != targetRule['attributes']['enabled']:
-                        baseRuleAttr = copySettings(cmp_baseDict['component'])
-                        targetRule = self.targets[target]['api'].updateRule(rule_id=targetRuleId,attr_dict=baseRuleAttr) ## keeping in a var for debug
-                        del self.targets[target]['rules'][index]
-                        self.targets[target]['rules'].append(targetRule)
+                    if not flagSkipCreation:
+                        if cmp_baseDict['component']['attributes']['enabled'] != targetRule['attributes']['enabled']:
+                            baseRuleAttr = copySettings(cmp_baseDict['component'])
+                            targetRule = self.targets[target]['api'].updateRule(rule_id=targetRuleId,attr_dict=baseRuleAttr) ## keeping in a var for debug
+                            del self.targets[target]['rules'][index]
+                            self.targets[target]['rules'].append(targetRule)
 
     def syncComponents(self,componentsName:list=None,componentsId:list=None,publishedVersion:bool=False)->None:
         """
