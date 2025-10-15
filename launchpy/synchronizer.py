@@ -459,6 +459,8 @@ class Synchronizer:
                 copy['name'] = new_name
                 comp = self.targets[target]['api'].updateRule(rule_id=component['id'],attr_dict=copy)
                 self.targets[target]['libraryStack']['rules'].append(comp)
+                self.targets[target]['rules'].append(comp)
+                self.translator.extendTargetRules(ruleName=new_name,ruleId=comp['id'],property_name=target) 
 
 
     def checkComponentSync(self,componentName:str=None,componentId:str=None,publishedVersion:bool=False,excludeSimilar:bool=False,**kwargs)->bool:
