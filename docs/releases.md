@@ -15,6 +15,9 @@ Patch:
 * Support of extension added in `createTargetsLibrary`
 * Fixing dependency to `aepp` `som` module
 * Fixing renaming path to use `renameComponent` and using `syncComponent`
+* Adding capability to set environment to a lib in `Library` instance via `setEnvironment`
+* Capability to get a `Library` class from the `getLibrary` method in `Property` instance
+* Fixing code in `deleteLibrary`
 
 ## 0.4.4
 * adding a `getBuilds` method on the `Library` class instance

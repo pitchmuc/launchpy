@@ -603,7 +603,7 @@ class Property:
             data = data + append_data
         return data
 
-    def getLibrary(self,libraryId:str=None)->dict:
+    def getLibrary(self,libraryId:str=None,return_class:bool=False)->dict:
         """
         get a library based on its ID.
         Arguments:
@@ -614,6 +614,8 @@ class Property:
         path = f"/libraries/{libraryId}"
         res = self.connector.getData(self.endpoint+path)
         if 'data' in res.keys():
+            if return_class:
+                return Library(res['data'],config_object=self.connector.config,header=self.header)
             return res['data']
         return res
 
@@ -1278,7 +1280,10 @@ class Property:
         if library in librariesIds:
             libraryId = library
         else:
-            libraryId = librariesNameId[library]
+            try:
+                libraryId = librariesNameId[library]
+            except KeyError:
+                raise ValueError("Library name or ID provided not found.")
         path = f"/libraries/{libraryId}"
         if components==True:  
             myLib = self.getLibrary(libraryId)
@@ -1286,10 +1291,11 @@ class Property:
             rules = libClass.getRules()
             dataelements = libClass.getDataElements()
         res = self.connector.deleteData('https://reactor.adobe.io/'+path)
-        for rule in rules:
-            self.deleteRule(rule['id'])
-        for de in dataelements:
-            self.deleteDataElement(de['id'])
+        if components==True:
+            for rule in rules:
+                self.deleteRule(rule['id'])
+            for de in dataelements:
+                self.deleteDataElement(de['id'])
         return res
     
     def getProductionEndpoint(self)->dict:

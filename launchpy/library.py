@@ -313,7 +313,7 @@ class Library:
 
     def setEnvironments(self, environments_list: list, dev_name: str = None)->None:
         """
-        Save the different environments ids available. 
+        Save the different environments ids available in a config variable.
         It is required to use the library class.
         Arguments : 
             environments_list : REQUIRED : list of environment retrieved by the getEnvironments method
@@ -340,6 +340,21 @@ class Library:
         res = new_env
         return res
 
+    def setEnvironment(self, env_id: str,verbose:bool=False)->None:
+        """
+        Set the environment of the library. 
+        Arguments:
+            env_id : REQUIRED : The environment id you want to set.
+        """
+        obj = {
+            "data": {
+                "id": env_id,
+                "type": "environments"
+            }
+        }
+        res = self._setEnvironment(obj,verbose=verbose)
+        return res
+
     def _removeEnvironment(self)->None:
         """
         Remove environment
@@ -347,7 +362,7 @@ class Library:
         path = f'/libraries/{self.id}/relationships/environment'
         new_env = self.connector.getData(self.endpoint+path) 
         return new_env
-    
+
     def updateLibrary(self,empty:bool=False)->dict:
         """
         Update the library
@@ -383,12 +398,14 @@ class Library:
         return res
 
 
-    def build(self,verbose:bool=False)->dict:
+    def build(self,timesleep:int=20, verbose:bool=False)->dict:
         """
         Build the library. 
         Part of the code takes care of assigning the right environement before building the library.
         Returns the build when it is completed (succeed or not).
-        It will check every 15 seconds for the build status, making sure it is not "pending".
+        Arguments:
+            timesleep : OPTIONAL : How many seconds to wait between each check of the build status. Default to 20 seconds.
+        It will check every 20 seconds for the build status, making sure it is not "pending".
         """
         if self.build_required == False and self.state != 'approved':
             return 'build is not required'
@@ -430,7 +447,7 @@ class Library:
         build_status = build['data']['attributes']['status']
         while build_status == 'pending':
             print('pending...')
-            time.sleep(20)
+            time.sleep(timesleep)
             # return the json directly
             build = self.connector.getData(
                 config.endpoints['global']+'/builds/'+str(build_id))
