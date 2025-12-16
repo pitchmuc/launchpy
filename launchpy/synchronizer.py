@@ -21,37 +21,48 @@ class Synchronizer:
     It requires that you have imported a configuration file.
     """
 
-    def __init__(self,base:str=None,targets:list=None,**kwargs)->None:
+    def __init__(self,base:str | Property = None,targets:list=None,**kwargs)->None:
         """
         Instantiating the Synchronizer taking 2 parameters, base property name, target property list.
         Arguments:
-            base : REQUIRED : The name of your base/template property
+            base : REQUIRED : The name of your base/template property or the instance of Property class
             targets : REQUIRED : The list of property names that you want to sync with.
+                the list of target can be string of property name or Property instance for other organization.
         possible kwargs:
             dynamicRuleComponent: A data element name that contains rule for synchronization on the property.
+            mapping_extensions : A dictionary of target extension name and base extension name when in different IMS org and 2 private extensions are name differently for the same purpose.
         """
         tmp_admin = Admin()
         cid = tmp_admin.getCompanyId()
         properties = tmp_admin.getProperties(cid)
-        base_property = [prop for prop in properties if prop['attributes']['name'] == base]
-        if len(base_property) ==0:
-            raise KeyError("The base property name has not been found in your account")
+        mapping_extensions = kwargs.get('mapping_extensions',None)
         self.base = {}
-        self.base["name"] = base
-        self.base["api"]:Property = Property(base_property[0])
+        if type(base) == str:
+            base_property = [prop for prop in properties if prop['attributes']['name'] == base]
+            if len(base_property) ==0:
+                raise KeyError("The base property name has not been found in your account")
+            self.base["name"] = base
+            self.base["api"]:Property = Property(base_property[0])
+        elif type(base) == Property:
+            self.base["name"] = base.name
+            self.base["api"]:Property = base
         self.base['rules'] = self.base['api'].getRules()
         self.base['dataElements'] = self.base['api'].getDataElements()
         self.base['extensions'] = self.base['api'].getExtensions()
-        self.translator = Translator()
+        self.translator = Translator(mapping_extensions=mapping_extensions)
         self.translator.setBaseExtensions(self.base['extensions'],self.base['name'])
         self.translator.setBaseRules(self.base['rules'],self.base['name'])
         self.targets = {}
         self.target_configs = {}
         for target in targets:
-            tmp_target = [prop for prop in properties if prop['attributes']['name'] == target]
-            if len(tmp_target) == 0:
-                raise KeyError(f"The target property : {target} cannot be found. Please, fix it")
-            self.targets[target] = {'api' : Property(tmp_target[0]),'name':target}
+            if isinstance(target,str):
+                tmp_target = [prop for prop in properties if prop['attributes']['name'] == target]
+                if len(tmp_target) == 0:
+                    raise KeyError(f"The target property : {target} cannot be found. Please, fix it")
+                self.targets[target] = {'api' : Property(tmp_target[0]),'name':target}
+            elif isinstance(target,Property):
+                self.targets[target.name] = {'api' : deepcopy(target),'name':target.name}
+                target = target.name
             self.targets[target]['rules'] = self.targets[target]['api'].getRules()
             self.targets[target]['extensions'] = self.targets[target]['api'].getExtensions()
             self.targets[target]['dataElements'] = self.targets[target]['api'].getDataElements()

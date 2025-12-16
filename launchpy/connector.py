@@ -31,7 +31,7 @@ class AdobeRequest:
             raise Exception(
                 'You have to upload the configuration file with importConfigFile method.')
         self.config = deepcopy(config_object)
-        self.header = header
+        self.header = deepcopy(header)
         self.retry = retry
         if self.config['token'] == '' or time.time() > self.config['date_limit']:
             if 'scopes' in self.config.keys() and self.config.get('scopes',None) is not None:
@@ -42,9 +42,9 @@ class AdobeRequest:
                 token_and_expiry = self.get_jwt_token_and_expiry_for_config(config=self.config, verbose=verbose)
             token = token_and_expiry['token']
             expiry = token_and_expiry['expiry']
-            self.token = token
-            self.config['token'] = token
-            self.config['date_limit'] = time.time() + expiry - 500
+            self.token = deepcopy(token)
+            self.config['token'] = deepcopy(token)
+            self.config['date_limit'] = deepcopy(time.time() + expiry - 500)
             self.header.update({'Authorization': f'Bearer {token}'})
 
     def get_jwt_token_and_expiry_for_config(self,config: dict, verbose: bool = False, save: bool = False, *args, **kwargs) -> Dict[str, str]:
@@ -166,8 +166,8 @@ class AdobeRequest:
             elif self.connectionType == 'jwt':
                 token_and_expiry = self.get_jwt_token_and_expiry_for_config(config=self.config)
             token = token_and_expiry['token']
-            self.config['token'] = token
-            self.config['date_limit'] = time.time() + token_and_expiry['expiry'] - 500
+            self.config['token'] = deepcopy(token)
+            self.config['date_limit'] = deepcopy(time.time() + token_and_expiry['expiry'] - 500)
             self.header.update({'Authorization': f'Bearer {token}'})
 
     def getData(self, endpoint: str, params: dict = None, data: dict = None, headers: dict = None, *args, **kwargs):

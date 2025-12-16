@@ -405,14 +405,23 @@ class Translator:
     --> You can use the translate method to translate Data Element settings 
     3. setBaseRules
     4. extendRules
-    --> You can use the translate method to translate Rule Components settings 
+    --> You can use the translate method to translate Rule Components settings
+
+    Possible arguments:
+        mapping_extensions : dictionary of extension names that should be replaced. 
+            Such as: {'old_name':'new_name'}
     """
 
-    def __init__(self):
+    def __init__(self,**kwargs):
         self.rules = {}
         self.baseRuleIdName = {}
         self.extensions = {}
         self.baseExtensionIdName = {}
+        self.mapping_extension = {}
+        if kwargs.get('mapping_extensions') is not None:
+            if type(kwargs.get('mapping_extensions')) == dict:
+                for key, value in kwargs.get('mapping_extensions').items():
+                    self.mapping_extension[key] = value
 
     def setBaseExtensions(self, base_property_extensions: list, property_name: str):
         """
@@ -422,8 +431,12 @@ class Translator:
             property_name : REQUIRED : name of your base property.
         """
         self.baseExtensionIdName = {ext['id'] : ext['attributes']['name'] for ext in base_property_extensions}
+        for extId, extName in self.baseExtensionIdName.items():
+            if extName in self.mapping_extension.keys():
+                self.baseExtensionIdName[extId] = self.mapping_extension[extName]
         self.extensions = {ext['attributes']['name']:{property_name:ext['id']} for ext in base_property_extensions}
 
+    
     def extendExtensions(self, new_property_extensions: list, new_prop_name: str)-> None:
         """
         Add the extensions id from a target property.
@@ -432,8 +445,11 @@ class Translator:
             new_prop_name : REQUIRED : target property name. 
         """
         for ext in new_property_extensions:
-            if ext['attributes']['name'] in list(self.extensions.keys()):
-                self.extensions[ext['attributes']['name']][new_prop_name] = ext['id']
+            extName = ext['attributes']['name']
+            if extName in self.mapping_extension.keys():
+                extName = self.mapping_extension[extName]
+            if extName in list(self.extensions.keys()):
+                self.extensions[extName][new_prop_name] = ext['id']
         return self.extensions
 
     def setBaseRules(self, base_property_rules: list, property_name: str):

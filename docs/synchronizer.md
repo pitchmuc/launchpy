@@ -13,7 +13,6 @@ The Synchronizer will allow you to specify a template property and target proper
 This class is currently requiring the following elements on your side:
 
 * You have imported the config file (via `importConfigFile`) or configure your module via `configure` method.
-* Your template property and target properties are located in the same organization
 * You have unique name for your rule and data elements
 * You have the same extension installed in both the template and target properties.\
   The Synchronizer will not sync the extensions configuration.
@@ -24,8 +23,8 @@ If a rule and a data element have the same name, by passing that name in the `sy
 
 In order to instantiate the `Synchronizer` class, you will need to provide 2 elements:
 
-* The name of the base property (as string)
-* The names of the target properties (as a list of strings)
+* The name of the base property, as `string` or `launchpy.Property` instance
+* The names of the target properties (as a list of `strings`, or `launchpy.Property` instances)
 
 Example:
 
@@ -38,6 +37,56 @@ synchronizor = lp.Synchronizer(base='Prop1',targets=['Prop2'])
 
 ```
 
+### Multi Organization environments
+
+For some clients, they may want to synchronize the rules and data elements across organization setup.\
+That is possible, but the requirements are still needed regarding the following elements: 
+* You have unique name for your rule and data elements
+* You have the same extension installed in both the template and target properties.
+
+The synchronizer will use the environment credential lastly loaded in the system.\ 
+We would recommend to load first the target organization that you want to sync to, and then the base organization.\
+You will be able to use the Property instance of the target organization in order to sync the element afterwards.
+
+Example of setup
+
+```py
+import launchpy as lp
+
+
+### targeted org
+lp.importConfigFile('config_target.json')
+admin_target = lp.Admin()
+targetId = admin_target.getCompanyId()
+target_props = admin_target.getProperties(targetId)
+
+target_prop = lp.Property(target_props[1]) ## selecting one of the property
+
+### Source org for base
+lp.importConfigFile('config_source.json')
+admin = lp.Admin()
+sourceId = admin_target.getCompanyId()
+source_props = admin.getProperties(sourceId)
+
+base = lp.Property(source_props[0]) ### selecting the first one as base - it can be any
+
+synchronizor = lp.Synchronizer(base=base,targets=['another Property Name to sync',target_prop])
+
+### rest is as usual
+```
+
+If you have private extension that are not released between organization, you can pass a mapping to the synchronizer to tell that these extensions are to be treated as one.\
+You would need to pass the target extension name and the base extension name so that it is mapped as a single one.
+
+Example: 
+```py
+
+synchronizor = lp.Synchronizer(base=base,targets=['another Property Name to sync',target_prop],mapping_extensions={'extension_name_target':'extension_name_base'})
+
+```
+
+
+### Additional options
 There is a possibility to setup some rules so you can filter when migrating from one property to another. See [dynamic Filtering](#dynamic-component-filter)
 
 ## SyncComponent Method

@@ -3,6 +3,9 @@
 This page gathered the changes made between version of the launchpy module.\
 This has been started after the 0.3.0 release.\
 
+## 0.4.6
+* Allow Synchronizer to be used in multi IMS organization setup.
+
 ## 0.4.5
 * adding `getExtension` in `Property` class
 * improve `upgradeExtension` in `Property` class
