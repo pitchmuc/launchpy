@@ -5,6 +5,10 @@ This has been started after the 0.3.0 release.\
 
 ## 0.4.6
 * Allow Synchronizer to be used in multi IMS organization setup.
+Patch: 
+* Fixing multi-org synchronization:
+  * syncComponent method in Synchronizer class
+  * createTargetsLibrary method in Synchronizer class
 
 ## 0.4.5
 * adding `getExtension` in `Property` class

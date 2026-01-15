@@ -418,6 +418,7 @@ class Translator:
         self.extensions = {}
         self.baseExtensionIdName = {}
         self.mapping_extension = {}
+        self.extension_descriptor_update = {}
         if kwargs.get('mapping_extensions') is not None:
             if type(kwargs.get('mapping_extensions')) == dict:
                 for key, value in kwargs.get('mapping_extensions').items():
@@ -447,6 +448,7 @@ class Translator:
         for ext in new_property_extensions:
             extName = ext['attributes']['name']
             if extName in self.mapping_extension.keys():
+                self.extension_descriptor_update[new_prop_name] = {self.mapping_extension[extName]:extName}
                 extName = self.mapping_extension[extName]
             if extName in list(self.extensions.keys()):
                 self.extensions[extName][new_prop_name] = ext['id']
@@ -525,6 +527,9 @@ class Translator:
             based_ext_name = self.baseExtensionIdName[base_id]
             new_extension_id = self.extensions[based_ext_name][target_property]
             new_de['extension']['id'] = new_extension_id
+            if target_property in self.extension_descriptor_update.keys():
+                if based_ext_name in self.extension_descriptor_update[target_property].keys():
+                    new_de['descriptor']  = new_de['descriptor'] .replace(based_ext_name,self.extension_descriptor_update[target_property][based_ext_name])
             return new_de
         elif rule_component is not None:
             if len(self.rules) == 0:
@@ -535,6 +540,9 @@ class Translator:
             based_ext_name = self.baseExtensionIdName[base_id]
             new_extension_id = self.extensions[based_ext_name][target_property]
             new_rc['extension']['id'] = new_extension_id
+            if target_property in self.extension_descriptor_update.keys():
+                if based_ext_name in self.extension_descriptor_update[target_property].keys():
+                    new_rc['descriptor'] = new_rc['descriptor'] .replace(based_ext_name,self.extension_descriptor_update[target_property][based_ext_name])
             if len(self.rules) > 0:
                 new_rc['rule_setting'] = {
                     'data': [{

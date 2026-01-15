@@ -328,7 +328,8 @@ class Synchronizer:
                         for rc in template_ruleComponents:
                             try:
                                 translatedComponent = self.translator.translate(target,rule_component=copySettings(rc))
-                            except:
+                            except Exception as e:
+                                print(e)
                                 raise KeyError("Could not translate the component. Please check if your extensions are aligned in the properties.")
                             translatedComponent['rule_setting']['data'][0]['id'] = targetRuleId
                             if timeout is not None:
@@ -382,7 +383,7 @@ class Synchronizer:
                     lib = [lib for lib in librariesDev if name in lib['attributes']['name']][0]
                 else:
                     lib = self.targets[target]['api'].createLibrary(name=name,return_class=False)
-                library = Library(lib)
+                library = Library(lib,config_object=self.targets[target]['api'].connector.config,header=self.targets[target]['api'].connector.header)
                 self.targets[target]['library'] = library
             self.targets[target]['library'].getFullLibrary()
             ## taking care of rule update
