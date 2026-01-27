@@ -54,7 +54,7 @@ class Property:
         self._Environments = data['links']['environments']
         self._Libraries = data['relationships']['libraries']['links']['related']
         self.ruleComponents = {}
-        self.header = deepcopy(config.header)
+        self.header = deepcopy(self.connector.header)
 
     def __repr__(self)-> dict:
         return json.dumps(self.definition, indent=4)
@@ -1082,7 +1082,7 @@ class Property:
         Update the ruleComponents based on the information provided.
         arguments: 
             rc_id : REQUIRED : Rule Component ID
-            attr_dict : REQUIRED : dictionary that will be passed to Launch for update
+            attr_dict : REQUIRED : dictionary of the attributes that will be passed to Launch for update
         """
         obj = {
             "data": {

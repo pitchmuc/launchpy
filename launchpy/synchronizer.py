@@ -30,7 +30,7 @@ class Synchronizer:
                 the list of target can be string of property name or Property instance for other organization.
         possible kwargs:
             dynamicRuleComponent: A data element name that contains rule for synchronization on the property.
-            mapping_extensions : A dictionary of target extension name and base extension name when in different IMS org and 2 private extensions are name differently for the same purpose.
+            mapping_extensions : A dictionary of {"target-extension-name" : "base-extension-name"} when in different IMS org and 2 private extensions are name differently for the same purpose.
         """
         tmp_admin = Admin()
         cid = tmp_admin.getCompanyId()
@@ -67,11 +67,11 @@ class Synchronizer:
             self.targets[target]['extensions'] = self.targets[target]['api'].getExtensions()
             self.targets[target]['dataElements'] = self.targets[target]['api'].getDataElements()
             self.targets[target]['libraryStack'] = {'dataElements':[],'rules':[],"extensions":[]}
-            self.translator.extendExtensions(self.targets[target]['extensions'],self.targets[target]['name'])
+            self.translator.extendExtensions(self.targets[target]['extensions'],target)
             if len(self.targets[target]['rules']) > 0:
-                self.translator.extendRules(self.targets[target]['rules'],self.targets[target]['name'])
+                self.translator.extendRules(self.targets[target]['rules'],target)
             else:
-                self.translator.rules[self.targets[target]['name']] = None
+                self.translator.rules[target] = None
         if kwargs.get("dynamicRuleComponent",None) is not None:
             configRules = [de for de in self.base['dataElements'] if de['attributes']['name'] == kwargs.get("dynamicRuleComponent",None)]
             if len(configRules)==1:

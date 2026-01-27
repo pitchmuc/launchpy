@@ -432,9 +432,9 @@ class Translator:
             property_name : REQUIRED : name of your base property.
         """
         self.baseExtensionIdName = {ext['id'] : ext['attributes']['name'] for ext in base_property_extensions}
-        for extId, extName in self.baseExtensionIdName.items():
-            if extName in self.mapping_extension.keys():
-                self.baseExtensionIdName[extId] = self.mapping_extension[extName]
+        #for extId, extName in self.baseExtensionIdName.items():
+        #    if extName in self.mapping_extension.keys():
+        #        self.baseExtensionIdName[extId] = self.mapping_extension[extName]
         self.extensions = {ext['attributes']['name']:{property_name:ext['id']} for ext in base_property_extensions}
 
     
@@ -542,7 +542,7 @@ class Translator:
             new_rc['extension']['id'] = new_extension_id
             if target_property in self.extension_descriptor_update.keys():
                 if based_ext_name in self.extension_descriptor_update[target_property].keys():
-                    new_rc['descriptor'] = new_rc['descriptor'] .replace(based_ext_name,self.extension_descriptor_update[target_property][based_ext_name])
+                    new_rc['descriptor'] = new_rc['descriptor'].replace(based_ext_name,self.extension_descriptor_update[target_property][based_ext_name])
             if len(self.rules) > 0:
                 new_rc['rule_setting'] = {
                     'data': [{

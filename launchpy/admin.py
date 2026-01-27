@@ -243,6 +243,38 @@ class Admin:
                 saveFile(data,'packages.txt',type='txt')
         return data
     
+    def createExtensionPackageUsage(self,packageId:str=None,imsOrgId:str=None)->dict:
+        """
+        Create an extension package usage.
+        Arguments:
+            packageId : REQUIRED : The extension package ID to be authorized
+            imsOrgId : REQUIRED : The IMS Org ID to be authorized
+        More info here : https://developer.adobelaunch.com/api/reference/1.0/extension_package_usages/create/
+        """
+        if packageId is None:
+            raise ValueError("A packageId is required")
+        if imsOrgId is None:
+            raise ValueError("A Target imsOrgId is required")
+        path = f"/extension_packages/{packageId}/extension_package_usage_authorizations"
+        obj = {
+                "data": {
+                "attributes": {
+                    "authorized_org_id": imsOrgId
+                },
+                "type": "extension_package_usage_authorizations"
+            }
+}
+        res = self.connector.postData(self.endpoint+path,data=obj)
+        return res
+    
+    def getExtensionPackageUsage(self)->dict:
+        """
+        Retrieve a list of extension package usage authorizations
+        """
+        path = "/extension_package_usage_authorizations"
+        res = self.connector.getData(self.endpoint+path)
+        return res
+    
     def getEdgeConfigs(self)->dict:
         """
         Returns the edge configs, using a different endpoints.
