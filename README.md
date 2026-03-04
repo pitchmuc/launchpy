@@ -5,17 +5,15 @@ This module is named launchpy.
 
 ## Installation
 
-You can install the module by realising the following pip command:
-
+You can install the module by realising the following pip command:\
 `pip install launchpy`
 
-You can access the version of the module that you run via the following attribute:
-
+You can access the version of the module that you run via the following attribute:\
 `launchpy.__version__`
 
 ## Content of the module
 
-This module is built around 5 main parts:
+This module is built around 7 main parts:
 
 - Helping functions [Core Components](./docs/main.md)
 - Admin instantiating functions [Admin Class](./docs/admin.md)
@@ -23,6 +21,7 @@ This module is built around 5 main parts:
 - Managing Publishing Cycle [Library Class](./docs/library.md)
 - Translator functionationality [Translator Class](./docs/translator.md)
 - Synchronizer [Synchronizer Class](./docs/synchronizer.md)
+- Command Line Interface [CLI](./docs/cli.md)
 
 ## Get Started
 
