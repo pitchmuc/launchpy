@@ -3,6 +3,10 @@
 This page gathered the changes made between version of the launchpy module.\
 This has been started after the 0.3.0 release.\
 
+## 0.4.7
+* modify `getRuleComponents` to `getRulesComponents` as it can return all the rules components if no rule is specified. Kept `getRuleComponents` as an alias for backward compatibility and also provide a single rule components retrieval.
+* Adding the `CLI` layer. [Documentation to CLI](cli.md)
+
 ## 0.4.6
 * Allow Synchronizer to be used in multi IMS organization setup.
 Patch: 

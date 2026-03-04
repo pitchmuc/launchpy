@@ -6,3 +6,5 @@ requests>=2.25.0
 aepp=>0.3.10
 pandas>=2.1.0
 aepp>=0.3.12
+httpx>=0.24.0
+asyncio>=3.0.0

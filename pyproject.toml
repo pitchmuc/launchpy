@@ -8,6 +8,7 @@ authors = [
     {name = "Julien Piccini", email = "piccini.julien@gmail.com"},
 ]
 description = "Adobe Launch API wrapper"
+dynamic = ["version"]
 readme = "README.md"
 requires-python = ">=3.7"
 keywords = ["adobe", "analytics", "API", "python"]
@@ -30,15 +31,19 @@ dependencies = ['pandas',
                  "PyJWT[crypto]",
                  "pathlib2", 
                  "pathlib",
-                 "aepp"]
-dynamic = ["version"]
+                 "aepp",
+                 "rich",]
 
 [project.urls]
 homepage = "https://github.com/pitchmuc/launchpy"
 changelog = "https://github.com/pitchmuc/launchpy/blob/master/docs/releases.md"
 
-[tool.setuptools]
-include-package-data = true
+[tool.setuptools.dynamic]
+version = {attr = "launchpy.__version__.__version__"}
 
-[project.optional-dependencies]
-dynamic = ["version"]
+[project.scripts]
+launchpy = "launchpy.cli.__main__:main"
+
+[tool.setuptools]
+packages = ["launchpy", "launchpy.cli"]
+include-package-data = true

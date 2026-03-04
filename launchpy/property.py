@@ -282,12 +282,16 @@ class Property:
         return res['data']
 
 
-    def getRules(self,verbose:bool=False)->object:
+    def getRules(self,filter:dict=None,verbose:bool=False)->object:
         """
         Return the list of the rules data.
         On top, it fills the ruleComponents attribute with a dictionnary based on rule id and their rule name and the ruleComponent of each.
         """
-        rules = self.connector.getData(self._Rules)
+        params = {}
+        if filter is not None:
+            for key in filter:
+                params[f'filter[{key}]'] = filter[key]
+        rules = self.connector.getData(self._Rules, params=params)
         try:
             data = rules['data']  # skip meta for now
             pagination = rules['meta']['pagination']
@@ -394,7 +398,7 @@ class Property:
         return data
 
 
-    def getRuleComponents(self, verbose:bool=False,**kwargs)->dict:
+    def getRulesComponents(self, verbose:bool=False,**kwargs)->dict:
         """
         Returns a list of all the ruleComponents gathered in the ruleComponents attributes.
         You must have retrieved the rules before using this method (getRules()), otherwise, the method will also realize it and it will take longer, without saving the rules.
@@ -428,7 +432,6 @@ class Property:
         ids = list(ruleComponents.keys())
         headers = [self.header for nb in range(len(list_urls))]
         workers = min((len(list_urls), 5))
-
         def request_data(url, header, name, ids):
             rule_component = self.connector.getData(url)
             data = rule_component['data']
@@ -463,6 +466,24 @@ class Property:
             raise ValueError('Require a ruleComponent ID')
         path = f"/rule_components/{rc_id}"
         res:dict = self.connector.getData(self.endpoint+path)
+        return res
+    
+    def getRuleComponents(self,rule:dict|str=None,**kwargs)->dict:
+        """
+        Returns the components of a specific rule.
+        Arguments:
+            rule : REQUIRED : rule definition or rule id
+        """
+        if rule is None or kwargs.get('rule_ids', False) or kwargs.get('rule_names', False):
+            return self.getRulesComponents(**kwargs)
+        if type(rule) is dict:
+            if 'id' not in rule.keys():
+                raise ValueError("Rule definition must have an ID")
+            rule_id = rule['id']
+        elif type(rule) is str:
+            rule_id = rule
+        path = f"/rules/{rule_id}/rule_components"
+        res:dict = self.connector.getData(self.endpoint+path).get('data',[])
         return res
 
     def getDataElements(self,verbose:bool=False)->object:
