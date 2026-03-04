@@ -1,6 +1,4 @@
 pathlib>=1.0.0
-PyJWT[crypto]>=1.7.1
-PyJWT>=1.7.1
 pathlib2>=2.3.5
 requests>=2.25.0
 aepp=>0.3.10
@@ -8,3 +6,4 @@ pandas>=2.1.0
 aepp>=0.3.12
 httpx>=0.24.0
 asyncio>=3.0.0
+rich>=14.0.0

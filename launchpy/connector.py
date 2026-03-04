@@ -4,7 +4,6 @@ import time
 from typing import Dict, Union
 from copy import deepcopy
 # Non standard libraries
-import jwt
 import requests
 from launchpy import config, configs
 
@@ -37,81 +36,14 @@ class AdobeRequest:
             if 'scopes' in self.config.keys() and self.config.get('scopes',None) is not None:
                 self.connectionType = 'oauthV2'
                 token_and_expiry = self.get_oauth_token_and_expiry_for_config(config=self.config, verbose=verbose)
-            elif self.config.get("private_key",None) is not None or self.config.get("pathToKey",None) is not None:
-                self.connectionType = 'jwt'
-                token_and_expiry = self.get_jwt_token_and_expiry_for_config(config=self.config, verbose=verbose)
+            else:
+                raise ValueError("Invalid configuration: missing 'scopes' for OAuth V2 authentication.")
             token = token_and_expiry['token']
             expiry = token_and_expiry['expiry']
             self.token = deepcopy(token)
             self.config['token'] = deepcopy(token)
             self.config['date_limit'] = deepcopy(time.time() + expiry - 500)
             self.header.update({'Authorization': f'Bearer {token}'})
-
-    def get_jwt_token_and_expiry_for_config(self,config: dict, verbose: bool = False, save: bool = False, *args, **kwargs) -> Dict[str, str]:
-        """
-        Retrieve the token by using the information provided by the user during the import importConfigFile function.
-        Arguments :
-            config : REQUIRED : config object to passs for information
-            verbose : OPTIONAL : Default False. If set to True, print information.
-            save : OPTIONAL : Default False. If set to True, save the toke in the .
-        """
-        private_key = configs.get_private_key_from_config(config)
-        header_jwt = {
-            'cache-control': 'no-cache',
-            'content-type': 'application/x-www-form-urlencoded'
-        }
-        now_plus_24h = int(time.time()) + 24 * 60 * 60
-        jwtPayload_default = {
-        # Expiration set to 24 hours
-        "exp": now_plus_24h,
-        "iss": config['org_id'],
-        "sub": config['tech_id'],
-        config["official_scope"] : True,
-        "aud": "https://ims-na1.adobelogin.com/c/"+config["client_id"]
-        }
-        jwtPayload_dev = {
-            # Expiration set to 24 hours
-            "exp": now_plus_24h,
-            "iss": config['org_id'],
-            "sub": config['tech_id'],
-            config['scope_dev']: True,
-            "aud": "https://ims-na1.adobelogin.com/c/"+config["client_id"]
-        }
-        encoded_jwt_admin = self._get_jwt(payload=jwtPayload_default, private_key=private_key)
-        encoded_jwt_dev = self._get_jwt(payload=jwtPayload_dev, private_key=private_key)
-        payload_admin = {
-            'client_id': config['client_id'],
-            'client_secret': config['secret'],
-            'jwt_token': encoded_jwt_admin
-        }
-        payload_dev = {
-            'client_id': config['client_id'],
-            'client_secret': config['secret'],
-            'jwt_token': encoded_jwt_dev
-        }
-        response = requests.post(config['jwtTokenEndpoint'], headers=header_jwt, data=payload_admin)
-        json_response = response.json()
-        if 'error' in json_response.keys():
-            if json_response['error'] == "invalid_scope":
-                try:
-                    response = requests.post(config['jwtTokenEndpoint'], headers=header_jwt, data=payload_dev)
-                    json_response = response.json()
-                except Exception as e:
-                    print(json.dumps(json_response, indent=4))
-                    raise Exception(e)
-        try:
-            token = json_response['access_token']
-        except KeyError:
-            print('Issue retrieving token')
-            print(json_response)
-        expiry = json_response['expires_in'] / 1000
-        if save:
-            with open('token.txt', 'w') as f:
-                f.write(token)
-            print(f'token has been saved here: {os.getcwd()}{os.sep}token.txt')
-        if verbose:
-            print('token valid till : ' + time.ctime(time.time() + expiry / 1000))
-        return {'token': token, 'expiry': expiry}
     
     def get_oauth_token_and_expiry_for_config(self,config:dict,verbose:bool=False,save:bool=False)->Dict[str,str]:
         """
@@ -144,16 +76,6 @@ class AdobeRequest:
         if verbose:
             print('token valid till : ' + time.ctime(time.time() + expiry))
         return {'token': token, 'expiry': expiry}
-
-
-    def _get_jwt(self,payload: dict, private_key: str) -> str:
-        """
-        Ensure that jwt enconding return the same type (str) as versions < 2.0.0 returned bytes and >2.0.0 return strings. 
-        """
-        token: Union[str, bytes] = jwt.encode(payload, private_key, algorithm='RS256')
-        if isinstance(token, bytes):
-            return token.decode('utf-8')
-        return token
 
     def _checkingDate(self) -> None:
         """
