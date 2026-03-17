@@ -1,5 +1,3 @@
-from html import parser
-from matplotlib.pyplot import table
 from rich import rule
 import launchpy
 import argparse, cmd, shlex, json
@@ -7,12 +5,9 @@ from functools import wraps
 from rich.console import Console
 from rich.table import Table
 from rich.panel import Panel
-from rich.markdown import Markdown
 from pathlib import Path
-from io import FileIO
 import pandas as pd
-from datetime import datetime
-import urllib.parse
+from datetime import datetime, timedelta
 from typing import Any, Concatenate, ParamSpec, ParamSpecKwargs
 from collections.abc import Callable
 
@@ -675,7 +670,140 @@ class SynchronizerCLI(cmd.Cmd):
             return
         except SystemExit:
             return
-        
+    
+    def do_get_base_libraries(self,args:Any):
+        """Get the base libraries that are being synchronized."""
+        parser = argparse.ArgumentParser(prog='get_base_libraries', add_help=True)
+        parser.add_argument('-s', '--state', help="Filter by library state. Possible values: 'published'(default),'development' , 'submitted', 'approved', 'rejected', ", type=str, default="published")
+        parser.add_argument("-n", "--name", help="Filter base libraries by name (partial match, non-case sensitive)", type=str, default=None)
+        parser.add_argument("-d", "--days", help="Filter libraries that have been updated in the last X days", type=int, default=None)
+        try:
+            args = parser.parse_args(shlex.split(args))
+            base_libs = self.synchronizer.base["api"].getLibraries(state=args.state)
+            if args.name:
+                base_libs = [lib for lib in base_libs if args.name.lower() in lib['attributes']['name'].lower()]
+            if args.days is not None:
+                cutoff_date = datetime.now() - timedelta(days=args.days)
+                base_libs = [lib for lib in base_libs if 'updated_at' in lib['attributes'] and datetime.strptime(lib['attributes']['updated_at'], "%Y-%m-%dT%H:%M:%S.%fZ") >= cutoff_date]
+            table = Table(title=f"Libraries for {self.synchronizer.base['name']}")
+            table.add_column("ID", style="cyan")
+            table.add_column("Name", style="magenta")
+            table.add_column("State", style="green")
+            table.add_column("Published", style="yellow")
+            for lib in base_libs:
+                lib_id = lib['id']
+                lib_name = lib['attributes']['name']
+                lib_state = lib['attributes']['state']
+                lib_published = lib['attributes'].get('published_at', 'N/A')
+                table.add_row(lib_id, lib_name, lib_state, lib_published)
+            console.print(table)
+        except Exception as e:
+            console.print(f"(!) Error: {str(e)}", style="red")
+            return
+        except SystemExit:
+            return
+    
+    def do_get_base_library(self,args:Any):
+        """ Return the components that are in the base library specified (rules, data elements, extensions)"""
+        parser = argparse.ArgumentParser(prog='get_base_library', add_help=True)
+        parser.add_argument("-n", "--name", help="Name of the library to get details for", type=str)
+        parser.add_argument("-id", "--id", help="ID of the library to get details for (overrides name if both provided)", type=str)
+        try:
+            args = parser.parse_args(shlex.split(args))
+            if args.id is not None:
+                lib = self.synchronizer.base["api"].getLibrary(args.id, return_class=True)
+            else:
+                libs = self.synchronizer.base["api"].getLibraries()
+                matching_libs = [lib for lib in libs if lib['attributes']['name'] == args.name]
+                if not matching_libs:
+                    console.print(f"Library '{args.name}' not found in this property.", style="red")
+                    return
+                lib = self.synchronizer.base["api"].getLibrary(matching_libs[0]['id'], return_class=True)
+            rules = lib.getRules()
+            data_elements = lib.getDataElements()
+            extensions = lib.getExtensions()
+            data = {
+                "rules": [],
+                "dataElements": [],
+                "extensions": []
+            }
+            if len(rules) > 0:
+                data['rules'] = [r['attributes']['name'] for r in rules]
+            if len(data_elements) > 0:
+                data['dataElements'] = [de['attributes']['name'] for de in data_elements]
+            if len(extensions) > 0:
+                data['extensions'] = [ext['attributes']['name'] for ext in extensions]
+            console.print_json(json.dumps(data, indent=4))
+        except Exception as e:
+            console.print(f"(!) Error: {str(e)}", style="red")
+            return
+        except SystemExit:
+            return
+
+    def do_sync_from_library(self,args:Any):
+        """Sync all components from a base library in the source property to the destination properties. Rules and data elements will be the latest published one"""
+        parser = argparse.ArgumentParser(prog='sync_from_library', add_help=True)
+        parser.add_argument("-n", "--name", help="Name of the library to sync from", type=str)
+        parser.add_argument("-id", "--id", help="ID of the library to sync from (overrides name if both provided)", type=str)
+        try:
+            args = parser.parse_args(shlex.split(args))
+            if args.id is not None:
+                lib = self.synchronizer.base["api"].getLibrary(args.id, return_class=True)
+            else:
+                libs = self.synchronizer.base["api"].getLibraries()
+                matching_libs = [lib for lib in libs if lib['attributes']['name'] == args.name]
+                if not matching_libs:
+                    console.print(f"Library '{args.name}' not found in this property.", style="red")
+                    return
+                lib = self.synchronizer.base["api"].getLibrary(matching_libs[0]['id'], return_class=True)
+            rules = lib.getRules()
+            dataelements = lib.getDataElements()
+            extensions = lib.getExtensions()
+            if len(extensions)>0:
+                console.print(f"Upgrading {len(extensions)} extension{'s' if len(extensions) > 1 else ''} from library '{lib.name}'...", style="blue")
+                for ext in extensions:
+                    try:
+                        self.synchronizer.upgradeTargetExtension(extensionName=ext['attributes']['name'])
+                        console.print(f"Extension '{ext['attributes']['name']}' upgraded successfully.", style="green")
+                    except Exception as e:
+                        console.print(f"(!) Error upgrading extension '{ext['attributes']['name']}': {str(e)}", style="red")
+            if len(rules)>0:
+                console.print(f"Syncing {len(rules)} rule{'s' if len(rules) > 1 else ''} from library '{lib.name}'...", style="blue")
+                for rule in rules:
+                    try:
+                        self.synchronizer.syncComponent(componentId=rule['id'], publishedVersion=True, forceCreation=True)
+                        console.print(f"Rule '{rule['attributes']['name']}' synced successfully.", style="green")
+                    except Exception as e:
+                        console.print(f"(!) Error syncing rule '{rule['attributes']['name']}': {str(e)}", style="red")
+            if len(dataelements)>0:
+                console.print(f"Syncing {len(dataelements)} data element{'s' if len(dataelements) > 1 else ''} from library '{lib.name}'...", style="blue")
+                for de in dataelements:
+                    try:
+                        self.synchronizer.syncComponent(componentId=de['id'], publishedVersion=True, forceCreation=True)
+                        console.print(f"Data element '{de['attributes']['name']}' synced successfully.", style="green")
+                    except Exception as e:
+                        console.print(f"(!) Error syncing data element '{de['attributes']['name']}': {str(e)}", style="red")
+        except Exception as e:
+            console.print(f"(!) Error: {str(e)}", style="red")
+            return
+        except SystemExit:
+            return
+    
+    def do_create_libraries(self,args:Any):
+        """Create libraries in the destination property based on the libraries in the source property that are selected for synchronization."""
+        parser = argparse.ArgumentParser(prog='create_libraries', add_help=True)
+        parser.add_argument("name",help="Name for the new library to be created in the destination properties", type=str)
+        parser.add_argument("-env",'--environment',help='Boolean. try to find an empty environment to build the library. Default False.',type=bool,default=False)
+        try:
+            args = parser.parse_args(shlex.split(args))
+            res = self.synchronizer.createTargetsLibrary(name=args.name,assignEnv=args.environment)
+            console.print_json(json.dumps(res, indent=4))
+        except Exception as e:
+            console.print(f"(!) Error: {str(e)}", style="red")
+            return
+        except SystemExit:
+            return
+
     def do_exit(self, arg):
         """Return to the main menu."""
         console.print(Panel("Returning to main menu...", style="blue"))

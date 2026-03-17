@@ -369,13 +369,16 @@ class Synchronizer:
             for component in componentsId:
                 self.syncComponent(componentId=component,publishedVersion=publishedVersion)
     
-    def createTargetsLibrary(self,name:str="syncComponents")->None:
+    def createTargetsLibrary(self,name:str="syncComponents",assignEnv:bool=False)->None:
         """
         This method will create or update a Library in all of the target properties to gather all elements changed.
         If a library exists and **contains** the same name, it will be used.
         Argument:
             name : REQUIRED : The name of the library to create. Default : "syncComponents"
+            assignEnv : REQUIRED : If you want to assign a library to an environment. By default, the library is not assigned to any environment.
+                    If set to True, the library will be assigned to an available environment in the Target Property if available and build it.
         """
+        response = {target:{'libraryName':name} for target in self.targets.keys()}
         for target in list(self.targets.keys()):
             if 'library' not in list(self.targets[target].keys()):
                 librariesDev = self.targets[target]['api'].getLibraries(state="development")
@@ -407,6 +410,28 @@ class Synchronizer:
                 self.targets[target]['library'].updateExtensions(existingExtensions)
             if len(newExtensions)>0:
                 self.targets[target]['library'].addExtensions(newExtensions)
+            if assignEnv:
+                envs = self.targets[target]['api'].getEnvironments()
+                found_free_env = False
+                if len(envs)>0:
+                    for env in envs:
+                        library_rel = env['relationships']['library'].get('data')
+                        if library_rel is None: ## no associated library
+                            found_free_env = True
+                            envId = env['id']
+                            envName = env['attributes']['name']
+                            scriptSource = env['meta'].get('script_sources',[{}])[0].get('minified')
+                            break ## take the first one available
+                if found_free_env:
+                    self.targets[target]['library'].setEnvironment(envId)
+                    self.targets[target]['library'].build()
+                    response[target]['environment'] = envName
+                    response[target]['script'] = scriptSource
+                else:
+                    response[target]['environment'] = "No free environment to assign"
+                    response[target]['script'] = None
+        return response
+
 
     def upgradeTargetExtension(self,extensionName:str=None,platform:str="web")->dict:
         """

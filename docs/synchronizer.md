@@ -142,6 +142,7 @@ The name is then used to match if a library already exist with that name, in the
 Note that the match looked for is using regular expression (`re.search`) to find a match in the existing libraries name.\
 Arguments:
 * name : REQUIRED : Name of the library to create or to use.
+* assignEnv : OPTIONAL : If you want to automatically assign an environment to the library and build it. Default False. Possible values: `True`, `False`
 
 ## renameComponent
 

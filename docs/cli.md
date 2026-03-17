@@ -40,6 +40,10 @@ This document provides an overview of the command line interface (CLI) for `laun
       - [get\_base\_rules](#get_base_rules)
       - [get\_base\_data\_elements](#get_base_data_elements)
       - [get\_base\_extensions](#get_base_extensions)
+      - [get\_base\_libraries](#get_base_libraries)
+      - [get\_base\_library](#get_base_library)
+      - [sync\_from\_library](#sync_from_library)
+      - [create\_libraries](#create_libraries)
 
 
 
@@ -449,3 +453,46 @@ Arguments:
 ```bash
 synchronizer:Base_Property_Name> get_base_extensions -n "Extension Name"
 ```
+
+#### get_base_libraries
+This command allows you to view the libraries that are availble in the base property for synchronization with the target properties.\
+Arguments:
+`-s`, `--state`: Filter by library state. Possible values: 'published'(default),'development' , 'submitted', 'approved', 'rejected'. This is an optional parameter.
+`-n`, `--name`: Filter base libraries by name (partial match, non-case sensitive). This is an optional parameter.
+`-d`, `--days`: Filter libraries that have been updated in the last X days. This is an optional parameter.
+
+```bash
+synchronizer:Base_Property_Name> get_base_libraries -s "published" -n "Library Name" -d 30
+```
+
+#### get_base_library
+This command allows you to view the details of a specific library that is availble in the base property for synchronization with the target properties.\
+It returns the rule, data elements and extensions that are part of the library, as well as the details of the library itself.\
+Arguments:
+`-n`, `--name`: The name of the library to get details for. This is a required parameter.
+`-id`, `--id`: The ID of the library to get details for (overrides name if both provided). This is an optional parameter.
+
+```bash
+synchronizer:Base_Property_Name> get_base_library -n "Library Name"
+```
+
+#### sync_from_library
+This command allows you to synchronize a library from the base property to the target properties.\
+**IMPORTANT**:By default it will use the published version of the elements that are part of the library. 
+`-n`, `--name`: The name of the library to sync from. This is a required parameter.
+`-id`, `--id`: The ID of the library to sync from (overrides name if both provided). This is an optional parameter.
+
+```bash
+synchronizer:Base_Property_Name> sync_from_library -n "Library Name"
+```
+
+#### create_libraries
+This command allows you to create a library in the destination properties with the elements you have sync.\
+Arguments:
+`name`: Name for the new library to be created in the destination properties. This is a required parameter.
+`-env`, `--environment`: Boolean. Try to find an empty environment to build the library. Default False. Possible values: `True`, `False`
+
+```bash
+synchronizer:Base_Property_Name> create_library "Library Name" -env True
+```
+        
