@@ -122,13 +122,15 @@ def configure(org_id: str = None,
               client_id: str = None,
               scopes : str= None,
               scope: str="https://ims-na1.adobelogin.com/s/ent_reactor_admin_sdk",
+              **kwargs
               ):
     """Performs programmatic configuration of the API using provided values.
     Arguments:
         org_id : REQUIRED : Organization ID
         tech_id : REQUIRED : Technical Account ID
         secret : REQUIRED : secret generated for your connection
-        client_id : REQUIRED : The client_id (old api_key) provided by the JWT connection. 
+        client_id : REQUIRED : The client_id (old api_key) provided by the Adobe Project. 
+        scopes : REQUIRED : The scopes required for the Oauth connection
         scope : OPTIONAL : Scope that is needed for JWT auth.
             Possible scope: https://www.adobe.io/authentication/auth-methods.html#!AdobeDocs/adobeio-auth/master/JWT/Scopes.md
     """
@@ -136,12 +138,10 @@ def configure(org_id: str = None,
         raise ValueError("`org_id` must be specified in the configuration.")
     if not client_id:
         raise ValueError("`client_id` must be specified in the configuration.")
-    if not tech_id and not scopes:
-        raise ValueError("`tech_id` must be specified in the configuration.")
+    if not scopes:
+        raise ValueError("`scopes` must be specified in the configuration.")
     if not secret:
         raise ValueError("`secret` must be specified in the configuration.")
-    if not path_to_key and not private_key and not scopes:
-        raise ValueError("`scopes` must be specified if Oauth setup.\n `pathToKey` or `private_key` must be specified in the configuration if JWT setup.")
     config_object["org_id"] = org_id
     header["x-gw-ims-org-id"] = org_id
     config_object["client_id"] = client_id

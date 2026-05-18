@@ -1,4 +1,4 @@
-import launchpy
+﻿import launchpy
 import argparse, cmd, shlex, json
 from functools import wraps
 from rich.console import Console
@@ -10,6 +10,16 @@ from datetime import datetime, timedelta
 from typing import Any, Concatenate, ParamSpec, ParamSpecKwargs
 from collections.abc import Callable
 import os
+
+def str2bool(v):
+    if isinstance(v, bool):
+        return v
+    if v.lower() in ('yes', 'true', 't', 'y', '1'):
+        return True
+    elif v.lower() in ('no', 'false', 'f', 'n', '0'):
+        return False
+    else:
+        raise argparse.ArgumentTypeError('Boolean value expected.')
 
 P = ParamSpec("P")
 
@@ -53,7 +63,7 @@ class PropertyCLI(cmd.Cmd):
     def do_get_extensions(self, arg):
         """Get all extensions in the property and list them."""
         parser = argparse.ArgumentParser(prog='get_extensions', add_help=True)
-        parser.add_argument("-s", "--save", help="Boolean. Save extensions to a CSV file. Default False. Possible values: True, False", type=bool, default=False)
+        parser.add_argument("-s", "--save", help="Boolean. Save extensions to a CSV file. Default False. Possible values: True, False", type=str2bool,  nargs="?", const=True, default=False)
         try:
             args = parser.parse_args(shlex.split(arg))
             extensions = self.property.getExtensions()
@@ -87,7 +97,7 @@ class PropertyCLI(cmd.Cmd):
         """Get details for a specific extension by name."""
         parser = argparse.ArgumentParser(prog='get_extension', add_help=True)
         parser.add_argument("name", help="Name of the extension to get details for", type=str)
-        parser.add_argument("-s", "--save", help="Boolean. Save extension details to a JSON file. Default False. Possible values: True, False", type=bool, default=False)
+        parser.add_argument("-s", "--save", help="Boolean. Save extension details to a JSON file. Default False. Possible values: True, False", type=str2bool, nargs="?", const=True, default=False)
         try:
             args = parser.parse_args(shlex.split(args))
             extensions = self.property.getExtensions()
@@ -112,7 +122,7 @@ class PropertyCLI(cmd.Cmd):
         """Get all rules for the property."""
         parser = argparse.ArgumentParser(prog='get_rules', add_help=True)
         parser.add_argument("-n", "--name", help="Filter rules by name (partial match, non-case sensitive)", type=str, default=None)
-        parser.add_argument("-s", "--save", help="Boolean. Save rules to a CSV file. Default False. Possible values: True, False", type=bool, default=False)
+        parser.add_argument("-s", "--save", help="Boolean. Save rules to a CSV file. Default False. Possible values: True, False", type=str2bool, nargs="?", const=True, default=False)
         try:
             args = parser.parse_args(shlex.split(arg))
             rules = self.property.getRules()
@@ -148,7 +158,7 @@ class PropertyCLI(cmd.Cmd):
         parser = argparse.ArgumentParser(prog='get_rule', add_help=True)
         parser.add_argument("-n", "--name", help="Name of the rule to get details for", type=str)
         parser.add_argument("-id", "--id", help="ID of the rule to get details for (overrides name if both provided)", type=str)
-        parser.add_argument("-s", "--save", help="Boolean. Save rule details to a JSON file. Default False. Possible values: True, False", type=bool, default=False)
+        parser.add_argument("-s", "--save", help="Boolean. Save rule details to a JSON file. Default False. Possible values: True, False", type=str2bool, nargs="?", const=True, default=False)
         try:
             args = parser.parse_args(shlex.split(arg))
             if self.rules is None:
@@ -185,7 +195,7 @@ class PropertyCLI(cmd.Cmd):
         parser = argparse.ArgumentParser(prog='get_rules_components', add_help=True)
         parser.add_argument("-rn", "--rule_name", help="(Partial) Name of the rule to get components for", type=str,default=None)
         parser.add_argument("-rid", "--rule_id", help="ID of the rule to get components for (overrides rule_name if both provided)", type=str, default=None)
-        parser.add_argument("-s", "--save", help="Boolean. Save components to a CSV file. Default False. Possible values: True, False", type=bool, default=False)
+        parser.add_argument("-s", "--save", help="Boolean. Save components to a CSV file. Default False. Possible values: True, False", type=str2bool, nargs="?", const=True, default=False)
         try:
             args = parser.parse_args(shlex.split(arg))
             if self.rules_components is None:
@@ -249,7 +259,7 @@ class PropertyCLI(cmd.Cmd):
         parser = argparse.ArgumentParser(prog='get_rule_components', add_help=True)
         parser.add_argument("-rn", "--rule_name", help="(Partial) Name of the rule to get components for", type=str, default=None)
         parser.add_argument("-rid", "--rule_id", help="ID of the rule to get components for (overrides rule_name if both provided)", type=str, default=None)
-        parser.add_argument("-s", "--save", help="Boolean. Save components to a JSON file. Default False. Possible values: True, False", type=bool, default=False)
+        parser.add_argument("-s", "--save", help="Boolean. Save components to a JSON file. Default False. Possible values: True, False", type=str2bool, nargs="?", const=True, default=False)
         try:
             args = parser.parse_args(shlex.split(arg))
             rule = None ## fallback
@@ -290,7 +300,7 @@ class PropertyCLI(cmd.Cmd):
         """Get all data elements, or only the ones matching a name filter, for the property. Can save them in CSV file."""
         parser = argparse.ArgumentParser(prog='get_data_elements', add_help=True)
         parser.add_argument("-n", "--name", help="Filter data elements by name (partial match, non-case sensitive)", type=str, default=None)
-        parser.add_argument("-s", "--save", help="Boolean. Save data elements to a CSV file. Default False. Possible values: True, False", type=bool, default=False)
+        parser.add_argument("-s", "--save", help="Boolean. Save data elements to a CSV file. Default False. Possible values: True, False", type=str2bool, nargs="?", const=True, default=False)
         try:
             args = parser.parse_args(shlex.split(args))
             des = self.property.getDataElements()
@@ -325,7 +335,7 @@ class PropertyCLI(cmd.Cmd):
         """Get details for a specific data element by name."""
         parser = argparse.ArgumentParser(prog='get_data_element', add_help=True)
         parser.add_argument("name", help="Name of the data element to get details for", type=str)
-        parser.add_argument("-s", "--save", help="Boolean. Save data element details to a JSON file. Default False. Possible values: True, False", type=bool, default=False)
+        parser.add_argument("-s", "--save", help="Boolean. Save data element details to a JSON file. Default False. Possible values: True, False", type=str2bool, nargs="?", const=True, default=False)
         try:
             args = parser.parse_args(shlex.split(args))
             if self.data_elements is None:
@@ -354,7 +364,7 @@ class PropertyCLI(cmd.Cmd):
         parser = argparse.ArgumentParser(prog='get_latest_published_version', add_help=True)
         parser.add_argument("-n", "--name", help="Name of the component to get the latest published version for", type=str, default=None)
         parser.add_argument("-t", "--type", help="Type of the component (e.g. 'rule', 'data_element', 'extension') to get the latest published version for. Default None", type=str, default=None)
-        parser.add_argument("-s", "--save", help="Boolean. Save the latest published version details to a JSON file. Default False. Possible values: True, False", type=bool, default=False)
+        parser.add_argument("-s", "--save", help="Boolean. Save the latest published version details to a JSON file. Default False. Possible values: True, False", type=str2bool,  nargs="?", const=True, default=False)
         try:
             args = parser.parse_args(shlex.split(arg))
             if args.type and args.name is None:
@@ -424,7 +434,7 @@ class PropertyCLI(cmd.Cmd):
     def do_get_libraries(self, arg: Any):
         """Get all libraries for the property."""
         parser = argparse.ArgumentParser(prog='get_libraries', add_help=True)
-        parser.add_argument("-s", "--save", help="Boolean. Save libraries to a CSV file. Default False. Possible values: True, False", type=bool, default=False)
+        parser.add_argument("-s", "--save", help="Boolean. Save libraries to a CSV file. Default False. Possible values: True, False", type=str2bool, nargs="?", const=True, default=False)
         parser.add_argument("-st", "--state", help="Filter by library state. Possible values: 'development' (default), 'submitted', 'approved', 'rejected', 'published'", type=str, default="development")
         try:
             args = parser.parse_args(shlex.split(arg))
@@ -538,7 +548,7 @@ class SynchronizerCLI(cmd.Cmd):
         parser = argparse.ArgumentParser(prog='check_component', add_help=True)
         parser.add_argument("-n", "--name", help="Name of the component to check", type=str)
         parser.add_argument("-id", "--id", help="ID of the component to check (overrides name if both provided)", type=str)
-        parser.add_argument("-p", "--published", help="Boolean. Check the latest published version of the component instead of the current version. Default False. Possible values: True, False", type=bool, default=False)
+        parser.add_argument("-p", "--published", help="Boolean. Check the latest published version of the component instead of the current version. Default False. Possible values: True, False", type=str2bool,  nargs="?", const=True, default=False)
         try:
             args = parser.parse_args(shlex.split(ars))
             if args.id is not None:
@@ -557,8 +567,8 @@ class SynchronizerCLI(cmd.Cmd):
         parser = argparse.ArgumentParser(prog='sync', add_help=True)
         parser.add_argument("-n", "--name", help="Name of the component to sync", type=str)
         parser.add_argument("-id", "--id", help="ID of the component to sync (overrides name if both provided)", type=str)
-        parser.add_argument("-p", "--published", help="Boolean. Sync the latest published version of the component instead of the current version. Default False. Possible values: True, False", type=bool, default=False)
-        parser.add_argument("-f", "--force", help="Boolean. Create the component if it does not exist. Default True. Possible values: True, False", type=bool, default=True)
+        parser.add_argument("-p", "--published", help="Boolean. Sync the latest published version of the component instead of the current version. Default False. Possible values: True, False", type=str2bool,  nargs="?", const=True, default=False)
+        parser.add_argument("-f", "--force", help="Boolean. Create the component if it does not exist. Default True. Possible values: True, False", type=str2bool, default=True)
         try:
             args = parser.parse_args(shlex.split(args))
             if args.id is not None:
@@ -755,10 +765,10 @@ class SynchronizerCLI(cmd.Cmd):
         parser = argparse.ArgumentParser(prog='sync_from_library', add_help=True)
         parser.add_argument("-n", "--name", help="Name of the library to sync from", type=str)
         parser.add_argument("-id", "--id", help="ID of the library to sync from (overrides name if both provided)", type=str)
-        parser.add_argument("-f", "--force", help="Boolean. Create the component if it does not exist. Default True. Possible values: True, False", type=bool, default=True)
-        parser.add_argument("-ll", "--library_linked", help="Boolean. Whether to use library linked components or not. If set to True, the sync will be done using the library linked components. If set to False, the sync will be done using the component IDs in the library. Default True. Possible values: True, False", type=bool, default=True)
-        parser.add_argument("-p", "--published", help="Boolean. Sync the latest published version of the component instead of the current version. Default False. Possible values: True, False", type=bool, default=False)
-        parser.add_argument("-dr", "--dry_run", help="Boolean. If set to True, will only check the sync status of the components without actually syncing them. Default False. Possible values: True, False", type=bool, default=False)
+        parser.add_argument("-f", "--force", help="Boolean. Create the component if it does not exist. Default True. Possible values: True, False", type=str2bool, default=True)
+        parser.add_argument("-ll", "--library_linked", help="Boolean. Whether to use library linked components or not. If set to True, the sync will be done using the library linked components. If set to False, the sync will be done using the component IDs in the library. Default True. Possible values: True, False", type=str, default=True)
+        parser.add_argument("-p", "--published", help="Boolean. Sync the latest published version of the component instead of the current version. Default False. Possible values: True, False", type=str2bool, nargs="?", const=True, default=False,)
+        parser.add_argument("-dr", "--dry_run", help="Boolean. If set to True, will only check the sync status of the components without actually syncing them. Default False. Possible values: True, False", type=str2bool, nargs="?", const=True, default=False,)
         try:
             args = parser.parse_args(shlex.split(args))
             publishedVersion = args.published # default False
@@ -1004,7 +1014,7 @@ class MainShell(cmd.Cmd):
         """List all properties available in the connected AEP instance."""
         parser = argparse.ArgumentParser(prog='get_properties', add_help=True)
         parser.add_argument("-n", "--name", help="Filter properties by name (partial match, non-case sensitive)", type=str, default=None)
-        parser.add_argument("-s", "--save", help="Boolean. Save properties to a CSV file. Default False. Possible values: True, False", type=bool, default=False)
+        parser.add_argument("-s", "--save", help="Boolean. Save properties to a CSV file. Default False. Possible values: True, False", type=str2bool, nargs="?", const=True, default=False)
         try:
             args = parser.parse_args(shlex.split(arg))
             properties = self.admin.getProperties(self.cid)
@@ -1133,7 +1143,7 @@ class MainShell(cmd.Cmd):
     def do_get_extensions(self, arg:Any) -> None:
         """List all available extensions in the connected Adobe Launch organization."""
         parser = argparse.ArgumentParser(prog='get_extensions', add_help=True)
-        parser.add_argument("-s", "--save", help="Boolean. Save extensions to a JSON file. Default False. Possible values: True, False", type=bool, default=False)
+        parser.add_argument("-s", "--save", help="Boolean. Save extensions to a JSON file. Default False. Possible values: True, False", type=str2bool, nargs="?", const=True, default=False)
         try:
             args = parser.parse_args(shlex.split(arg))
             extensions = self.admin.getExtensionsCatalogue()
