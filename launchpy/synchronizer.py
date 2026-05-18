@@ -1,10 +1,9 @@
 import re,json
 # Non standard libraries
-from .admin import Admin
-from .property import Property
-from .library import Library
-from .launchpy import Translator, copySettings
-from collections import defaultdict
+from launchpy.admin import Admin
+from launchpy.property import Property
+from launchpy.library import Library
+from launchpy.launchpy import Translator, copySettings
 from copy import deepcopy
 from aepp import som
 
@@ -126,31 +125,52 @@ class Synchronizer:
                             'inclComponents': deepcopy(self.dict_config[rule]['inclComponents'])
                         }
     
-    def __prepareBaseComponent__(self,componentName:str=None,componentId:str=None,publishedVersion:bool=False)->dict:
+    def __prepareBaseComponent__(self,componentName:str=None,componentId:str=None,publishedVersion:bool=False,**kwargs)->dict:
         """
         Prepare the base component to be used in the syncComponent method.
         Arguments:
             componentName : REQUIRED : the name of the component to sync
             componentID : REQUIRED : the id of the component to sync
             publishedVersion : OPTIONAL : if you want to take the version that has been published
+        kwargs: 
+            libraryLinked : OPTIONAL : If you want to pass ID that are associated to a specific library. Default: False
         """
         cmp_base=None
+        componentBase = None
         if componentId is not None:
             if componentId.startswith('DE'): ## if data element
+                if kwargs.get('libraryLinked',False):
+                    lib_cmp_base = self.base['api'].getDataElement(componentId)
+                    if lib_cmp_base is None:
+                         raise KeyError("Component ID cannot be found")
+                    componentId = lib_cmp_base['links']['origin'].split('/').pop()
                 componentBase = [de for de in self.base['dataElements'] if de['id'] == componentId]
                 if len(componentBase)==0:
                     raise KeyError("Component ID cannot be found")
-                cmp_base = componentBase[0]
+                if type(componentBase) == list and len(componentBase)>0:
+                    cmp_base = componentBase[0]
             elif componentId.startswith('RL'): ## if a rule
+                if kwargs.get('libraryLinked',False):
+                    lib_cmp_base = self.base['api'].getRule(componentId)
+                    if lib_cmp_base is None:
+                         raise KeyError("Component ID cannot be found")
+                    componentId = lib_cmp_base['links']['origin'].split('/').pop()
                 componentBase = [de for de in self.base['rules'] if de['id'] == componentId]
                 if len(componentBase)==0:
                     raise KeyError("Component ID cannot be found")
-                cmp_base = componentBase[0]
+                if type(componentBase) == list and len(componentBase)>0:
+                    cmp_base = componentBase[0]
             elif componentId.startswith('EX'): ## if an extension
+                if kwargs.get('libraryLinked',False):
+                    lib_cmp_base = self.base['api'].getExtension(componentId)
+                    if lib_cmp_base is None:
+                         raise KeyError("Component ID cannot be found")
+                    componentId = lib_cmp_base['links']['origin'].split('/').pop()
                 componentBase = [ext for ext in self.base['extensions'] if ext['id'] == componentId]
                 if len(componentBase)==0:
-                    raise KeyError("Component ID cannot be found")
-                cmp_base = componentBase[0]
+                        raise KeyError("Component ID cannot be found")
+                if type(componentBase) == list and len(componentBase)>0:
+                    cmp_base = componentBase[0]
         if componentId is None and componentName is not None: ## If only componentName
             for rule in self.base['rules']:
                 if componentName == rule['attributes']['name']:
@@ -174,7 +194,7 @@ class Synchronizer:
             data = self.base['api'].getRevisions(cmp_baseDict['component'])
             publishedVersion = self.base['api'].getLatestPublishedVersion(data) 
             if publishedVersion['attributes']['name'] != cmp_baseDict['name']:
-                ## Updating mapping table with old name when published version name diff than last versio name.
+                ## Updating mapping table with old name when published version name diff than last version name.
                 if cmp_baseDict['component']['type'] == 'rules':
                     self.translator.extendBaseRules(
                     ruleName=publishedVersion['attributes']['name'],
@@ -183,10 +203,18 @@ class Synchronizer:
                     self.base['rules'].append(publishedVersion)
                 if cmp_baseDict['component']['type'] == 'data_elements':
                     self.base['dataElements'].append(publishedVersion)
-            cmp_baseDict['id'] = publishedVersion['id']
-            cmp_baseDict['name'] = publishedVersion['attributes']['name']
-            cmp_baseDict['component'] = publishedVersion
-            cmp_baseDict['copy'] = copySettings(publishedVersion)
+            cmp_baseDict = {'id':publishedVersion['id'],'name':publishedVersion['attributes']['name'],'component':publishedVersion,'copy':copySettings(publishedVersion)}
+        if kwargs.get('libraryLinked',False) and cmp_baseDict['component']['type'] in ['rules','data_elements']:
+            if lib_cmp_base['attributes']['name'] != cmp_baseDict['name']:
+                if cmp_baseDict['component']['type'] == 'rules':
+                    self.translator.extendBaseRules(
+                    ruleName=lib_cmp_base['attributes']['name'],
+                    ruleId=lib_cmp_base['id'],
+                    property_name=self.base["name"])
+                    self.base['rules'].append(lib_cmp_base)
+                if cmp_baseDict['component']['type'] == 'data_elements':
+                    self.base['dataElements'].append(lib_cmp_base)
+            cmp_baseDict = {'id':lib_cmp_base['id'],'name':lib_cmp_base['attributes']['name'],'component':lib_cmp_base,'copy':copySettings(lib_cmp_base)}
         return cmp_baseDict
 
     def syncComponent(self,componentName:str=None,componentId:str=None,publishedVersion:bool=False,forceCreation:bool=True,**kwargs)->None:
@@ -202,11 +230,13 @@ class Synchronizer:
             forceCreation : OPTIONAL : If the component does not exist in the target property, create it. Default: True
         possible kwargs:
             timeout : OPTIONAL : The timeout to be used for the rule component. If not provided, the existing timeout will be used.
+            libraryLinked : OPTIONAL : If you want to take a component ID that are associated to a specific library. Default: False. If set to True, the method will look for the component in the library and take the version linked to the library instead of the latest version in the property. Do not work for Extensions.
         """
         timeout = kwargs.get('timeout',None)
+        libraryLinked = kwargs.get('libraryLinked',False)
         if componentName is None and componentId is None:
             raise ValueError('Require a component Name of a component ID')
-        cmp_baseDict = self.__prepareBaseComponent__(componentName=componentName,componentId=componentId,publishedVersion=publishedVersion)
+        cmp_baseDict = self.__prepareBaseComponent__(componentName=componentName,componentId=componentId,publishedVersion=publishedVersion,libraryLinked=libraryLinked)
         ## handling the data element
         if cmp_baseDict['component']['type'] == 'data_elements':
             for target in list(self.targets.keys()):
@@ -369,14 +399,15 @@ class Synchronizer:
             for component in componentsId:
                 self.syncComponent(componentId=component,publishedVersion=publishedVersion)
     
-    def createTargetsLibrary(self,name:str="syncComponents",assignEnv:bool=False)->None:
+    def createTargetsLibrary(self,name:str="syncComponents",assignEnv:bool|str=False)->None:
         """
         This method will create or update a Library in all of the target properties to gather all elements changed.
         If a library exists and **contains** the same name, it will be used.
         Argument:
             name : REQUIRED : The name of the library to create. Default : "syncComponents"
-            assignEnv : REQUIRED : If you want to assign a library to an environment. By default, the library is not assigned to any environment.
+            assignEnv : REQUIRED : If you want to assign a library to an environment. 
                     If set to True, the library will be assigned to an available environment in the Target Property if available and build it.
+                    If set to a string (regex supported), the library will be assigned to the environment with the name provided if it exists, and build it. If that environment is used in a Library, it will remove that environment from the library and assign it to the new one. Default: False  
         """
         response = {target:{'libraryName':name} for target in self.targets.keys()}
         for target in list(self.targets.keys()):
@@ -410,8 +441,14 @@ class Synchronizer:
                 self.targets[target]['library'].updateExtensions(existingExtensions)
             if len(newExtensions)>0:
                 self.targets[target]['library'].addExtensions(newExtensions)
-            if assignEnv:
+            if type(assignEnv) == bool and assignEnv == True:
                 envs = self.targets[target]['api'].getEnvironments()
+                prod = [env for env in envs if env['attributes']['stage'].lower() == 'production']
+                if len(prod) == 0:
+                    prod_script = "https://assets.adobedtm.com/" ## default script source when no production environment exist, with a random id to avoid any conflict with an existing environment script source.
+                else:
+                    prod = prod[0]
+                    prod_script = prod['meta'].get('script_sources',[{}])[0].get('minified')
                 found_free_env = False
                 if len(envs)>0:
                     for env in envs:
@@ -426,9 +463,47 @@ class Synchronizer:
                     self.targets[target]['library'].setEnvironment(envId)
                     self.targets[target]['library'].build()
                     response[target]['environment'] = envName
-                    response[target]['script'] = scriptSource
+                    response[target]['script'] = {f"{target} - {self.targets[target]['library'].name}" : {
+                        "replace": prod_script,
+                        "with": scriptSource
+                    }}
+                    response[target]['build_status'] = self.targets[target]['library'].build_status
                 else:
                     response[target]['environment'] = "No free environment to assign"
+                    response[target]['script'] = None
+            elif type(assignEnv) == str:
+                envs = self.targets[target]['api'].getEnvironments()
+                prod = [env for env in envs if env['attributes']['stage'].lower() == 'production']
+                if len(prod) == 0:
+                    prod_script = "https://assets.adobedtm.com/" ## default script source when no production environment exist, with a random id to avoid any conflict with an existing environment script source.
+                else:
+                    prod = prod[0]
+                    prod_script = prod['meta'].get('script_sources',[{}])[0].get('minified')
+                env = [env for env in envs if re.search(assignEnv, env['attributes']['name'], re.IGNORECASE)]
+                if len(env) == 0:
+                    response[target]['environment'] = f"No environment with the name {assignEnv} to assign"
+                    response[target]['script'] = None
+                elif len(env) == 1:
+                    env = env[0]
+                    envId = env['id']
+                    envName = env['attributes']['name']
+                    scriptSource = env['meta'].get('script_sources',[{}])[0].get('minified')
+                    libraryUsed = self.targets[target]["api"].getEnvironmentLibrary(envId)
+                    if libraryUsed is not None:
+                        print(f'Environment is already used by library "{libraryUsed["attributes"]["name"]}" in "{target}" property. Removing the environment from that library.')
+                        libraryUsedId = libraryUsed['id']
+                        tmp_lib = Library(libraryUsedId,config_object=self.targets[target]['api'].connector.config,header=self.targets[target]['api'].connector.header)
+                        tmp_lib.removeEnvironment()
+                    self.targets[target]['library'].setEnvironment(envId)
+                    self.targets[target]['library'].build()
+                    response[target]['environment'] = envName
+                    response[target]['script'] = {f"{target} - {self.targets[target]['library'].name}" : {
+                    "replace": prod_script,
+                    "with": scriptSource
+                    }}
+                    response[target]['build_status'] = self.targets[target]['library'].build_status
+                else:
+                    response[target]['environment'] = f"Multiple environment with the name {assignEnv} to assign"
                     response[target]['script'] = None
         return response
 
@@ -514,25 +589,14 @@ class Synchronizer:
             action_setting_path : [str,list] : The dot notation of the paths you want to verify for the settings object. ex: ["code","customAttributes"]. If not provided, the complete settings are compared.
             condition_setting_path : [str,list] : The dot notation of the paths you want to verify for the setting object . ex: ["id",""]. If not provided, the complete settings are compared
             event_setting_path : [str,list] : The dot notation of the paths you want to verify for the setting object . ex: ["id",""]. If not provided, the complete settings are compared
+            libraryLinked : bool : If you want to pass ID that are associated to a specific library. Default: False
         """
         if componentName is None and componentId is None:
             raise ValueError('Require a component Name of a component ID')
-        cmp_baseDict = self.__prepareBaseComponent__(componentName=componentName,componentId=componentId,publishedVersion=publishedVersion)
+        cmp_baseDict = self.__prepareBaseComponent__(componentName=componentName,componentId=componentId,publishedVersion=publishedVersion,libraryLinked=kwargs.get('libraryLinked',False))
         dict_result = {tar:"" for tar in self.targets.keys()}
         dict_result['base-enabled'] = cmp_baseDict['component']['attributes'].get('enabled',False)
         dict_result['base-published'] = cmp_baseDict['component']['attributes'].get('published',False)
-        if cmp_baseDict['component']['attributes'].get('latest',False):
-            dict_result['base-state'] = "Latest"
-        else:
-            if cmp_baseDict['component']['attributes'].get('latest','unknown') == 'unknown':
-                if dict_result['base-enabled']:
-                    dict_result['base-state'] = "Draft"
-                else:
-                    dict_result['base-state'] = "Unknown"
-            elif dict_result['base-published'] == False:
-                dict_result['base-state'] = "Draft"
-            else:
-                dict_result['base-state'] = "Edited"
         if cmp_baseDict['component']['type'] == 'data_elements':
             for target in list(self.targets.keys()):
                 ## if it does not exist
@@ -676,3 +740,97 @@ class Synchronizer:
                             if not excludeSimilar:
                                 dict_result[target] = 'Similar'+issue_pub
         return dict_result
+    
+    def __checkLibrarySync__(self,library:str=None,state='published',excludeSimilar:bool=False,libraryLinked:bool=True,publishedVersion:bool=False)->dict:
+        """
+        Check if the components in a library, from the base property, is synced to the different target properties.
+        By default, it will compare the version of the library to the latest version in the target properties.
+        It will return a dictionary with the key being the component name and the value being the result of the evaluation, such as {componentName: {'targetProperty': 'similar'}} when library have same settings.
+        Arguments:
+            library : REQUIRED : the library name or the library ID to get the components.
+            state : OPTIONAL : the state of the library to compare. Default: 'published', possible states: "development", "submitted", "approved", "rejected", "published"
+            excludeSimilar : OPTIONAL : If you do not want to see the result if the comparison provide a "similar" result. Similar means that the elements are about the same. Default: False. 
+            libraryLinked : OPTIONAL : If set to True, it will use library linked components for comparison. Default: True.
+            publishedVersion : OPTIONAL : If set to True, it will compare the components to the published version in the target properties. Default: False.
+        """
+        if library is None:
+            raise ValueError('Require a library Name of a library ID')
+        libraryLink = True
+        base_libraries = self.base['api'].getLibraries(state=state)
+        if library in [lib['attributes']['name'] for lib in base_libraries]:
+            base_library = [lib for lib in base_libraries if lib['attributes']['name'] == library][0]
+        elif library in [lib['id'] for lib in base_libraries]:
+            base_library = [lib for lib in base_libraries if lib['id'] == library][0]
+        else:
+            raise ValueError('The library name or ID provided does not exist in the base property')
+        myLib = Library(base_library['id'],config_object=self.base['api'].connector.config,header=self.base['api'].connector.header)
+        components = myLib.getFullLibrary()
+        rules = components['rules']
+        dataElements = components['data_elements']
+        extensions = components['extensions']
+        elements = rules + dataElements + extensions
+        if publishedVersion == True:
+            element_ids = {elem['id']: elem['attributes']['name'] for elem in elements}
+            libraryLink = False
+        elif libraryLinked == True:
+            element_ids ={elem['links']['self'].split('/').pop():elem['attributes']['name'] for elem in elements}
+        else:
+            element_ids = {elem['id']: elem['attributes']['name'] for elem in elements}
+        dict_check = {}
+        for element_id, element_name in element_ids.items():
+            dict_check[element_name] = self.checkComponentSync(componentId=element_id, excludeSimilar=excludeSimilar,publishedVersion=publishedVersion,libraryLinked=libraryLink)
+        return dict_check
+    
+    def syncFromLibrary(self,library:str=None,state='published',force:bool=True,libraryLinked:bool=True,publishedVersion:bool=False,dryRun:bool=False)->None:
+        """
+        Sync the components in a library, from the base property, to the different target properties by using the createTargetsLibrary method.
+        Arguments:
+            library : REQUIRED : the library name or the library ID to get the components.
+            state : OPTIONAL : the state of the library to compare. Default: 'published', possible states: "development", "submitted", "approved", "rejected", "published"
+            force : OPTIONAL : If set to True, it will sync the components even if they do not exist in the target properties. If set to False, it will only sync the components that already exist in the target properties. Default: True.
+            libraryLinked : OPTIONAL : If set to True, it will sync the components using the library version. Default: False.
+            publishedVersion : OPTIONAL : if you want to sync the version of the library that has been published in your base vs the published version of your target. Default: False.
+            dryRun : OPTIONAL : If set to True, it will not actually sync the components but will return a dictionary with the components that would be synced and the target properties they would be synced to. Default: False.
+        """
+        if library is None:
+            raise ValueError('Require a library Name of a library ID')
+        libs = self.base['api'].getLibraries(state=state)
+        if library in [lib['attributes']['name'] for lib in libs]:
+            libraryId = [lib for lib in libs if lib['attributes']['name'] == library][0]['id']
+        elif library in [lib['id'] for lib in libs]:
+            libraryId = [lib for lib in libs if lib['id'] == library][0]['id']
+        else:
+            raise ValueError('The library name or ID provided does not exist in the base property')
+        if dryRun:
+            return self.__checkLibrarySync__(library=library,state=state,excludeSimilar=False,libraryLinked=libraryLinked,publishedVersion=publishedVersion)
+        myLib = self.base['api'].getLibrary(libraryId,return_class=True)
+        rules = myLib.getRules()
+        dataelements = myLib.getDataElements()
+        extensions = myLib.getExtensions()
+        if len(extensions)>0:
+            for ext in extensions:
+                try:
+                    self.upgradeTargetExtension(extensionName=ext['attributes']['name'])
+                except:
+                    print(f'Extension {ext["attributes"]["name"]} could not be updated in the target properties. Please check if the extension exist and if there is an update available.')
+        if len(rules)>0:
+            for rule in rules:
+                try:
+                    if libraryLinked:
+                        ruleId = rule['links']['self'].split('/').pop()
+                    else:
+                        ruleId = rule['id']
+                    self.syncComponent(componentId=ruleId,publishedVersion=publishedVersion, forceCreation=force,libraryLinked=libraryLinked)
+                except:
+                    print(f'Rule {rule["attributes"]["name"]} could not be updated in the target properties. Please check if the rule exist.')
+        if len(dataelements)>0:
+            for de in dataelements:
+                try:
+                    if libraryLinked:
+                        deId = de['links']['self'].split('/').pop()
+                    else:
+                        deId = de['id']
+                    self.syncComponent(componentId=deId,publishedVersion=publishedVersion,forceCreation=force,libraryLinked=libraryLinked)
+                except:
+                    print(f'Data Element {de["attributes"]["name"]} could not be updated in the target properties. Please check if the data element exist.')
+        return 

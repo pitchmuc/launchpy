@@ -3,9 +3,7 @@ token = ""
 config_object = {
     "org_id": "",
     "api_key": "",
-    "pathToKey": "",
     "secret": "",
-    "jwtTokenEndpoint" : "https://ims-na1.adobelogin.com/ims/exchange/jwt",
     "oauthTokenEndpointV2" : "https://ims-na1.adobelogin.com/ims/token/v2",
     "date_limit" : 0,
     "scope_admin" : "https://ims-na1.adobelogin.com/s/ent_reactor_admin_sdk",

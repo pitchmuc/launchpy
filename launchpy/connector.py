@@ -85,8 +85,6 @@ class AdobeRequest:
         if now > self.config['date_limit']:
             if self.connectionType =='oauthV2':
                 token_and_expiry = self.get_oauth_token_and_expiry_for_config(config=self.config)
-            elif self.connectionType == 'jwt':
-                token_and_expiry = self.get_jwt_token_and_expiry_for_config(config=self.config)
             token = token_and_expiry['token']
             self.config['token'] = deepcopy(token)
             self.config['date_limit'] = deepcopy(time.time() + token_and_expiry['expiry'] - 500)

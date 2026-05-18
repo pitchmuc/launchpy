@@ -10,29 +10,29 @@ authors = [
 description = "Adobe Launch API wrapper"
 dynamic = ["version"]
 readme = "README.md"
-requires-python = ">=3.7"
+requires-python = ">=3.10"
 keywords = ["adobe", "analytics", "API", "python"]
 license = {text = "Apache License 2.0"}
 classifiers = [
     "Intended Audience :: Developers",
-    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
+    "License :: OSI Approved :: Apache Software License",
     "Operating System :: OS Independent",
     "Programming Language :: Python",
     "Topic :: Scientific/Engineering :: Information Analysis",
-    "Programming Language :: Python :: 3.6",
-    "Programming Language :: Python :: 3.7",
-    "Programming Language :: Python :: 3.8",
-    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Development Status :: 4 - Beta"
 ]
 dependencies = ['pandas', 
                 "requests",
-                "PyJWT", 
-                 "PyJWT[crypto]",
                  "pathlib2", 
                  "pathlib",
                  "aepp",
-                 "rich",]
+                 "rich",
+                 "deprecated"]
 
 [project.urls]
 homepage = "https://github.com/pitchmuc/launchpy"

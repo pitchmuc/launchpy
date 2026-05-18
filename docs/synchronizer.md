@@ -6,6 +6,16 @@ You can recreate a (more advanced) version that supports additional methods or e
 
 The Synchronizer will allow you to specify a template property and target property **within the same organization** in order to sync these properties rules and data elements.
 
+## Menu 
+
+[MENUI](#menu)
+[Pre Requisite](#pre-requisite)
+[Instantiation](#instantiation)
+[SyncComponent Method](#syncComponent-Method)
+[SyncComponents](#syncComponents)
+[SyncFromLibrary](#syncFromLibrary)
+[createTargetsLibrary](#createTargetsLibrary)
+[renameComponent](#renameComponent)
 
 
 ## PRE REQUISITE
@@ -85,7 +95,6 @@ synchronizor = lp.Synchronizer(base=base,targets=['another Property Name to sync
 
 ```
 
-
 ### Additional options
 There is a possibility to setup some rules so you can filter when migrating from one property to another. See [dynamic Filtering](#dynamic-component-filter)
 
@@ -122,7 +131,7 @@ The method will delete all rule components existing in the Target property for t
 It will then copy all template rule component existing in that base property to the target properties.\
 No history is saved from the existing rule component, which will make revision check very hard.
 
-## SyncComponents Method
+## SyncComponents
 
 You can pass down a list of component names or componentIds.\
 It takes 3 arguments:\
@@ -131,10 +140,28 @@ Arguments:
 * componentsId : REQUIRED : The list of component ID to sync*
 * publishedVersion : OPTIONAL : if you want to take the version that has been published
 
+## syncFromLibrary
+
+This method allows you to take a library in your base property and sync all of the components in that library to the target properties.
+Arguments: 
+* library : REQUIRED : the name or the ID of the library to sync from.
+* state : OPTIONAL : the state of the library to sync from. Default: 'published', possible states: "development", "submitted", "approved", "rejected", "published"
+* force : OPTIONAL : If set to True, it will create the element sync if it does not exist in the target property. Set to `False`, it will prevent that behavior. Default: `True`.
+* libraryLinked : OPTIONAL : If set to True, it will use library linked components for comparison. Default: `True`.
+* publishedVersion : OPTIONAL : If set to True, it will compare the components to the published version in the target properties. Default: `False`.
+* dryRun : OPTIONAL : If set to True, will only check the sync status of the components without actually syncing them. Default `False`. Possible values: `True`, `False`
+
+**Note**: A library is not created automatically, so you will need to create a new one via the `createTargetsLibrary` method.
+
+### Behaviors for syncFromLibrary
+By default, the method will sync the components present in the library as they are in the library.
+If the `publishedVersion` is set to True, it will try to sync the version that has been published in the base property to the targets.\
+If the `libraryLinked` is set to `False` and the `publishedVersion` is set to `False` (default), it will try to sync the latest version of the components present in the base property library to the targets.\
+
 ## createTargetsLibrary
 
 The synchronizer will automatically track the component that has been updated via the module.\
-When you are done synchronizing your components, you can run this method to create a library, that will contain all of your elements you synchronized.\
+When you are done synchronizing your components, you can run this method to create a library, that will contain all the elements you synchronized.\
 The library will be available within all of your synch properties.
 
 You can pass a name to define the library name that is created.\
@@ -142,7 +169,10 @@ The name is then used to match if a library already exist with that name, in the
 Note that the match looked for is using regular expression (`re.search`) to find a match in the existing libraries name.\
 Arguments:
 * name : REQUIRED : Name of the library to create or to use.
-* assignEnv : OPTIONAL : If you want to automatically assign an environment to the library and build it. Default False. Possible values: `True`, `False`
+* assignEnv : OPTIONAL : If you want to automatically assign an environment to the library and build it. Default False. 
+  Possible values: `True`, `False` or a `string` which is the name of the environment you want to assign to the library.\
+  If `True`, it will try to find a free environment and assign it to the library. If none is available, it will not assign any environment to the library.\
+  If the name of the environment is provided, it will try to assign it to that library. If the environment is already used in a Library, it will remove that association and assign it to the new library. (A print statement will be printed to warn about that change of association)
 
 ## renameComponent
 
@@ -198,14 +228,10 @@ For Data Elements:
 
 #### Additional elements
 On top of the different properties check, additional information will be provided for the base component: 
-* `base-publihsed`: If the current component check is published.\
+* `base-published`: If the current component check is published.\
   **IMPORTANT NOTE**: When you using the `publishedVersion` parameter set to True, most of the element will be set to Published. In reverse, it is not because the component current version is not published that it has never been published. Use the `publishedVersion` to ensure this.
 * `base-enabled`: If the current component check is enabled. 
-* `base-state`: 
-  * `Latest`: If the component retrieved is the latest latest version
-  * `Unknown`: If the component retrieved cannot be evaluated to know if it is the latest.
-  * `Draft` : If the component retrieved is not the latest and it has not yet been published
-  * `Edited`: If the component retrieved is not the latest and has been published before.
+
 
 #### Similar vs Same
 The idea of checking the similarity of 2 components is partially done as not everything can be tested during the check.\

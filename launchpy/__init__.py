@@ -48,7 +48,6 @@ async def process_all_rules(rules_list, folder, header):
     async with httpx.AsyncClient(timeout=timeout, limits=limits) as client:
         # Create a list of "tasks" to run
         tasks = [__extractRuleComponents__(rule, client, folder, header) for rule in rules_list]
-        
         # 'gather' runs them all concurrently
         await asyncio.gather(*tasks)
 

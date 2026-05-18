@@ -1,4 +1,3 @@
-from rich import rule
 import launchpy
 import argparse, cmd, shlex, json
 from functools import wraps
@@ -10,6 +9,7 @@ import pandas as pd
 from datetime import datetime, timedelta
 from typing import Any, Concatenate, ParamSpec, ParamSpecKwargs
 from collections.abc import Callable
+import os
 
 P = ParamSpec("P")
 
@@ -32,6 +32,11 @@ def login_required(f:Callable[Concatenate["MainShell", P], None]) -> Callable[Co
             return
         return f(self, *args, **kwargs)
     return wrapper
+
+def clear_terminal():
+    """Clears the terminal screen based on the OS."""
+    # os.name is 'nt' for Windows, 'posix' for Mac/Linux
+    os.system('cls' if os.name == 'nt' else 'clear')
 
 console = Console()
 
@@ -507,6 +512,10 @@ class PropertyCLI(cmd.Cmd):
         except SystemExit:
             return
     
+    def do_clear(self, arg) -> None:
+        """Clear the terminal screen."""
+        clear_terminal()
+
     def do_exit(self, arg):
         """Return to the main menu."""
         console.print(Panel("Returning to main menu..."),style="blue")
@@ -741,12 +750,22 @@ class SynchronizerCLI(cmd.Cmd):
             return
 
     def do_sync_from_library(self,args:Any):
-        """Sync all components from a base library in the source property to the destination properties. Rules and data elements will be the latest published one"""
+        """Sync all components from a base library in the source property to the destination properties. 
+        Rules and data elements will be the library version by default. Can be changed with --ll parameter."""
         parser = argparse.ArgumentParser(prog='sync_from_library', add_help=True)
         parser.add_argument("-n", "--name", help="Name of the library to sync from", type=str)
         parser.add_argument("-id", "--id", help="ID of the library to sync from (overrides name if both provided)", type=str)
+        parser.add_argument("-f", "--force", help="Boolean. Create the component if it does not exist. Default True. Possible values: True, False", type=bool, default=True)
+        parser.add_argument("-ll", "--library_linked", help="Boolean. Whether to use library linked components or not. If set to True, the sync will be done using the library linked components. If set to False, the sync will be done using the component IDs in the library. Default True. Possible values: True, False", type=bool, default=True)
+        parser.add_argument("-p", "--published", help="Boolean. Sync the latest published version of the component instead of the current version. Default False. Possible values: True, False", type=bool, default=False)
+        parser.add_argument("-dr", "--dry_run", help="Boolean. If set to True, will only check the sync status of the components without actually syncing them. Default False. Possible values: True, False", type=bool, default=False)
         try:
             args = parser.parse_args(shlex.split(args))
+            publishedVersion = args.published # default False
+            libraryLinked = args.library_linked # default True
+            if args.published:
+                publishedVersion = True
+                libraryLinked = False
             if args.id is not None:
                 lib = self.synchronizer.base["api"].getLibrary(args.id, return_class=True)
             else:
@@ -756,6 +775,10 @@ class SynchronizerCLI(cmd.Cmd):
                     console.print(f"Library '{args.name}' not found in this property.", style="red")
                     return
                 lib = self.synchronizer.base["api"].getLibrary(matching_libs[0]['id'], return_class=True)
+            if args.dry_run:
+                results = self.synchronizer.__checkLibrarySync__(library=lib.id, state=lib.state, excludeSimilar=False,libraryLinked=libraryLinked,publishedVersion=publishedVersion)
+                console.print_json(json.dumps(results, indent=4))
+                return
             rules = lib.getRules()
             dataelements = lib.getDataElements()
             extensions = lib.getExtensions()
@@ -771,7 +794,11 @@ class SynchronizerCLI(cmd.Cmd):
                 console.print(f"Syncing {len(rules)} rule{'s' if len(rules) > 1 else ''} from library '{lib.name}'...", style="blue")
                 for rule in rules:
                     try:
-                        self.synchronizer.syncComponent(componentId=rule['id'], publishedVersion=True, forceCreation=True)
+                        if args.library_linked:
+                            ruleId = rule['links']['self'].split('/').pop()
+                        else:
+                            ruleId = rule['id']
+                        self.synchronizer.syncComponent(componentId=ruleId, publishedVersion=publishedVersion, forceCreation=args.force,libraryLinked=libraryLinked)
                         console.print(f"Rule '{rule['attributes']['name']}' synced successfully.", style="green")
                     except Exception as e:
                         console.print(f"(!) Error syncing rule '{rule['attributes']['name']}': {str(e)}", style="red")
@@ -779,7 +806,11 @@ class SynchronizerCLI(cmd.Cmd):
                 console.print(f"Syncing {len(dataelements)} data element{'s' if len(dataelements) > 1 else ''} from library '{lib.name}'...", style="blue")
                 for de in dataelements:
                     try:
-                        self.synchronizer.syncComponent(componentId=de['id'], publishedVersion=True, forceCreation=True)
+                        if args.library_linked:
+                            deId = de['links']['self'].split('/').pop()
+                        else:
+                            deId = de['id']
+                        self.synchronizer.syncComponent(componentId=deId, publishedVersion=publishedVersion, forceCreation=args.force,libraryLinked=libraryLinked)
                         console.print(f"Data element '{de['attributes']['name']}' synced successfully.", style="green")
                     except Exception as e:
                         console.print(f"(!) Error syncing data element '{de['attributes']['name']}': {str(e)}", style="red")
@@ -793,9 +824,13 @@ class SynchronizerCLI(cmd.Cmd):
         """Create libraries in the destination property based on the libraries in the source property that are selected for synchronization."""
         parser = argparse.ArgumentParser(prog='create_libraries', add_help=True)
         parser.add_argument("name",help="Name for the new library to be created in the destination properties", type=str)
-        parser.add_argument("-env",'--environment',help='Boolean. try to find an empty environment to build the library. Default False.',type=bool,default=False)
+        parser.add_argument("-env",'--environment',help='Set to True to try to assign an available environment. Set a string with name of an environment to set a specific environment. Default False',type=str,default=False)
         try:
             args = parser.parse_args(shlex.split(args))
+            if args.environment == "True":
+                args.environment = True
+            if args.environment == "False":
+                args.environment = False
             res = self.synchronizer.createTargetsLibrary(name=args.name,assignEnv=args.environment)
             console.print_json(json.dumps(res, indent=4))
         except Exception as e:
@@ -803,6 +838,10 @@ class SynchronizerCLI(cmd.Cmd):
             return
         except SystemExit:
             return
+
+    def do_clear(self, arg) -> None:
+        """Clear the terminal screen."""
+        clear_terminal()
 
     def do_exit(self, arg):
         """Return to the main menu."""
@@ -1143,6 +1182,10 @@ class MainShell(cmd.Cmd):
             return
         except SystemExit:
             return
+
+    def do_clear(self, arg:Any) -> None:
+        """Clear the terminal screen."""
+        clear_terminal()
 
     def do_exit(self, arg:Any) -> bool:
         """Exit the application."""

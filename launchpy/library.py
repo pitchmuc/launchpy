@@ -2,6 +2,8 @@ import time
 # Non standard libraries
 from launchpy import config, connector
 from typing import Union
+from copy import deepcopy
+import json
 
 class Library:
     """
@@ -26,6 +28,7 @@ class Library:
         self.name = data['attributes']['name']
         self.state = data['attributes']['state']
         self.build_required = data['attributes']['build_required']
+        self.definition = deepcopy(data)
         self._DataElements = config.endpoints['global'] + \
             '/libraries/'+data['id']+'/data_elements'
         self._Extensions = config.endpoints['global'] + \
@@ -40,6 +43,12 @@ class Library:
         self.relationships = {}
         self._environments = {}
         self._dev_env = ''
+    
+    def __str__(self):
+        return json.dumps(self.definition, indent=4)
+    
+    def __repr__(self):
+        return json.dumps(self.definition, indent=4)
 
     def getDataElements(self,page:int=0,pageSize:int=50,origin:bool=True)->list:
         """
@@ -355,13 +364,24 @@ class Library:
         res = self._setEnvironment(obj,verbose=verbose)
         return res
 
-    def _removeEnvironment(self)->None:
+    def removeEnvironment(self)->None:
         """
         Remove environment
         """
-        path = f'/libraries/{self.id}/relationships/environment'
-        new_env = self.connector.getData(self.endpoint+path) 
-        return new_env
+        path = f'/libraries/{self.id}'
+        data = {
+            "data": {
+                "id": self.id,
+                "type": "libraries",
+                "relationships": {
+                    "environment": {
+                        "data": None
+                    }
+                }
+            }
+        }
+        res = self.connector.patchData(self.endpoint+path, data=data) 
+        return res
 
     def updateLibrary(self,empty:bool=False)->dict:
         """
@@ -418,7 +438,6 @@ class Library:
                     "type": "environments"
                 }
             }
-            self._removeEnvironment()
             status = self._setEnvironment(obj,verbose=verbose)
         elif self.state == 'submitted':
             env = 'staging'
@@ -428,7 +447,6 @@ class Library:
                     "type": "environments"
                 }
             }
-            self._removeEnvironment()
             status = self._setEnvironment(obj,verbose=verbose)
         elif self.state == 'approved':
             env = 'production'
@@ -438,7 +456,6 @@ class Library:
                     "type": "environments"
                 }
             }
-            self._removeEnvironment()
             status = self._setEnvironment(obj,verbose=verbose)
         if 'error' in status.keys():
             raise SystemExit('Issue setting environment')

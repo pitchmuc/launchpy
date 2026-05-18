@@ -3,8 +3,16 @@
 This page gathered the changes made between version of the launchpy module.\
 This has been started after the 0.3.0 release.\
 
+## 0.4.8
+* Adding the `clear` method in CLI
+* Adding `syncFromLibrary` in synchronizer[doc](./synchronizer.md#syncFromLibrary).
+* Adding `sync_from_library` command in CLI[doc](./cli.md#sync_from_library-command).
+* Cleaning the JWT components and requirements
+* Adding the `definition` attribute in the Library class
+* Adding capability to define a specific environment name when creating a library in synchronizer
+
 ## 0.4.7
-* modify `getRuleComponents` to `getRulesComponents` as it can return all the rules components if no rule is specified. Kept `getRuleComponents` as an alias for backward compatibility and also provide a single rule components retrieval.
+* Modify `getRuleComponents` to `getRulesComponents` as it can return all the rules components if no rule is specified. Kept `getRuleComponents` as an alias for backward compatibility and also provide a single rule components retrieval.
 * Adding the `CLI` layer. [Documentation to CLI](cli.md)
 
 ## 0.4.6

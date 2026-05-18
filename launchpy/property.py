@@ -1334,6 +1334,16 @@ class Property:
         envs = self.getEnvironments()
         staging = [env for env in envs if env['attributes']['stage'] == 'staging'][0]
         return staging['meta']['script_sources'][0]["license_path"]
+    
+    def getEnvironmentLibrary(self,env_id:str)->dict:
+        """
+        Returns the library URL to use on the website for a specific environment.
+        Arguments:
+            env_id : REQUIRED : Environment ID
+        """
+        path = f"/environments/{env_id}/library"
+        res = self.connector.getData('https://reactor.adobe.io'+path)
+        return res.get('data',{})
 
 def extensionsInfo(data: list)->dict:
     """

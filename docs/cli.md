@@ -43,6 +43,7 @@ This document provides an overview of the command line interface (CLI) for `laun
       - [get\_base\_libraries](#get_base_libraries)
       - [get\_base\_library](#get_base_library)
       - [sync\_from\_library](#sync_from_library)
+    - [Behaviors for sync\_from\_library](#behaviors-for-sync_from_library)
       - [create\_libraries](#create_libraries)
 
 
@@ -479,8 +480,23 @@ synchronizer:Base_Property_Name> get_base_library -n "Library Name"
 #### sync_from_library
 This command allows you to synchronize a library from the base property to the target properties.\
 **IMPORTANT**:By default it will use the published version of the elements that are part of the library. 
-`-n`, `--name`: The name of the library to sync from. This is a required parameter.
-`-id`, `--id`: The ID of the library to sync from (overrides name if both provided). This is an optional parameter.
+* `-n`, `--name`: Name of the library to sync from. This is a required parameter.
+* `-id`, `--id`: ID of the library to sync from (overrides name if both provided). This is an optional parameter.
+* `-f`, `--force`: Boolean. Create the component if it does not exist. Default True. Possible values: True, False
+* `-ll`, `--library_linked`: Boolean. Whether to use library linked components or not. If set to True, the sync will be done using the library linked components. If set to False, the sync will be done using the component IDs in the library. Default True. Possible values: True, False
+* `-p`, `--published`: Boolean. Sync the latest published version of the component instead of the current version. Default False. Possible values: True, False
+* `-dr`, `--dry_run`: Boolean. If set to True, will only check the sync status of the components without actually syncing them. Default False. Possible values: True, False
+
+```bash
+synchronizer:Base_Property_Name> sync_from_library -id "LibraryId" -ll False -p True -dr True
+```
+
+
+### Behaviors for sync_from_library
+By default, the method will sync the components present in the library as they are in the library.
+If the `published` is set to True, it will try to sync the version that has been published in the base property to the targets.\
+If the `library_linked` is set to `False` and the `published` is set to `False` (default), it will try to sync the latest version of the components present in the base property library to the targets.\
+
 
 ```bash
 synchronizer:Base_Property_Name> sync_from_library -n "Library Name"
@@ -490,9 +506,14 @@ synchronizer:Base_Property_Name> sync_from_library -n "Library Name"
 This command allows you to create a library in the destination properties with the elements you have sync.\
 Arguments:
 `name`: Name for the new library to be created in the destination properties. This is a required parameter.
-`-env`, `--environment`: Boolean. Try to find an empty environment to build the library. Default False. Possible values: `True`, `False`
+`-env`, `--environment`: String. If set to `True`, it will try to find a free environment and assign it to the library. If none is available, it will not assign any environment to the library. If the name of the environment is provided, it will try to assign it to that library. If the environment is already used in a Library, it will remove that association and assign it to the new library. Default False. Possible values: `True`, `False` or a `string` which is the (partial) name of the environment you want to assign to the library.
 
 ```bash
 synchronizer:Base_Property_Name> create_library "Library Name" -env True
+```
+
+```bash
+synchronizer:Base_Property_Name> create_library "Library Name" -env "Environment Name
+
 ```
         
