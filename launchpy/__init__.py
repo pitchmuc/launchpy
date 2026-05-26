@@ -9,7 +9,7 @@ from launchpy.library import Library
 from launchpy.admin import Admin
 from launchpy.property import Property
 from launchpy.synchronizer import Synchronizer
-import re
+import re,json
 from pathlib import Path
 import httpx, asyncio
 
@@ -51,6 +51,15 @@ async def process_all_rules(rules_list, folder, header):
         # 'gather' runs them all concurrently
         await asyncio.gather(*tasks)
 
+
+async def write_all_data_elements(data_elements_list, folder, header):
+    for data_element in data_elements_list:
+        data_element_name = __safe_name__(data_element['attributes']['name'])
+        file_path = Path(folder) / f"{data_element_name}.json"
+        with open(file_path, "w") as f:
+            json.dump(data_element, f, indent=4)
+
+
 def extractProperty(property: dict | Property):
     if property is None:
         raise ValueError("Property is None")
@@ -63,3 +72,15 @@ def extractProperty(property: dict | Property):
     Path(folder).mkdir(parents=True, exist_ok=True)
     rules = property.getRules()
     asyncio.run(process_all_rules(rules, folder, property.header))
+    dataElements = property.getDataElements()
+    dataElements_folder = Path(folder) / "data_elements"
+    Path(dataElements_folder).mkdir(parents=True, exist_ok=True)
+    asyncio.run(write_all_data_elements(dataElements, dataElements_folder, property.header))
+    extension_folder = Path(folder) / "extensions"
+    extension_folder.mkdir(parents=True, exist_ok=True)
+    extensions = property.getExtensions()
+    for extension in extensions:
+        extension_name = __safe_name__(extension['attributes']['name'])
+        file_path = extension_folder / f"{extension_name}.json"
+        with open(file_path, "w") as f:
+            json.dump(extension, f, indent=4)
