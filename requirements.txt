@@ -5,3 +5,4 @@ aepp>=0.3.12
 pandas>=2.1.0
 rich>=14.0.0
 deprecated
+httpx>=0.24.0

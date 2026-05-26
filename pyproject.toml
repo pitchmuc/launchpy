@@ -32,7 +32,7 @@ dependencies = ['pandas',
                  "pathlib",
                  "aepp",
                  "rich",
-                 "deprecated"]
+                 "deprecated","httpx"]
 
 [project.urls]
 homepage = "https://github.com/pitchmuc/launchpy"
