@@ -482,10 +482,10 @@ This command allows you to synchronize a library from the base property to the t
 **IMPORTANT**:By default it will use the published version of the elements that are part of the library. 
 * `-n`, `--name`: Name of the library to sync from. This is a required parameter.
 * `-id`, `--id`: ID of the library to sync from (overrides name if both provided). This is an optional parameter.
-* `-f`, `--force`: Boolean. Create the component if it does not exist. Default True. Possible values: True, False
-* `-ll`, `--library_linked`: Boolean. Whether to use library linked components or not. If set to True, the sync will be done using the library linked components. If set to False, the sync will be done using the component IDs in the library. Default True. Possible values: True, False
-* `-p`, `--published`: Boolean. Sync the latest published version of the component instead of the current version. Default False. Possible values: True, False
-* `-dr`, `--dry_run`: Boolean. If set to True, will only check the sync status of the components without actually syncing them. Default False. Possible values: True, False
+* `-c`, `--create`: Boolean. Create the component if it does not exist. Default `False`. Possible values: True, False
+* `-ll`, `--library_linked`: Boolean. Whether to use library linked components or not. If set to True, the sync will be done using the library linked components. If set to False, the sync will be done using the component IDs in the library. Default `True`. Possible values: True, False
+* `-p`, `--published`: Boolean. Sync the latest published version of the component instead of the current version. Default `False`. Possible values: True, False
+* `-dr`, `--dry_run`: Boolean. If set to True, will only check the sync status of the components without actually syncing them. Default `False`. Possible values: True, False
 
 ```bash
 synchronizer:Base_Property_Name> sync_from_library -id "LibraryId" -ll False -p True -dr True

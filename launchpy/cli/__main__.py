@@ -568,13 +568,13 @@ class SynchronizerCLI(cmd.Cmd):
         parser.add_argument("-n", "--name", help="Name of the component to sync", type=str)
         parser.add_argument("-id", "--id", help="ID of the component to sync (overrides name if both provided)", type=str)
         parser.add_argument("-p", "--published", help="Boolean. Sync the latest published version of the component instead of the current version. Default False. Possible values: True, False", type=str2bool,  nargs="?", const=True, default=False)
-        parser.add_argument("-f", "--force", help="Boolean. Create the component if it does not exist. Default True. Possible values: True, False", type=str2bool, default=True)
+        parser.add_argument("-c", "--create", help="Boolean. Create the component if it does not exist. Default True. Possible values: True, False", type=str2bool, default=True)
         try:
             args = parser.parse_args(shlex.split(args))
             if args.id is not None:
-                result = self.synchronizer.syncComponent(componentId=args.id, publishedVersion=args.published, forceCreation=args.force)
+                result = self.synchronizer.syncComponent(componentId=args.id, publishedVersion=args.published, forceCreation=args.create)
             else:
-                result = self.synchronizer.syncComponent(componentName=args.name, publishedVersion=args.published, forceCreation=args.force)
+                result = self.synchronizer.syncComponent(componentName=args.name, publishedVersion=args.published, forceCreation=args.create)
             console.print(f"Component '{args.name or args.id}' synced successfully.", style="green")
         except Exception as e:
             console.print(f"(!) Error: {str(e)}", style="red")
@@ -765,8 +765,8 @@ class SynchronizerCLI(cmd.Cmd):
         parser = argparse.ArgumentParser(prog='sync_from_library', add_help=True)
         parser.add_argument("-n", "--name", help="Name of the library to sync from", type=str)
         parser.add_argument("-id", "--id", help="ID of the library to sync from (overrides name if both provided)", type=str)
-        parser.add_argument("-f", "--force", help="Boolean. Create the component if it does not exist. Default True. Possible values: True, False", type=str2bool, default=True)
-        parser.add_argument("-ll", "--library_linked", help="Boolean. Whether to use library linked components or not. If set to True, the sync will be done using the library linked components. If set to False, the sync will be done using the component IDs in the library. Default True. Possible values: True, False", type=str, default=True)
+        parser.add_argument("-c", "--create", help="Boolean. Create the component if it does not exist. Default True. Possible values: True, False", type=str2bool, default=False)
+        parser.add_argument("-ll", "--library_linked", help="Boolean. Whether to use library linked components or not. If set to True, the sync will be done using the library linked components. If set to False, the sync will be done using the component IDs in the library. Default True. Possible values: True, False", type=str2bool, default=True)
         parser.add_argument("-p", "--published", help="Boolean. Sync the latest published version of the component instead of the current version. Default False. Possible values: True, False", type=str2bool, nargs="?", const=True, default=False,)
         parser.add_argument("-dr", "--dry_run", help="Boolean. If set to True, will only check the sync status of the components without actually syncing them. Default False. Possible values: True, False", type=str2bool, nargs="?", const=True, default=False,)
         try:
@@ -808,7 +808,7 @@ class SynchronizerCLI(cmd.Cmd):
                             ruleId = rule['links']['self'].split('/').pop()
                         else:
                             ruleId = rule['id']
-                        self.synchronizer.syncComponent(componentId=ruleId, publishedVersion=publishedVersion, forceCreation=args.force,libraryLinked=libraryLinked)
+                        self.synchronizer.syncComponent(componentId=ruleId, publishedVersion=publishedVersion, forceCreation=args.create,libraryLinked=libraryLinked)
                         console.print(f"Rule '{rule['attributes']['name']}' synced successfully.", style="green")
                     except Exception as e:
                         console.print(f"(!) Error syncing rule '{rule['attributes']['name']}': {str(e)}", style="red")
@@ -820,7 +820,7 @@ class SynchronizerCLI(cmd.Cmd):
                             deId = de['links']['self'].split('/').pop()
                         else:
                             deId = de['id']
-                        self.synchronizer.syncComponent(componentId=deId, publishedVersion=publishedVersion, forceCreation=args.force,libraryLinked=libraryLinked)
+                        self.synchronizer.syncComponent(componentId=deId, publishedVersion=publishedVersion, forceCreation=args.create,libraryLinked=libraryLinked)
                         console.print(f"Data element '{de['attributes']['name']}' synced successfully.", style="green")
                     except Exception as e:
                         console.print(f"(!) Error syncing data element '{de['attributes']['name']}': {str(e)}", style="red")

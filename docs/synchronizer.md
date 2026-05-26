@@ -146,7 +146,7 @@ This method allows you to take a library in your base property and sync all of t
 Arguments: 
 * library : REQUIRED : the name or the ID of the library to sync from.
 * state : OPTIONAL : the state of the library to sync from. Default: 'published', possible states: "development", "submitted", "approved", "rejected", "published"
-* force : OPTIONAL : If set to True, it will create the element sync if it does not exist in the target property. Set to `False`, it will prevent that behavior. Default: `True`.
+* create : OPTIONAL : If set to True, it will create the element sync if it does not exist in the target property. Set to `False`, it will prevent that behavior. Default: `False`.
 * libraryLinked : OPTIONAL : If set to True, it will use library linked components for comparison. Default: `True`.
 * publishedVersion : OPTIONAL : If set to True, it will compare the components to the published version in the target properties. Default: `False`.
 * dryRun : OPTIONAL : If set to True, will only check the sync status of the components without actually syncing them. Default `False`. Possible values: `True`, `False`

@@ -3,13 +3,19 @@
 This page gathered the changes made between version of the launchpy module.\
 This has been started after the 0.3.0 release.\
 
+## 0.4.9
+* fixing httpx dependency requirement
+* extractProperty will now also extract Data Elements and Extensions configurations in separate folders.
+* fix the argument handling for linkedLibrary in CLI.
+* Change of the `force` parameter to `create` in the synchronizer CLI for better understanding of the action. `create` is now default to `False`. The synchronizer module keeps its long name `forceCreation` for backward compatibility and better understanding of the action. Also turning it to `False` by default. 
+
 ## 0.4.8
 * Adding the `clear` method in CLI
 * Adding `syncFromLibrary` in synchronizer[doc](./synchronizer.md#syncFromLibrary).
 * Adding `sync_from_library` command in CLI[doc](./cli.md#sync_from_library-command).
 * Cleaning the JWT components and requirements
 * Adding the `definition` attribute in the Library class
-* Adding capability to define a specific environment name when creating a library in synchronizer
+* Adding capability to define a specific environment name when creating a library in synchronizer.
 
 ## 0.4.7
 * Modify `getRuleComponents` to `getRulesComponents` as it can return all the rules components if no rule is specified. Kept `getRuleComponents` as an alias for backward compatibility and also provide a single rule components retrieval.

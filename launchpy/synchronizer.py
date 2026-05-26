@@ -217,7 +217,7 @@ class Synchronizer:
             cmp_baseDict = {'id':lib_cmp_base['id'],'name':lib_cmp_base['attributes']['name'],'component':lib_cmp_base,'copy':copySettings(lib_cmp_base)}
         return cmp_baseDict
 
-    def syncComponent(self,componentName:str=None,componentId:str=None,publishedVersion:bool=False,forceCreation:bool=True,**kwargs)->None:
+    def syncComponent(self,componentName:str=None,componentId:str=None,publishedVersion:bool=False,forceCreation:bool=False,**kwargs)->None:
         """
         Synchronize a component from the base property to the different target properties.
         It will detect the component with the same name in target properties.
@@ -227,7 +227,7 @@ class Synchronizer:
             componentName : REQUIRED : the name of the component to sync
             componentID : REQUIRED : the id of the component to sync
             publishedVersion : OPTIONAL : if you want to take the version that has been published
-            forceCreation : OPTIONAL : If the component does not exist in the target property, create it. Default: True
+            forceCreation : OPTIONAL : If the component does not exist in the target property, create it. Default: False
         possible kwargs:
             timeout : OPTIONAL : The timeout to be used for the rule component. If not provided, the existing timeout will be used.
             libraryLinked : OPTIONAL : If you want to take a component ID that are associated to a specific library. Default: False. If set to True, the method will look for the component in the library and take the version linked to the library instead of the latest version in the property. Do not work for Extensions.
@@ -384,20 +384,21 @@ class Synchronizer:
                             del self.targets[target]['rules'][index]
                             self.targets[target]['rules'].append(targetRule)
 
-    def syncComponents(self,componentsName:list=None,componentsId:list=None,publishedVersion:bool=False)->None:
+    def syncComponents(self,componentsName:list=None,componentsId:list=None,publishedVersion:bool=False,forceCreation:bool=False)->None:
         """
         Sync multiple components by looping through the list of name passed.
         Arguments:
             componentsName : REQUIRED : The list of component names to sync
             componentsId : REQUIRED : The list of component ID to sync
             publishedVersion : OPTIONAL : if you want to take the version that has been published
+            forceCreation : OPTIONAL : If set to True, it will sync the components even if they do not exist in the target properties. If set to False, it will only sync the components that already exist in the target properties. Default: False.
         """
         if componentsName is not None:
             for component in componentsName:
-                self.syncComponent(componentName=component,publishedVersion=publishedVersion)
+                self.syncComponent(componentName=component,publishedVersion=publishedVersion,forceCreation=forceCreation)
         if componentsId is not None:
             for component in componentsId:
-                self.syncComponent(componentId=component,publishedVersion=publishedVersion)
+                self.syncComponent(componentId=component,publishedVersion=publishedVersion,forceCreation=forceCreation)
     
     def createTargetsLibrary(self,name:str="syncComponents",assignEnv:bool|str=False)->None:
         """
@@ -781,13 +782,13 @@ class Synchronizer:
             dict_check[element_name] = self.checkComponentSync(componentId=element_id, excludeSimilar=excludeSimilar,publishedVersion=publishedVersion,libraryLinked=libraryLink)
         return dict_check
     
-    def syncFromLibrary(self,library:str=None,state='published',force:bool=True,libraryLinked:bool=True,publishedVersion:bool=False,dryRun:bool=False)->None:
+    def syncFromLibrary(self,library:str=None,state='published',forceCreation:bool=False,libraryLinked:bool=True,publishedVersion:bool=False,dryRun:bool=False)->None:
         """
         Sync the components in a library, from the base property, to the different target properties by using the createTargetsLibrary method.
         Arguments:
             library : REQUIRED : the library name or the library ID to get the components.
             state : OPTIONAL : the state of the library to compare. Default: 'published', possible states: "development", "submitted", "approved", "rejected", "published"
-            force : OPTIONAL : If set to True, it will sync the components even if they do not exist in the target properties. If set to False, it will only sync the components that already exist in the target properties. Default: True.
+            forceCreation : OPTIONAL : If set to True, it will sync the components even if they do not exist in the target properties. If set to False, it will only sync the components that already exist in the target properties. Default: False.
             libraryLinked : OPTIONAL : If set to True, it will sync the components using the library version. Default: False.
             publishedVersion : OPTIONAL : if you want to sync the version of the library that has been published in your base vs the published version of your target. Default: False.
             dryRun : OPTIONAL : If set to True, it will not actually sync the components but will return a dictionary with the components that would be synced and the target properties they would be synced to. Default: False.
@@ -820,7 +821,7 @@ class Synchronizer:
                         ruleId = rule['links']['self'].split('/').pop()
                     else:
                         ruleId = rule['id']
-                    self.syncComponent(componentId=ruleId,publishedVersion=publishedVersion, forceCreation=force,libraryLinked=libraryLinked)
+                    self.syncComponent(componentId=ruleId,publishedVersion=publishedVersion, forceCreation=forceCreation,libraryLinked=libraryLinked)
                 except:
                     print(f'Rule {rule["attributes"]["name"]} could not be updated in the target properties. Please check if the rule exist.')
         if len(dataelements)>0:
@@ -830,7 +831,7 @@ class Synchronizer:
                         deId = de['links']['self'].split('/').pop()
                     else:
                         deId = de['id']
-                    self.syncComponent(componentId=deId,publishedVersion=publishedVersion,forceCreation=force,libraryLinked=libraryLinked)
+                    self.syncComponent(componentId=deId,publishedVersion=publishedVersion,forceCreation=forceCreation,libraryLinked=libraryLinked)
                 except:
                     print(f'Data Element {de["attributes"]["name"]} could not be updated in the target properties. Please check if the data element exist.')
         return 
