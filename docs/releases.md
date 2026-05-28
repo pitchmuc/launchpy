@@ -7,7 +7,11 @@ This has been started after the 0.3.0 release.\
 * fixing httpx dependency requirement
 * extractProperty will now also extract Data Elements and Extensions configurations in separate folders.
 * fix the argument handling for linkedLibrary in CLI.
-* Change of the `force` parameter to `create` in the synchronizer CLI for better understanding of the action. `create` is now default to `False`. The synchronizer module keeps its long name `forceCreation` for backward compatibility and better understanding of the action. Also turning it to `False` by default. 
+* Change of the `force` parameter to `create` in the synchronizer CLI for better understanding of the action. `create` is now default to `False`. The synchronizer module keeps its long name `forceCreation` for backward compatibility and better understanding of the action. Also turning it to `False` by default. \
+Patch:
+* adding a `verbose` parameter to the synchronizer CLI for better understanding of the process. Default to `False`.
+* adding a `verbose` parameter to the synchronizer module for better understanding of the process. Default to `False`.
+* fixing default value for `create` parameter and its documentation in the CLI.
 
 ## 0.4.8
 * Adding the `clear` method in CLI

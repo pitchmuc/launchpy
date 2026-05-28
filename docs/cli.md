@@ -394,10 +394,10 @@ Arguments:
 `-n`, `--name`: The name of the component to synchronize. This is a required parameter.
 `-id`, `--id`: ID of the component to synchronize (overrides name if both provided)
 `-p`, `--published` : Boolean. Synchronize the latest published version of the component. Default `False`. Possible values: `True`, `False`
-`-f`, `--force` : Boolean. Create the component if it does not exist. Default `True`. Possible values: `True`, `False`
+`-c`, `--create` : Boolean. Create the component if it does not exist. Default `True`. Possible values: `True`, `False`
 
 ```bash
-synchronizer:Base_Property_Name> sync -n "Component Name" -p True -f True
+synchronizer:Base_Property_Name> sync -n "Component Name" -p True -c True
 ```
 
 #### rename_component
