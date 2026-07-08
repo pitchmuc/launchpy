@@ -54,9 +54,34 @@ That is possible, but the requirements are still needed regarding the following 
 * You have unique name for your rule and data elements
 * You have the same extension installed in both the template and target properties.
 
-The synchronizer will use the environment credential lastly loaded in the system.\ 
-We would recommend to load first the target organization that you want to sync to, and then the base organization.\
-You will be able to use the Property instance of the target organization in order to sync the element afterwards.
+#### Using the `@org_name` shorthand (recommended)
+
+The simplest way is to import a **multi-org config file** (a JSON list where each block has its own `org_name`, see [getstarted](getstarted.md)) so that every organization you want to reference is loaded in a single call, then reference a property in a specific organization by appending `@<org_name>` to its name in `base` or `targets`. Any name without `@<org_name>` is resolved against the default/last configured organization.
+
+```py
+import launchpy as lp
+
+lp.importConfigFile('config_multi_org.json') ## loads every org_name block in the file at once
+
+synchronizor = lp.Synchronizer(
+    base='Base Property Name@client_a',
+    targets=['Target Property 1@client_b', 'Target Property 2@client_c']
+)
+```
+
+You can mix organizations freely; a target without `@org_name` resolves to the default organization (the first one loaded, or the one set by your last `configure()` call without an explicit `org_name`):
+
+```py
+synchronizor = lp.Synchronizer(
+    base='Base Property Name', ## resolved in the default org
+    targets=['Target Property 1', 'Target Property 2@client_b']
+)
+```
+
+#### Using explicit Property instances (alternative)
+
+You can also build the `Property` instances yourself and pass them directly instead of strings. This is useful for one-off scripts or when you want to select a property that `getProperties` returns without relying on name matching.\
+The synchronizer will use the environment credential lastly loaded in the system, so we recommend loading the target organization first, then the base organization, so that the `Property` instances you build stay tied to the correct organization's connector.
 
 Example of setup
 

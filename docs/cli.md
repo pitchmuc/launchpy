@@ -17,7 +17,7 @@ This document provides an overview of the command line interface (CLI) for `laun
       - [extract\_property](#extract_property)
       - [load\_property](#load_property)
       - [get\_extensions](#get_extensions)
-      - [load\_extension](#load_extension)
+      - [load\_synchronizer](#load_synchronizer)
     - [Property Layer Commands](#property-layer-commands)
       - [get\_extensions](#get_extensions-1)
       - [get\_extension](#get_extension)
@@ -286,8 +286,8 @@ python -m launchpy.cli -cf <path_to_your_config_file>
 launchpy> get_extensions -s True
 ```
 
-#### load_extension
-Load a the synchronizer layer, allowing you to manage and synchronize properties with rules and data elements.\
+#### load_synchronizer
+Load the synchronizer layer, allowing you to manage and synchronize properties with extensions, rules and data elements.\
 Arguments:
 `base_name`: Name of the Launch Property to use as base.
 `-t`, `--targets`: list of target property names for synchronization. This is a required parameter.
@@ -298,6 +298,31 @@ python -m launchpy.cli -cf <path_to_your_config_file>
 launchpy> load_synchronizer "Base Property Name" -t "Target Property 1" "Target Property 2" -dy "Dynamic Component Data Element Name"
 synchronizer:Base_Property_Name>
 ```
+
+**Synchronizing across organizations**\
+The synchronizer also supports a base property and/or target properties that live in a *different* Adobe organization than the one currently active in the CLI. This is useful when you manage several IMS orgs and want to push the same rules, data elements and extensions from a single base property to properties in other orgs.
+
+To reference a property in another organization, append `@<org_name>` to its name, where `<org_name>` matches an `org_name` entry from a multi-org config file (see [create_config_file](#create_config_file)). Any property name without `@<org_name>` is resolved against the organization that is currently active in the session (the one last set via [config](#config) or [change_org](#change_org)).
+
+First, load a multi-org config file so every organization you want to reference is available in the session:
+```bash
+python -m launchpy.cli -cf <path_to_your_multi_org_config_file> --org_name client_a
+launchpy:client_a>
+```
+
+Then load the synchronizer using `@org_name` on the base and/or the targets:
+```bash
+launchpy:client_a> load_synchronizer "Base Property Name@client_a" -t "Target Property 1@client_b" "Target Property 2@client_c"
+synchronizer:Base_Property_Name>
+```
+
+Organizations can be mixed freely; targets that omit `@org_name` resolve to the currently active organization (`client_a` below):
+```bash
+launchpy:client_a> load_synchronizer "Base Property Name" -t "Target Property 1" "Target Property 2@client_b"
+synchronizer:Base_Property_Name>
+```
+
+**Note**: if a private extension used by the base property is named differently in a target organization, the CLI cannot map the two names for you — this requires passing a `mapping_extensions` dictionary (`{"target-extension-name": "base-extension-name"}`) to `launchpy.Synchronizer` directly through the Python API, usually done via a Notebook, since that option is not exposed as a CLI flag.
 
 ### Property Layer Commands
 
