@@ -22,16 +22,15 @@ class Property:
           rules : dictionnary to extract ruleComponents from rules. Filled when running getRules
         """
 
-    def __init__(self, data: object,config_object:dict=config.config_object,header:dict=config.header) -> None:
+    def __init__(self, data: object, org_name: str = None, _connector: connector.AdobeRequest = None) -> None:
         """
         Instanciate the class with the object retrieved by getProperties.
-        Arguments : 
+        Arguments :
           data : REQUIRED : Single property dictionary definition
-          config : OPTIONAL : Configuration required to generate JWT token
-          header : OPTIONAL : Header used for the requests
+          _connector : OPTIONAL : Pass an existing AdobeRequest instance (internal use / multi-org).
+          org_name : OPTIONAL : The name of the organization (internal use / multi-org).
         """
-        self.connector = connector.AdobeRequest(
-            config_object=config_object, header=header)
+        self.connector = _connector if _connector is not None else connector.AdobeRequest(org_name=org_name)
         self.endpoint = config.endpoints['global']
         self.definition = data
         self.name = data['attributes']['name']
@@ -636,7 +635,7 @@ class Property:
         res = self.connector.getData(self.endpoint+path)
         if 'data' in res.keys():
             if return_class:
-                return Library(res['data'],config_object=self.connector.config,header=self.header)
+                return Library(res['data'], _connector=self.connector)
             return res['data']
         return res
 
@@ -679,7 +678,7 @@ class Property:
         Arguments : 
             extension_id : REQUIRED : ID for the extension to be created
             settings : REQUIRED: string that define the setting to set in the extension. Usually, it can be empty.
-            delegate_descriptor_id : REQUIRED : delegate descriptor id (set in name)
+            descriptor : REQUIRED : delegate descriptor id
         """
         if extension_id is None:
             raise ValueError("Require an extension ID")

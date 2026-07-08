@@ -10,16 +10,17 @@ class Library:
     A class that handle the library in a Launch environment.
     """
 
-    def __init__(self, data: Union[str,dict],config_object:dict=config.config_object,header:dict=config.header):
+    def __init__(self, data: Union[str,dict], _connector: connector.AdobeRequest = None, orgName: str = None) -> None:
         """
         The instantiator for the library.
         Arguments:
             data : REQUIRED : The dictionary definition of the library (Retrieve by getLibrary method in Property class)
+            _connector : OPTIONAL : Pass an existing AdobeRequest instance (internal use / multi-org).
+            orgName : OPTIONAL : The name of the organization (internal use / multi-org).
         """
         if data is None:
-            raise ValueError("Require a library definition") 
-        self.connector = connector.AdobeRequest(
-            config_object=config_object, header=header)
+            raise ValueError("Require a library definition")
+        self.connector = _connector if _connector is not None else connector.AdobeRequest(org_name=orgName)
         self.header = self.connector.header
         self.endpoint = config.endpoints['global']
         if type(data) == str:

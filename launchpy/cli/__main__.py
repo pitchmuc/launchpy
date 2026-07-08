@@ -1,4 +1,5 @@
 ﻿import launchpy
+from launchpy.config import config_objects, headers
 import argparse, cmd, shlex, json
 from functools import wraps
 from rich.console import Console
@@ -10,6 +11,7 @@ from datetime import datetime, timedelta
 from typing import Any, Concatenate, ParamSpec, ParamSpecKwargs
 from collections.abc import Callable
 import os
+from copy import deepcopy
 
 def str2bool(v):
     if isinstance(v, bool):
@@ -63,7 +65,7 @@ class PropertyCLI(cmd.Cmd):
     def do_get_extensions(self, arg):
         """Get all extensions in the property and list them."""
         parser = argparse.ArgumentParser(prog='get_extensions', add_help=True)
-        parser.add_argument("-s", "--save", help="Boolean. Save extensions to a CSV file. Default False. Possible values: True, False", type=str2bool,  nargs="?", const=True, default=False)
+        parser.add_argument("-s", "--save", help="Save extensions to a CSV file. Default False.", action="store_true", default=False)
         try:
             args = parser.parse_args(shlex.split(arg))
             extensions = self.property.getExtensions()
@@ -97,7 +99,7 @@ class PropertyCLI(cmd.Cmd):
         """Get details for a specific extension by name."""
         parser = argparse.ArgumentParser(prog='get_extension', add_help=True)
         parser.add_argument("name", help="Name of the extension to get details for", type=str)
-        parser.add_argument("-s", "--save", help="Boolean. Save extension details to a JSON file. Default False. Possible values: True, False", type=str2bool, nargs="?", const=True, default=False)
+        parser.add_argument("-s", "--save", help="Save extension details to a JSON file. Default False.", action="store_true", default=False)
         try:
             args = parser.parse_args(shlex.split(args))
             extensions = self.property.getExtensions()
@@ -122,7 +124,7 @@ class PropertyCLI(cmd.Cmd):
         """Get all rules for the property."""
         parser = argparse.ArgumentParser(prog='get_rules', add_help=True)
         parser.add_argument("-n", "--name", help="Filter rules by name (partial match, non-case sensitive)", type=str, default=None)
-        parser.add_argument("-s", "--save", help="Boolean. Save rules to a CSV file. Default False. Possible values: True, False", type=str2bool, nargs="?", const=True, default=False)
+        parser.add_argument("-s", "--save", help="Save rules to a CSV file. Default False.", action="store_true", default=False)
         try:
             args = parser.parse_args(shlex.split(arg))
             rules = self.property.getRules()
@@ -158,7 +160,7 @@ class PropertyCLI(cmd.Cmd):
         parser = argparse.ArgumentParser(prog='get_rule', add_help=True)
         parser.add_argument("-n", "--name", help="Name of the rule to get details for", type=str)
         parser.add_argument("-id", "--id", help="ID of the rule to get details for (overrides name if both provided)", type=str)
-        parser.add_argument("-s", "--save", help="Boolean. Save rule details to a JSON file. Default False. Possible values: True, False", type=str2bool, nargs="?", const=True, default=False)
+        parser.add_argument("-s", "--save", help="Save rule details to a JSON file. Default False.", action="store_true", default=False)
         try:
             args = parser.parse_args(shlex.split(arg))
             if self.rules is None:
@@ -195,7 +197,7 @@ class PropertyCLI(cmd.Cmd):
         parser = argparse.ArgumentParser(prog='get_rules_components', add_help=True)
         parser.add_argument("-rn", "--rule_name", help="(Partial) Name of the rule to get components for", type=str,default=None)
         parser.add_argument("-rid", "--rule_id", help="ID of the rule to get components for (overrides rule_name if both provided)", type=str, default=None)
-        parser.add_argument("-s", "--save", help="Boolean. Save components to a CSV file. Default False. Possible values: True, False", type=str2bool, nargs="?", const=True, default=False)
+        parser.add_argument("-s", "--save", help="Save components to a CSV file. Default False.", action="store_true", default=False)
         try:
             args = parser.parse_args(shlex.split(arg))
             if self.rules_components is None:
@@ -259,7 +261,7 @@ class PropertyCLI(cmd.Cmd):
         parser = argparse.ArgumentParser(prog='get_rule_components', add_help=True)
         parser.add_argument("-rn", "--rule_name", help="(Partial) Name of the rule to get components for", type=str, default=None)
         parser.add_argument("-rid", "--rule_id", help="ID of the rule to get components for (overrides rule_name if both provided)", type=str, default=None)
-        parser.add_argument("-s", "--save", help="Boolean. Save components to a JSON file. Default False. Possible values: True, False", type=str2bool, nargs="?", const=True, default=False)
+        parser.add_argument("-s", "--save", help="Save components to a JSON file. Default False.", action="store_true", default=False)
         try:
             args = parser.parse_args(shlex.split(arg))
             rule = None ## fallback
@@ -335,7 +337,7 @@ class PropertyCLI(cmd.Cmd):
         """Get details for a specific data element by name."""
         parser = argparse.ArgumentParser(prog='get_data_element', add_help=True)
         parser.add_argument("name", help="Name of the data element to get details for", type=str)
-        parser.add_argument("-s", "--save", help="Boolean. Save data element details to a JSON file. Default False. Possible values: True, False", type=str2bool, nargs="?", const=True, default=False)
+        parser.add_argument("-s", "--save", help="Save data element details to a JSON file. Default False.", action="store_true", default=False)
         try:
             args = parser.parse_args(shlex.split(args))
             if self.data_elements is None:
@@ -364,7 +366,7 @@ class PropertyCLI(cmd.Cmd):
         parser = argparse.ArgumentParser(prog='get_latest_published_version', add_help=True)
         parser.add_argument("-n", "--name", help="Name of the component to get the latest published version for", type=str, default=None)
         parser.add_argument("-t", "--type", help="Type of the component (e.g. 'rule', 'data_element', 'extension') to get the latest published version for. Default None", type=str, default=None)
-        parser.add_argument("-s", "--save", help="Boolean. Save the latest published version details to a JSON file. Default False. Possible values: True, False", type=str2bool,  nargs="?", const=True, default=False)
+        parser.add_argument("-s", "--save", help="Save the latest published version details to a JSON file. Default False.", action="store_true", default=False)
         try:
             args = parser.parse_args(shlex.split(arg))
             if args.type and args.name is None:
@@ -434,7 +436,7 @@ class PropertyCLI(cmd.Cmd):
     def do_get_libraries(self, arg: Any):
         """Get all libraries for the property."""
         parser = argparse.ArgumentParser(prog='get_libraries', add_help=True)
-        parser.add_argument("-s", "--save", help="Boolean. Save libraries to a CSV file. Default False. Possible values: True, False", type=str2bool, nargs="?", const=True, default=False)
+        parser.add_argument("-s", "--save", help="Save libraries to a CSV file. Default False.", action="store_true", default=False)
         parser.add_argument("-st", "--state", help="Filter by library state. Possible values: 'development' (default), 'submitted', 'approved', 'rejected', 'published'", type=str, default="development")
         try:
             args = parser.parse_args(shlex.split(arg))
@@ -548,7 +550,7 @@ class SynchronizerCLI(cmd.Cmd):
         parser = argparse.ArgumentParser(prog='check_component', add_help=True)
         parser.add_argument("-n", "--name", help="Name of the component to check", type=str)
         parser.add_argument("-id", "--id", help="ID of the component to check (overrides name if both provided)", type=str)
-        parser.add_argument("-p", "--published", help="Boolean. Check the latest published version of the component instead of the current version. Default False. Possible values: True, False", type=str2bool,  nargs="?", const=True, default=False)
+        parser.add_argument("-p", "--published", help="Check the latest published version of the component instead of the current version. Default False.", action="store_true", default=False)
         try:
             args = parser.parse_args(shlex.split(ars))
             if args.id is not None:
@@ -567,9 +569,9 @@ class SynchronizerCLI(cmd.Cmd):
         parser = argparse.ArgumentParser(prog='sync', add_help=True)
         parser.add_argument("-n", "--name", help="Name of the component to sync", type=str)
         parser.add_argument("-id", "--id", help="ID of the component to sync (overrides name if both provided)", type=str)
-        parser.add_argument("-p", "--published", help="Boolean. Sync the latest published version of the component instead of the current version. Default False. Possible values: True, False", type=str2bool,  nargs="?", const=True, default=False)
-        parser.add_argument("-c", "--create", help="Boolean. Create the component if it does not exist. Default False. Possible values: True, False", type=str2bool, default=False)
-        parser.add_argument("-v", "--verbose", help="Boolean. Print detailed information about the sync process. Default False. Possible values: True, False", type=str2bool, nargs="?", const=True, default=False)
+        parser.add_argument("-p", "--published", help="Sync the latest published version of the component instead of the current version. Default False.", action="store_true", default=False)
+        parser.add_argument("-c", "--create", help="Create the component if it does not exist. Default False.", action="store_true", default=False)
+        parser.add_argument("-v", "--verbose", help="Print detailed information about the sync process. Default False.", action="store_true", default=False)
         try:
             args = parser.parse_args(shlex.split(args))
             if args.id is not None:
@@ -577,6 +579,53 @@ class SynchronizerCLI(cmd.Cmd):
             else:
                 result = self.synchronizer.syncComponent(componentName=args.name, publishedVersion=args.published, forceCreation=args.create, verbose=args.verbose)
             console.print(f"Component '{args.name or args.id}' synced successfully.", style="green")
+        except Exception as e:
+            console.print(f"(!) Error: {str(e)}", style="red")
+            return
+        except SystemExit:
+            return
+    def do_sync_rules(self,args:Any):
+        """Sync all rules between source and destination properties."""
+        parser = argparse.ArgumentParser(prog='sync_rules', add_help=True)
+        parser.add_argument("-r", "--regex", help="Regex pattern to filter rules by name (partial match, non-case sensitive). Default None.", type=str, default=None)
+        parser.add_argument("-c", "--create", help="Create rules that do not exist in the destination property. Default False.", action="store_true", default=False)
+        parser.add_argument("-p", "--published", help="Sync the latest published version of the rules. Default False.", action="store_true", default=False)
+        try:
+            args = parser.parse_args(shlex.split(args))
+            result = self.synchronizer.syncRules(regex=args.regex, forceCreation=args.create, publishedVersion=args.published)
+            console.print(f"All rules synced successfully.", style="green")
+        except Exception as e:
+            console.print(f"(!) Error: {str(e)}", style="red")
+            return
+        except SystemExit:
+            return
+    
+    def do_sync_data_elements(self,args:Any):
+        """Sync all data elements between source and destination properties."""
+        parser = argparse.ArgumentParser(prog='sync_data_elements', add_help=True)
+        parser.add_argument("-r", "--regex", help="Regex pattern to filter data elements by name (partial match, non-case sensitive). Default None.", type=str, default=None)
+        parser.add_argument("-c", "--create", help="Create data elements that do not exist in the destination property. Default False.", action="store_true", default=False)
+        parser.add_argument("-p", "--published", help="Sync the latest published version of the data elements. Default False.", action="store_true", default=False)
+        try:
+            args = parser.parse_args(shlex.split(args))
+            result = self.synchronizer.syncDataElements(regex=args.regex, forceCreation=args.create, publishedVersion=args.published)
+            console.print(f"All data elements synced successfully.", style="green")
+        except Exception as e:
+            console.print(f"(!) Error: {str(e)}", style="red")
+            return
+        except SystemExit:
+            return
+    
+    def do_sync_extensions(self,args:Any):
+        """Sync all extensions between source and destination properties."""
+        parser = argparse.ArgumentParser(prog='sync_extensions', add_help=True)
+        parser.add_argument("-r", "--regex", help="Regex pattern to filter extensions by name (partial match, non-case sensitive). Default None.", type=str, default=None)
+        parser.add_argument("-c", "--create", help="Create extensions that do not exist in the destination property. Default False.", action="store_true", default=False)
+        parser.add_argument("-v", "--verbose", help="Print detailed information about the sync process. Default False.", action="store_true", default=False)
+        try:
+            args = parser.parse_args(shlex.split(args))
+            result = self.synchronizer.syncExtensions(regex=args.regex, forceCreation=args.create, verbose=args.verbose)
+            console.print(f"All extensions synced successfully.", style="green")
         except Exception as e:
             console.print(f"(!) Error: {str(e)}", style="red")
             return
@@ -876,24 +925,69 @@ class MainShell(cmd.Cmd):
         self.admin = None
         self.cid = None
         self.properties = None
+        self.header_template = {"Accept": "application/vnd.api+json;revision=1",
+          "Content-Type": "application/vnd.api+json",
+          "Authorization": "Bearer ",
+          "x-gw-ims-org-id": '',#config_object['org_id']
+          "x-api-key": ''#config_object['client_id']
+          }
+        self.config_template = {
+            "org_id": "",
+            "client_id": "",
+            "secret": "",
+            "oauthTokenEndpointV2" : "https://ims-na1.adobelogin.com/ims/token/v2",
+            "date_limit" : 0,
+            "scope_admin" : "https://ims-na1.adobelogin.com/s/ent_reactor_admin_sdk",
+            "scope_dev" : "https://ims-na1.adobelogin.com/s/ent_reactor_sdk",
+            "official_scope" :  "",
+            "scopes":""
+        }
         if kwargs.get("config_file") is not None:
             config_path = Path(kwargs.get("config_file"))
             if not config_path.is_absolute():
                 config_path = Path.cwd() / config_path
             with open(config_path, "rb") as f:
                 dict_config = json.load(f)
-            self.secret = dict_config.get("secret", kwargs.get("secret"))
-            self.org_id = dict_config.get("org_id", kwargs.get("org_id"))
-            self.client_id = dict_config.get("client_id", dict_config.get("api_key", kwargs.get("client_id", kwargs.get("api_key"))))
-            self.scopes = dict_config.get("scopes", kwargs.get("scopes"))
+            if type(dict_config) == dict:
+                config_key = kwargs.get("org_name", "default")
+                self.config = {config_key: deepcopy(self.config_template)}
+                self.config[config_key]['secret'] = dict_config.get("secret", kwargs.get("secret"))
+                self.config[config_key]['org_id'] = dict_config.get("org_id", kwargs.get("org_id"))
+                self.config[config_key]['client_id'] = dict_config.get("client_id", dict_config.get("api_key", kwargs.get("client_id", kwargs.get("api_key"))))
+                self.config[config_key]['scopes'] = dict_config.get("scopes", kwargs.get("scopes"))
+                config_objects.update(self.config)
+            elif type(dict_config) == list:
+                self.config = {}
+                for config in dict_config:
+                    if 'org_name' not in config:
+                        console.print("(!) Error: 'org_name' key is missing in the config file.", style="red")
+                        return
+                    config_key = config.get("org_name")
+                    self.config[config_key] = deepcopy(self.config_template)
+                    self.config[config_key]['secret'] = config.get("secret", kwargs.get("secret"))
+                    self.config[config_key]['org_id'] = config.get("org_id", kwargs.get("org_id"))
+                    self.config[config_key]['client_id'] = config.get("client_id", config.get("api_key", kwargs.get("client_id", kwargs.get("api_key"))))
+                    self.config[config_key]['scopes'] = config.get("scopes", kwargs.get("scopes"))
+                config_objects.update(self.config)
+                config_key = dict_config[0].get("org_name", "default")
         else:
-            self.secret:str|None = kwargs.get("secret")
-            self.org_id:str|None = kwargs.get("org_id")
-            self.client_id:str|None = kwargs.get("client_id",kwargs.get("api_key"))
-            self.scopes:str|None = kwargs.get("scopes")
-        if self.secret is not None and self.org_id is not None and self.client_id is not None and self.scopes is not None:
+            config_key = kwargs.get("org_name", "default")
+            self.config = {config_key: deepcopy(self.config_template)}
+            self.config[config_key]['secret'] = kwargs.get("secret")
+            self.config[config_key]['org_id'] = kwargs.get("org_id")
+            self.config[config_key]['client_id'] = kwargs.get("client_id",kwargs.get("api_key"))
+            self.config[config_key]['scopes'] = kwargs.get("scopes")
+            config_objects.update(self.config)
+        if self.config[config_key]['secret'] is not None and self.config[config_key]['org_id'] is not None and self.config[config_key]['client_id'] is not None and self.config[config_key]['scopes'] is not None:
+            myheaders = {}
+            for org_name, config in config_objects.items():
+                myheaders[org_name] = deepcopy(self.header_template)
+                myheaders[org_name]["x-gw-ims-org-id"] = config['org_id']
+                myheaders[org_name]["x-api-key"] = config['client_id']
+            headers.update(myheaders)
+            config_key = kwargs.get("org_name", config_key)
             console.print("Configuring connection...", style="blue")
-            self._configure_connection()
+            self._configure_connection(config_key)
             if kwargs.get("property") is not None:
                 console.print(f"Auto-loading property '{kwargs.get('property')}'...", style="blue")
                 try:
@@ -902,7 +996,7 @@ class MainShell(cmd.Cmd):
                     properties = self.admin.getProperties(cid)
                     if property_name in [prop['attributes']['name'] for prop in properties]:
                         prop_def = [prop for prop in properties if prop['attributes']['name'] == property_name][0]
-                        myproperty = launchpy.Property(prop_def)
+                        myproperty = launchpy.Property(prop_def, org_name=self.org_name)
                         property_shell = PropertyCLI(myproperty)
                         property_shell.cmdloop()
                     else:
@@ -912,26 +1006,62 @@ class MainShell(cmd.Cmd):
                     console.print(f"(!) Error loading property: {str(e)}", style="red")
             console.print(Panel(f"Connected to [bold green]launchpy[/bold green]", style="blue"))
 
-    def _configure_connection(self) -> None:
+    def _configure_connection(self,org_name:str) -> None:
+        if org_name is not None and org_name in self.config.keys():
+            config_key = org_name
+        else:
+            config_key = list(self.config.keys())[0]
+        self.org_name = config_key
         self.config = launchpy.configure(
-            secret=self.secret,
-            org_id=self.org_id,
-            client_id=self.client_id,
-            scopes=self.scopes
+            secret=config_objects[config_key]['secret'],
+            org_id=config_objects[config_key]['org_id'],
+            client_id=config_objects[config_key]['client_id'],
+            scopes=config_objects[config_key]['scopes'],
+            org_name=config_key
         )
-        self.admin = launchpy.Admin()
+        self.admin = launchpy.Admin(org_name=config_key)
         self.cid = self.admin.getCompanyId()
-        self.prompt = "launchpy> "
+        if config_key == 'default' or config_key is None:
+            self.prompt = f"launchpy> "
+        else:
+            self.prompt = f"launchpy:{config_key}> "
+
+    def do_change_org(self, arg:Any) -> None:
+        """Change the organization context for the current session."""
+        parser = argparse.ArgumentParser(prog='change_org', add_help=True)
+        parser.add_argument("org_name", help="Name of the organization to switch to", type=str)
+        try:
+            args = parser.parse_args(shlex.split(arg))
+            org_name = args.org_name
+            if org_name not in config_objects.keys():
+                console.print(f"(!) Error: Organization '{org_name}' not found in the configuration.", style="red")
+                return
+            self.config = launchpy.configure(
+                secret=config_objects[org_name]['secret'],
+                org_id=config_objects[org_name]['org_id'],
+                client_id=config_objects[org_name]['client_id'],
+                scopes=config_objects[org_name]['scopes'],
+                org_name=org_name
+            )
+            self.admin = launchpy.Admin(org_name=org_name)
+            self.cid = self.admin.getCompanyId()
+            self.prompt = f"launchpy:{org_name}> "
+            console.print(f"Switched to organization '{org_name}'.", style="green")
+        except Exception as e:
+            console.print(f"(!) Error: {str(e)}", style="red")
+            return
+        except SystemExit:
+            return
 
     def do_create_config_file(self, arg:Any) -> None:
-        """Create a configuration file for storing your AEP API connection details."""
-
+        """Create a configuration file for storing your Launch API connection details."""
         parser = argparse.ArgumentParser(prog='create_config_file', add_help=True)
         parser.add_argument("-fn", "--file_name", help="file name for your config file", default="launchpy_config.json",type=str)
+        parser.add_argument("-m","--multi_org", help="Enable multi-org configuration", action="store_true", default=False)
         try:
             args = parser.parse_args(shlex.split(arg))
             filename = args.file_name
-            launchpy.createConfigFile(filename=filename)
+            launchpy.createConfigFile(filename=filename,multi_org=args.multi_org)
             filename_json = filename + ".json" if not filename.endswith(".json") else filename
             console.print(f"Configuration file created at {Path.cwd() / Path(filename_json)}", style="green")
             return
@@ -943,7 +1073,7 @@ class MainShell(cmd.Cmd):
 
     # # --- Commands ---
     def do_config(self, arg:Any) -> None:
-        """Pass the different configuration parameters to connect to an AEP instance. Either individually or through a config file with the --config_file option."""
+        """Pass the different configuration parameters to connect to Launch API. Either individually or through a config file with the --config_file option."""
         parser = argparse.ArgumentParser(prog='config', add_help=True)
         parser.add_argument("-s", "--secret", help="Secret")
         parser.add_argument("-o", "--org_id", help="IMS org ID")
@@ -951,6 +1081,7 @@ class MainShell(cmd.Cmd):
         parser.add_argument("-cid", "--client_id", help="client ID")
         parser.add_argument("-cf", "--config_file", help="Path to config file", default=None)
         parser.add_argument("-p", "--property", help="Property Name to auto-load on startup", default=None)
+        parser.add_argument("-on", "--org_name", help="Organization Name to use from config file", default=None)
         try:
             args = parser.parse_args(shlex.split(arg))
             if args.config_file is not None:
@@ -959,22 +1090,44 @@ class MainShell(cmd.Cmd):
                     config_path = Path.cwd() / config_path
                 with open(config_path, "rb") as f:
                     dict_config = json.load(f)
-                self.secret = dict_config.get("secret", args.secret)
-                self.org_id = dict_config.get("org_id", args.org_id)
-                self.client_id = dict_config.get("client_id", dict_config.get("api_key", args.client_id))
-                self.scopes = dict_config.get("scopes", args.scopes)
+                if type(dict_config) == dict:
+                    config_key = args.org_name if args.org_name else "default"
+                    self.config = {config_key: deepcopy(self.config_template)}
+                    self.config[config_key]['secret'] = dict_config.get("secret", args.secret)
+                    self.config[config_key]['org_id'] = dict_config.get("org_id", args.org_id)
+                    self.config[config_key]['client_id'] = dict_config.get("client_id", dict_config.get("api_key", args.client_id))
+                    self.config[config_key]['scopes'] = dict_config.get("scopes", args.scopes)
+                    config_objects.update(self.config)
+                elif type(dict_config) == list:
+                    self.config = {}
+                    for config in dict_config:
+                        if 'org_name' not in config:
+                            console.print("(!) Error: 'org_name' key is missing in the config file.", style="red")
+                            return
+                        config_key = config.get("org_name")
+                        self.config[config_key] = deepcopy(self.config_template)
+                        self.config[config_key]['secret'] = config.get("secret", args.secret)
+                        self.config[config_key]['org_id'] = config.get("org_id", args.org_id)
+                        self.config[config_key]['client_id'] = config.get("client_id", config.get("api_key", args.client_id))
+                        self.config[config_key]['scopes'] = config.get("scopes", args.scopes)
+                    config_objects.update(self.config)
+                    config_key = dict_config[0].get("org_name")
             else:
-                if args.secret: self.secret = str(args.secret)
-                if args.org_id: self.org_id = str(args.org_id)
-                if args.scopes: self.scopes = str(args.scopes)
-                if args.client_id: self.client_id = str(args.client_id)
-
+                config_key = args.org_name if args.org_name else "default"
+                if not isinstance(self.config, dict):
+                    self.config = {}
+                self.config[config_key] = deepcopy(self.config_template)
+                if args.secret: self.config[config_key]['secret'] = str(args.secret)
+                if args.org_id: self.config[config_key]['org_id'] = str(args.org_id)
+                if args.scopes: self.config[config_key]['scopes'] = str(args.scopes)
+                if args.client_id: self.config[config_key]['client_id'] = str(args.client_id)
+                config_objects.update(self.config)
             missing = [
                 key for key, value in {
-                    "secret": self.secret,
-                    "org_id": self.org_id,
-                    "client_id": self.client_id,
-                    "scopes": self.scopes,
+                    "secret": self.config[config_key].get('secret'),
+                    "org_id": self.config[config_key].get('org_id'),
+                    "client_id": self.config[config_key].get('client_id'),
+                    "scopes": self.config[config_key].get('scopes'),
                 }.items() if value is None
             ]
             if missing:
@@ -987,7 +1140,14 @@ class MainShell(cmd.Cmd):
                 self.cid = None
                 return
             console.print("Configuring connection...", style="blue")
-            self._configure_connection()
+            myheaders = {}
+            for org_name, config in config_objects.items():
+                myheaders[org_name] = deepcopy(self.header_template)
+                myheaders[org_name]["x-gw-ims-org-id"] = config['org_id']
+                myheaders[org_name]["x-gw-ims-org-id"] = config['org_id']
+            headers.update(myheaders)
+            config_key = args.org_name if args.org_name else config_key
+            self._configure_connection(org_name=config_key)
             console.print(Panel(f"Connected to [bold green]launchpy[/bold green]", style="blue"))
             if args.property is not None:
                 console.print(f"Auto-loading property '{args.property}'...", style="blue")
@@ -997,7 +1157,7 @@ class MainShell(cmd.Cmd):
                     properties = self.admin.getProperties(cid)
                     if property_name in [prop['attributes']['name'] for prop in properties]:
                         prop_def = [prop for prop in properties if prop['attributes']['name'] == property_name][0]
-                        myproperty = launchpy.Property(prop_def)
+                        myproperty = launchpy.Property(prop_def,org_name=self.org_name)
                         property_shell = PropertyCLI(myproperty)
                         property_shell.cmdloop()
                     else:
@@ -1049,7 +1209,7 @@ class MainShell(cmd.Cmd):
             return
     
     @login_required
-    def create_property(self, arg:Any) -> None:
+    def do_create_property(self, arg:Any) -> None:
         """
         Create a new property in the organization. 
         """
@@ -1085,7 +1245,7 @@ class MainShell(cmd.Cmd):
                 console.print(f"Property '{args.name}' not found in this instance.", style="red")
                 return
             prop_def = matching_props[0]
-            myproperty = launchpy.Property(prop_def)
+            myproperty = launchpy.Property(prop_def, org_name=self.org_name)
             property_shell = PropertyCLI(myproperty)
             property_shell.cmdloop()
         except Exception as e:
@@ -1093,12 +1253,14 @@ class MainShell(cmd.Cmd):
             return
         except SystemExit:
             return
-    
+
     @login_required
     def do_extract_property(self, arg:Any) -> None:
         """Extract all rules and components for a given property into folder."""
         parser = argparse.ArgumentParser(prog='extract_property', add_help=True)
         parser.add_argument("name", help="Name of the property to extract", type=str)
+        parser.add_argument("-p","--published_version", help="Whether to extract only the latest published version for the components (default False)", type=str2bool, nargs="?", const=True, default=False)
+        parser.add_argument("-f","--folder", help="Folder to extract the property into (default is current working directory)", type=str, default=None)
         try:
             args = parser.parse_args(shlex.split(arg))
             if self.properties is None:
@@ -1109,10 +1271,10 @@ class MainShell(cmd.Cmd):
                 console.print(f"Property '{args.name}' not found in this instance.", style="red")
                 return
             prop_def = matching_props[0]
-            myproperty = launchpy.Property(prop_def)
+            myproperty = launchpy.Property(prop_def, org_name=self.org_name)
             console.print(f"Extracting property '{args.name}'...", style="blue")
-            launchpy.extractProperty(myproperty)
-            console.print(f"Extraction completed for property '{args.name}'. Check the folder '{launchpy.__safe_name__(args.name)}' for the output files.", style="green")
+            launchpy.extractProperty(myproperty, publishedVersion=args.published_version, folder=args.folder)
+            console.print(f"Extraction completed for property '{args.name}'. Check the folder '{args.folder if args.folder else launchpy.__safe_name__(args.name)}' for the output files.", style="green")
         except Exception as e:
             console.print(f"(!) Error: {str(e)}", style="red")
             return
@@ -1221,6 +1383,7 @@ def main():
     parser.add_argument("-cid", "--client_id", help="Auto-login client ID")
     parser.add_argument("-cf", "--config_file", help="Path to config file", default=None)
     parser.add_argument("-p", "--property", help="Property Name to auto-load on startup", default=None)
+    parser.add_argument("-on", "--org_name", help="Organization Name to use from config file", default=None)
     args = parser.parse_args() 
     shell = MainShell(**vars(args))
     try:

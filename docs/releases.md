@@ -3,6 +3,20 @@
 This page gathered the changes made between version of the launchpy module.\
 This has been started after the 0.3.0 release.\
 
+## 0.5.0
+* Adding option to extract only the latest published version of the artifacts when extracting a property. This is available in the CLI with the `-p` or `--published_version` flag and in the `extractProperty` function with the `publishedVersion` parameter. 
+* Fixing the `create_property` method in the CLI
+* Adding support for multi-org config files.
+* Adding support for multi-org instantiation in the synchronizer module.
+* Adding capability to sync extensions via syncComponent method.
+* Adding `sync_rules` capabilitiy in the CLI and `syncRules` in synchronizer module.
+* Adding `sync_extensions` capabilitiy in the CLI and `syncExtensions` in synchronizer module.
+* Adding `sync_data_elements` capabilitiy in the CLI and `syncDataElements` in synchronizer module.
+* Fixing the `createTargetsLibrary` method in the synchronizer where using existing library that contained rules not touched by the synchronizer would delete them. Now it will keep them and only update the ones that are in the source property.
+* `extractProperty` can now extract the elements as they are in their published version. This is available in the CLI with the `-p` or `--published_version` flag and in the `extractProperty` function with the `publishedVersion` parameter.
+* `extractProperty` has a new parameter `folder` that allows you to specify the folder where the property will be extracted. If None, a folder named after the property name will be created in the current working directory.
+
+
 ## 0.4.9
 * fixing httpx dependency requirement
 * extractProperty will now also extract Data Elements and Extensions configurations in separate folders.

@@ -1,11 +1,13 @@
-import re,json
+import re,json,threading
 # Non standard libraries
 from launchpy.admin import Admin
 from launchpy.property import Property
 from launchpy.library import Library
 from launchpy.launchpy import Translator, copySettings
+from launchpy import connector
 from copy import deepcopy
 from aepp import som
+from concurrent.futures import ThreadPoolExecutor
 
 class Synchronizer:
     """
@@ -37,11 +39,22 @@ class Synchronizer:
         mapping_extensions = kwargs.get('mapping_extensions',None)
         self.base = {}
         if type(base) == str:
-            base_property = [prop for prop in properties if prop['attributes']['name'] == base]
-            if len(base_property) ==0:
-                raise KeyError("The base property name has not been found in your account")
-            self.base["name"] = base
-            self.base["api"]:Property = Property(base_property[0])
+            if '@' in base:
+                new_connector = connector.AdobeRequest(org_name=base.split('@')[1])
+                new_admin = Admin(_connector=new_connector)
+                new_cid = new_admin.getCompanyId()
+                new_properties = new_admin.getProperties(new_cid)
+                base_property = [prop for prop in new_properties if prop['attributes']['name'] == base.split('@')[0]]
+                if len(base_property) == 0:
+                    raise KeyError("The base property name has not been found in your account")
+                self.base["name"] = base.split('@')[0]
+                self.base["api"]:Property = Property(base_property[0],_connector=new_connector)
+            else:
+                base_property = [prop for prop in properties if prop['attributes']['name'] == base]
+                if len(base_property) ==0:
+                    raise KeyError("The base property name has not been found in your account")
+                self.base["name"] = base
+                self.base["api"]:Property = Property(base_property[0])
         elif type(base) == Property:
             self.base["name"] = base.name
             self.base["api"]:Property = base
@@ -55,10 +68,22 @@ class Synchronizer:
         self.target_configs = {}
         for target in targets:
             if isinstance(target,str):
-                tmp_target = [prop for prop in properties if prop['attributes']['name'] == target]
-                if len(tmp_target) == 0:
-                    raise KeyError(f"The target property : {target} cannot be found. Please, fix it")
-                self.targets[target] = {'api' : Property(tmp_target[0]),'name':target}
+                if '@' in target:
+                    prop_name = target.split('@')[0]
+                    new_org = target.split('@')[1]
+                    new_connector = connector.AdobeRequest(org_name=new_org)
+                    new_admin = Admin(_connector=new_connector,org_name=new_org)
+                    new_cid = new_admin.getCompanyId()
+                    new_properties = new_admin.getProperties(new_cid)
+                    tmp_target = [prop for prop in new_properties if prop['attributes']['name'] == prop_name]
+                    if len(tmp_target) == 0:
+                        raise KeyError(f"The target property : {prop_name} cannot be found. Please, fix it")
+                    self.targets[target] = {'api' : Property(tmp_target[0],_connector=new_connector,org_name=new_org),'name':prop_name}
+                else:
+                    tmp_target = [prop for prop in properties if prop['attributes']['name'] == target]
+                    if len(tmp_target) == 0:
+                        raise KeyError(f"The target property : {target} cannot be found. Please, fix it")
+                    self.targets[target] = {'api' : Property(tmp_target[0]),'name':target}
             elif isinstance(target,Property):
                 self.targets[target.name] = {'api' : deepcopy(target),'name':target.name}
                 target = target.name
@@ -71,6 +96,8 @@ class Synchronizer:
                 self.translator.extendRules(self.targets[target]['rules'],target)
             else:
                 self.translator.rules[target] = None
+        self._base_lock = threading.Lock()
+        self._target_locks = {target: threading.Lock() for target in self.targets}
         if kwargs.get("dynamicRuleComponent",None) is not None:
             configRules = [de for de in self.base['dataElements'] if de['attributes']['name'] == kwargs.get("dynamicRuleComponent",None)]
             if len(configRules)==1:
@@ -192,28 +219,30 @@ class Synchronizer:
             cmp_baseDict['version'] = cmp_base['attributes'].get('version','1.0.0')
         if publishedVersion and cmp_baseDict['component']['type'] not in ['extensions']:
             data = self.base['api'].getRevisions(cmp_baseDict['component'])
-            publishedVersion = self.base['api'].getLatestPublishedVersion(data) 
+            publishedVersion = self.base['api'].getLatestPublishedVersion(data)
             if publishedVersion['attributes']['name'] != cmp_baseDict['name']:
                 ## Updating mapping table with old name when published version name diff than last version name.
-                if cmp_baseDict['component']['type'] == 'rules':
-                    self.translator.extendBaseRules(
-                    ruleName=publishedVersion['attributes']['name'],
-                    ruleId=publishedVersion['id'],
-                    property_name=self.base["name"])
-                    self.base['rules'].append(publishedVersion)
-                if cmp_baseDict['component']['type'] == 'data_elements':
-                    self.base['dataElements'].append(publishedVersion)
+                with self._base_lock:
+                    if cmp_baseDict['component']['type'] == 'rules':
+                        self.translator.extendBaseRules(
+                        ruleName=publishedVersion['attributes']['name'],
+                        ruleId=publishedVersion['id'],
+                        property_name=self.base["name"])
+                        self.base['rules'].append(publishedVersion)
+                    if cmp_baseDict['component']['type'] == 'data_elements':
+                        self.base['dataElements'].append(publishedVersion)
             cmp_baseDict = {'id':publishedVersion['id'],'name':publishedVersion['attributes']['name'],'component':publishedVersion,'copy':copySettings(publishedVersion)}
         if kwargs.get('libraryLinked',False) and cmp_baseDict['component']['type'] in ['rules','data_elements']:
             if lib_cmp_base['attributes']['name'] != cmp_baseDict['name']:
-                if cmp_baseDict['component']['type'] == 'rules':
-                    self.translator.extendBaseRules(
-                    ruleName=lib_cmp_base['attributes']['name'],
-                    ruleId=lib_cmp_base['id'],
-                    property_name=self.base["name"])
-                    self.base['rules'].append(lib_cmp_base)
-                if cmp_baseDict['component']['type'] == 'data_elements':
-                    self.base['dataElements'].append(lib_cmp_base)
+                with self._base_lock:
+                    if cmp_baseDict['component']['type'] == 'rules':
+                        self.translator.extendBaseRules(
+                        ruleName=lib_cmp_base['attributes']['name'],
+                        ruleId=lib_cmp_base['id'],
+                        property_name=self.base["name"])
+                        self.base['rules'].append(lib_cmp_base)
+                    if cmp_baseDict['component']['type'] == 'data_elements':
+                        self.base['dataElements'].append(lib_cmp_base)
             cmp_baseDict = {'id':lib_cmp_base['id'],'name':lib_cmp_base['attributes']['name'],'component':lib_cmp_base,'copy':copySettings(lib_cmp_base)}
         return cmp_baseDict
 
@@ -245,57 +274,60 @@ class Synchronizer:
                 flagAllowList = False
                 ## check if the component is in the exclComponentList
                 if any([bool(re.search(key,cmp_baseDict['name'])) for key in self.target_configs.get(target,{}).get('exclComponents',[])]):
-                    return {cmp_baseDict['name']:False}
+                    if kwargs.get('verbose',False):
+                        print(f'The data element "{cmp_baseDict["name"]}" is in the exclusion list for the target property "{target}". Skipping it.')
+                    continue
                 ## if there is an allow list for that property
                 if len(self.target_configs.get(target,{}).get('inclComponents',[]))>0:
                     if any([bool(re.search(key,cmp_baseDict['name'])) for key in self.target_configs.get(target,{}).get('inclComponents',[])]):
                         flagAllowList = True
                 ## if there is no allow list for that property, or no match in the list of target properties, or component was allow
                 if len(self.target_configs.get(target,{}).get('inclComponents',[]))==0 or flagAllowList:
-                    translatedComponent = self.translator.translate(target,data_element=cmp_baseDict['copy'])
-                    ## if it does not exist
-                    if cmp_baseDict['name'] not in [de.get('attributes',{}).get('name') for de in self.targets[target]['dataElements']]:
-                        if forceCreation:
-                            if verbose:
-                                print(f'The data element "{cmp_baseDict["name"]}" does not exist in the target property "{target}". Creating it')
-                            comp = self.targets[target]['api'].createDataElement(
-                                name=cmp_baseDict['name'],
-                                descriptor= translatedComponent['descriptor'],
-                                settings=translatedComponent['settings'],
-                                extension=translatedComponent['extension'],
-                                storage_duration = translatedComponent["storage_duration"],
-                                force_lower_case = translatedComponent["force_lower_case"],
-                                clean_text = translatedComponent["clean_text"],
-                                default_value= translatedComponent["default_value"]
-                                )
-                            if cmp_baseDict['component']['attributes']['enabled'] != comp['attributes']['enabled']:
-                                updateDE = self.targets[target]['api'].updateDataElement(
-                                    dataElement_id=comp['id'],
-                                    attr_dict=translatedComponent)
-                            self.targets[target]['libraryStack']['dataElements'].append(comp)
-                            self.targets[target]['dataElements'].append(comp)
+                    with self._target_locks[target]:
+                        translatedComponent = self.translator.translate(target,data_element=cmp_baseDict['copy'])
+                        ## if it does not exist
+                        if cmp_baseDict['name'] not in [de.get('attributes',{}).get('name') for de in self.targets[target]['dataElements']]:
+                            if forceCreation:
+                                if verbose:
+                                    print(f'The data element "{cmp_baseDict["name"]}" does not exist in the target property "{target}". Creating it')
+                                comp = self.targets[target]['api'].createDataElement(
+                                    name=cmp_baseDict['name'],
+                                    descriptor= translatedComponent['descriptor'],
+                                    settings=translatedComponent['settings'],
+                                    extension=translatedComponent['extension'],
+                                    storage_duration = translatedComponent["storage_duration"],
+                                    force_lower_case = translatedComponent["force_lower_case"],
+                                    clean_text = translatedComponent["clean_text"],
+                                    default_value= translatedComponent["default_value"]
+                                    )
+                                if cmp_baseDict['component']['attributes']['enabled'] != comp['attributes']['enabled']:
+                                    updateDE = self.targets[target]['api'].updateDataElement(
+                                        dataElement_id=comp['id'],
+                                        attr_dict=translatedComponent)
+                                self.targets[target]['libraryStack']['dataElements'].append(comp)
+                                self.targets[target]['dataElements'].append(comp)
+                            else:
+                                if verbose:
+                                    print(f'The data element "{cmp_baseDict["name"]}" does not exist in the target property "{target}". Set forceCreation to True if you want to create it.')
                         else:
-                            if verbose:
-                                print(f'The data element "{cmp_baseDict["name"]}" does not exist in the target property "{target}". Set forceCreation to True if you want to create it.')
-                    else:
-                        index,old_component = [(index,de) for index,de in enumerate(self.targets[target]['dataElements']) if de.get('attributes',{}).get('name') == cmp_baseDict['name']][0]
-                        attributes = {
-                            "name" : translatedComponent['name'],
-                            "enabled" : translatedComponent["enabled"],
-                            "delegate_descriptor_id" : translatedComponent["descriptor"],
-                            "storage_duration" : translatedComponent["storage_duration"],
-                            "force_lower_case" : translatedComponent["force_lower_case"],
-                            "clean_text" : translatedComponent["clean_text"],
-                            "settings" : translatedComponent["settings"],
-                            "default_value": translatedComponent["default_value"]
-                        }
-                        comp = self.targets[target]['api'].updateDataElement(
-                            dataElement_id=old_component['id'],
-                            attr_dict=attributes,
-                            )
-                        del self.targets[target]['dataElements'][index]
-                        self.targets[target]['dataElements'].append(comp)
-                        self.targets[target]['libraryStack']['dataElements'].append(comp)
+                            index,old_component = [(index,de) for index,de in enumerate(self.targets[target]['dataElements']) if de.get('attributes',{}).get('name') == cmp_baseDict['name']][0]
+                            attributes = {
+                                "name" : translatedComponent['name'],
+                                "enabled" : translatedComponent["enabled"],
+                                "delegate_descriptor_id" : translatedComponent["descriptor"],
+                                "storage_duration" : translatedComponent["storage_duration"],
+                                "force_lower_case" : translatedComponent["force_lower_case"],
+                                "clean_text" : translatedComponent["clean_text"],
+                                "settings" : translatedComponent["settings"],
+                                "default_value": translatedComponent["default_value"]
+                            }
+                            comp = self.targets[target]['api'].updateDataElement(
+                                dataElement_id=old_component['id'],
+                                attr_dict=attributes,
+                                )
+                            del self.targets[target]['dataElements'][index]
+                            self.targets[target]['dataElements'].append(comp)
+                            self.targets[target]['libraryStack']['dataElements'].append(comp)
         ## Rules part
         if cmp_baseDict['component']['type'] == 'rules':
             ## fetching all rule components associated with a rule.
@@ -310,30 +342,72 @@ class Synchronizer:
                 flagSkipCreation = False ## do not check for new rule config if rule has not been created
                 ## check if the component is in the exclComponentList
                 if any([bool(re.search(key,cmp_baseDict['name'])) for key in self.target_configs.get(target,{}).get('exclComponents',[])]):
-                    return {cmp_baseDict['name']:False}
+                    if kwargs.get('verbose',False):
+                        print(f'The rule "{cmp_baseDict["name"]}" is in the exclusion list for the target property "{target}". Skipping it.')
+                    continue
                 ## if there is an allow list for that property
                 if len(self.target_configs.get(target,{}).get('inclComponents',[]))>0:
                     if any([bool(re.search(key,cmp_baseDict['name'])) for key in self.target_configs.get(target,{}).get('inclComponents',[])]):
                         flagAllowList = True
                 ## if there is no allow list for that property, or no match in the list of target properties, or component was allow
                 if len(self.target_configs.get(target,{}).get('inclComponents',[]))==0 or flagAllowList:
-                    ## if rule does not exist
-                    if cmp_baseDict['name'] not in [rule['attributes']['name'] for rule in self.targets[target]['rules']]:
-                        if forceCreation:## creating the rule
+                    with self._target_locks[target]:
+                        ## if rule does not exist
+                        if cmp_baseDict['name'] not in [rule['attributes']['name'] for rule in self.targets[target]['rules']]:
+                            if forceCreation:## creating the rule
+                                if verbose:
+                                    print(f'The rule "{cmp_baseDict["name"]}" does not exist in the target property "{target}". Creating it')
+                                targetRule = self.targets[target]['api'].createRule(
+                                    name=cmp_baseDict['name']
+                                    )
+                                targetRuleId = targetRule['id']
+                                self.translator.extendTargetRules(ruleName=cmp_baseDict['name'],ruleId=targetRuleId,property_name=target)
+                                self.targets[target]['rules'].append(targetRule)
+                                index = len(self.targets[target]['rules'])-1
+                                self.targets[target]['libraryStack']['rules'].append(targetRule)
+                                for rc in template_ruleComponents:
+                                    try:
+                                        translatedComponent = self.translator.translate(target,rule_component=copySettings(rc))
+                                    except:
+                                        raise KeyError("Could not translate the component. Please check if your extensions are aligned in the properties.")
+                                    translatedComponent['rule_setting']['data'][0]['id'] = targetRuleId
+                                    if timeout is not None:
+                                        translatedComponent['timeout'] = timeout
+                                    targetRuleComponent = self.targets[target]['api'].createRuleComponent(
+                                        name=translatedComponent['name'],
+                                        settings = translatedComponent['settings'],
+                                        descriptor = translatedComponent['descriptor'],
+                                        extension_infos = translatedComponent['extension'],
+                                        rule_infos = translatedComponent['rule_setting'],
+                                        rule_order=translatedComponent['rule_order'],
+                                        order=translatedComponent['order'],
+                                        negate=translatedComponent['negate'],
+                                        delay_next=translatedComponent['delay_next'],
+                                        timeout=translatedComponent['timeout'],
+                                    )
+                            else:
+                                flagSkipCreation = True
+                                if verbose:
+                                    print(f'The rule "{cmp_baseDict["name"]}" does not exist in the target property "{target}". Not creating it')
+                        else: ## if a rule exist with the same name
                             if verbose:
-                                print(f'The rule "{cmp_baseDict["name"]}" does not exist in the target property "{target}". Creating it')
-                            targetRule = self.targets[target]['api'].createRule(
-                                name=cmp_baseDict['name']
-                                )
-                            targetRuleId = targetRule['id']
-                            self.translator.extendTargetRules(ruleName=cmp_baseDict['name'],ruleId=targetRuleId,property_name=target)
-                            self.targets[target]['rules'].append(targetRule)
-                            index = len(self.targets[target]['rules'])-1
+                                    print(f'The rule "{cmp_baseDict["name"]}" exists in the target property "{target}". Updating it')
+                            index, targetRule = [(index,rule) for index, rule in enumerate(self.targets[target]['rules']) if rule['attributes']['name'] == cmp_baseDict['name']][0]
                             self.targets[target]['libraryStack']['rules'].append(targetRule)
+                            targetRuleId = targetRule['id']
+                            rcsLinkTarget = targetRule.get('relationships',{}).get('rule_components',{}).get('links',{}).get('related')
+                            resResource = self.targets[target]['api'].getRessource(rcsLinkTarget)
+                            old_components:list = resResource['data']
+                            ## deleting the old version of rule component
+                            if len(old_components)>0:
+                                for component in old_components:
+                                    self.targets[target]['api'].deleteRuleComponent(component['id'])
+                            ## creating the new version of the old version
                             for rc in template_ruleComponents:
                                 try:
                                     translatedComponent = self.translator.translate(target,rule_component=copySettings(rc))
-                                except:
+                                except Exception as e:
+                                    print(e)
                                     raise KeyError("Could not translate the component. Please check if your extensions are aligned in the properties.")
                                 translatedComponent['rule_setting']['data'][0]['id'] = targetRuleId
                                 if timeout is not None:
@@ -350,52 +424,63 @@ class Synchronizer:
                                     delay_next=translatedComponent['delay_next'],
                                     timeout=translatedComponent['timeout'],
                                 )
-                        else:
-                            flagSkipCreation = True
+                        ## updating rule attribute if difference between base and target
+                        if not flagSkipCreation: ## if the rule was created or updated, we want to make sure that the attribute are the same as the template
+                            if cmp_baseDict['component']['attributes']['enabled'] != targetRule['attributes']['enabled']:
+                                baseRuleAttr = copySettings(cmp_baseDict['component'])
+                                targetRule = self.targets[target]['api'].updateRule(rule_id=targetRuleId,attr_dict=baseRuleAttr) ## keeping in a var for debug
+                                del self.targets[target]['rules'][index]
+                                self.targets[target]['rules'].append(targetRule)
+        if cmp_baseDict['component']['type'] == 'extensions':
+            for target in list(self.targets.keys()):
+                flagAllowList = False
+                ## check if the component is in the exclComponentList
+                if any([bool(re.search(key,cmp_baseDict['name'])) for key in self.target_configs.get(target,{}).get('exclComponents',[])]):
+                    if kwargs.get('verbose',False):
+                        print(f'The extension "{cmp_baseDict["name"]}" is in the exclusion list for the target property "{target}". Skipping it.')
+                    continue
+                ## if there is an allow list for that property
+                if len(self.target_configs.get(target,{}).get('inclComponents',[]))>0:
+                    if any([bool(re.search(key,cmp_baseDict['name'])) for key in self.target_configs.get(target,{}).get('inclComponents',[])]):
+                        flagAllowList = True
+                ## if there is no allow list for that property, or no match in the list of target properties, or component was allow
+                if len(self.target_configs.get(target,{}).get('inclComponents',[]))==0 or flagAllowList:
+                    with self._target_locks[target]:
+                        comp_base_settings = cmp_baseDict['copy']['settings']
+                        comp_base_extension_id = cmp_baseDict['copy']['extension_id']
+                        descriptor = cmp_baseDict['copy']['descriptor']
+                        if cmp_baseDict['name'] not in [ext['attributes']['name'] for ext in self.targets[target]['extensions']]:
+                            if forceCreation:
+                                if verbose:
+                                    print(f'The extension "{cmp_baseDict["name"]}" does not exist in the target property "{target}". Creating it')
+                                comp = self.targets[target]['api'].createExtension(
+                                    extension_id=comp_base_extension_id,
+                                    settings=comp_base_settings,
+                                    descriptor=descriptor
+                                )
+                                if 'id' not in comp.keys():
+                                    raise Exception("The extension could not be created. Please check if your extensions' versions are aligned in the properties.")
+                                self.targets[target]['libraryStack']['extensions'].append(comp)
+                                self.targets[target]['extensions'].append(comp)
+                                self.translator.extendExtensions(self.targets[target]['extensions'],target)
+                            else:
+                                if verbose:
+                                    print(f'The extension "{cmp_baseDict["name"]}" does not exist in the target property "{target}". Set forceCreation to True if you want to create it.')
+                        else: ## if extension exist, we will update it
                             if verbose:
-                                print(f'The rule "{cmp_baseDict["name"]}" does not exist in the target property "{target}". Not creating it')
-                    else: ## if a rule exist with the same name
-                        if verbose:
-                                print(f'The rule "{cmp_baseDict["name"]}" exists in the target property "{target}". Updating it')
-                        index, targetRule = [(index,rule) for index, rule in enumerate(self.targets[target]['rules']) if rule['attributes']['name'] == cmp_baseDict['name']][0]
-                        self.targets[target]['libraryStack']['rules'].append(targetRule)
-                        targetRuleId = targetRule['id']
-                        rcsLinkTarget = targetRule.get('relationships',{}).get('rule_components',{}).get('links',{}).get('related')
-                        resResource = self.targets[target]['api'].getRessource(rcsLinkTarget)
-                        old_components:list = resResource['data']
-                        ## deleting the old version of rule component
-                        if len(old_components)>0:
-                            for component in old_components:
-                                self.targets[target]['api'].deleteRuleComponent(component['id'])
-                        ## creating the new version of the old version
-                        for rc in template_ruleComponents:
-                            try:
-                                translatedComponent = self.translator.translate(target,rule_component=copySettings(rc))
-                            except Exception as e:
-                                print(e)
-                                raise KeyError("Could not translate the component. Please check if your extensions are aligned in the properties.")
-                            translatedComponent['rule_setting']['data'][0]['id'] = targetRuleId
-                            if timeout is not None:
-                                translatedComponent['timeout'] = timeout
-                            targetRuleComponent = self.targets[target]['api'].createRuleComponent(
-                                name=translatedComponent['name'],
-                                settings = translatedComponent['settings'],
-                                descriptor = translatedComponent['descriptor'],
-                                extension_infos = translatedComponent['extension'],
-                                rule_infos = translatedComponent['rule_setting'],
-                                rule_order=translatedComponent['rule_order'],
-                                order=translatedComponent['order'],
-                                negate=translatedComponent['negate'],
-                                delay_next=translatedComponent['delay_next'],
-                                timeout=translatedComponent['timeout'],
+                                print(f'The extension "{cmp_baseDict["name"]}" exists in the target property "{target}". Updating it')
+                            index, targetExt = [(index,ext) for index, ext in enumerate(self.targets[target]['extensions']) if ext['attributes']['name'] == cmp_baseDict['name']][0]
+                            comp = self.targets[target]['api'].updateExtension( ## create and update used the POST method both
+                                extension_id=targetExt['id'],
+                                attr_dict=cmp_baseDict['copy']
                             )
-                    ## updating rule attribute if difference between base and target
-                    if not flagSkipCreation: ## if the rule was created or updated, we want to make sure that the attribute are the same as the template
-                        if cmp_baseDict['component']['attributes']['enabled'] != targetRule['attributes']['enabled']:
-                            baseRuleAttr = copySettings(cmp_baseDict['component'])
-                            targetRule = self.targets[target]['api'].updateRule(rule_id=targetRuleId,attr_dict=baseRuleAttr) ## keeping in a var for debug
-                            del self.targets[target]['rules'][index]
-                            self.targets[target]['rules'].append(targetRule)
+                            if 'id' not in comp.keys():
+                                raise Exception("The extension could not be updated. Please check if your extensions' versions are aligned in the properties.")
+                            del self.targets[target]['extensions'][index]
+                            self.targets[target]['extensions'].append(comp)
+                            self.targets[target]['libraryStack']['extensions'].append(comp)
+                            self.translator.extendExtensions(self.targets[target]['extensions'],target)
+
 
     def syncComponents(self,componentsName:list=None,componentsId:list=None,publishedVersion:bool=False,forceCreation:bool=False)->None:
         """
@@ -412,6 +497,54 @@ class Synchronizer:
         if componentsId is not None:
             for component in componentsId:
                 self.syncComponent(componentId=component,publishedVersion=publishedVersion,forceCreation=forceCreation)
+    
+    def syncRules(self,regex:str=None,forceCreation:bool=False,publishedVersion:bool=False)->None:
+        """
+        Synchronizing the rules in the base property to the target properties.
+        Arguments:
+            regex : OPTIONAL : If you want to filter the rules to sync based on a regex pattern. Default: None (sync all rules)
+            forceCreation : OPTIONAL : If set to True, it will sync the rules even if they do not exist in the target properties. If set to False, it will only sync the rules that already exist in the target properties. Default: False.
+            publishedVersion : OPTIONAL : If set to True, it will sync the latest published version of the rules. Default: False.
+        """
+        base_rule_names = [rule['attributes']['name'] for rule in self.base['rules']]
+        if regex is not None:
+            base_rule_names = [rule for rule in base_rule_names if re.search(regex,rule)]
+        with ThreadPoolExecutor() as executor:
+            futures = [executor.submit(self.syncComponent, componentName=rule, forceCreation=forceCreation, publishedVersion=publishedVersion) for rule in base_rule_names]
+            for future in futures:
+                future.result()
+
+    def syncDataElements(self,regex:str=None,forceCreation:bool=False,publishedVersion:bool=False)->None:
+        """
+        Synchronizing the data elements in the base property to the target properties.
+        Arguments:
+            regex : OPTIONAL : If you want to filter the data elements to sync based on a regex pattern. Default: None (sync all data elements)
+            forceCreation : OPTIONAL : If set to True, it will sync the data elements even if they do not exist in the target properties. If set to False, it will only sync the data elements that already exist in the target properties. Default: False.
+            publishedVersion : OPTIONAL : If set to True, it will sync the latest published version of the data elements. Default: False.
+        """
+        base_de_names = [de['attributes']['name'] for de in self.base['dataElements']]
+        if regex is not None:
+            base_de_names = [de for de in base_de_names if re.search(regex,de)]
+        with ThreadPoolExecutor() as executor:
+            futures = [executor.submit(self.syncComponent, componentName=de, forceCreation=forceCreation, publishedVersion=publishedVersion) for de in base_de_names]
+            for future in futures:
+                future.result()
+    
+    def syncExtensions(self,regex:str=None,forceCreation:bool=False, **kwargs)->None:
+        """
+        Take extensions from the Base and try to install them on the target properties.
+        It will check if the extension is already installed in the target property, if not it will install it.
+        Arguments:
+            regex : OPTIONAL : If you want to filter the extensions name to sync based on a regex pattern. Default: None (sync all extensions)
+            forceCreation : OPTIONAL : If set to True, will force the creation of the extension even if it already exists. Default: False
+        """
+        base_extensions = self.base['extensions']
+        base_extension_names = [ext['attributes']['name'] for ext in base_extensions]
+        if regex is not None:
+            base_extension_names = [ext for ext in base_extension_names if re.search(regex,ext)]
+        for ext_name in base_extension_names:
+            self.syncComponent(componentName=ext_name,forceCreation=forceCreation,**kwargs)
+
     
     def createTargetsLibrary(self,name:str="syncComponents",assignEnv:bool|str=False,**kwargs)->None:
         """
@@ -431,28 +564,35 @@ class Synchronizer:
                     lib = [lib for lib in librariesDev if name in lib['attributes']['name']][0]
                 else:
                     lib = self.targets[target]['api'].createLibrary(name=name,return_class=False)
-                library = Library(lib,config_object=self.targets[target]['api'].connector.config,header=self.targets[target]['api'].connector.header)
+                library = Library(lib, _connector=self.targets[target]['api'].connector)
                 self.targets[target]['library'] = library
             self.targets[target]['library'].getFullLibrary()
             ## taking care of rule update
-            existingRules = [rule['id'] for rule in self.targets[target]['library'].relationships['rules'] if rule['id'] in [r['id'] for r in self.targets[target]['libraryStack']['rules']]]
-            newRules = [rule['id'] for rule in self.targets[target]['libraryStack']['rules'] if rule['id'] not in existingRules]
-            if len(existingRules) > 0:
-                self.targets[target]['library'].updateRules(existingRules)
+            ## PATCH replaces the whole relationship, so the payload must keep components the library already has
+            currentRuleIds = {rule['id'] for rule in self.targets[target]['library'].relationships['rules']}
+            stackRuleIds = {rule['id'] for rule in self.targets[target]['libraryStack']['rules']}
+            newRules = list(stackRuleIds - currentRuleIds)
+            ruleIdsToKeep = list(currentRuleIds | stackRuleIds)
+            if len(ruleIdsToKeep) > 0:
+                self.targets[target]['library'].updateRules(ruleIdsToKeep)
             if len(newRules)>0:
                 self.targets[target]['library'].addRules(newRules)
             ## taking care of data elements
-            existingDataElements = [de['id'] for de in self.targets[target]['library'].relationships['data_elements'] if de['id'] in [d['id'] for d in self.targets[target]['libraryStack']['dataElements']]]
-            newDataElements = [de['id'] for de in self.targets[target]['libraryStack']['dataElements'] if de['id'] not in existingDataElements]
-            if len(existingDataElements) > 0:
-                self.targets[target]['library'].updateDataElements(existingDataElements)
+            currentDataElementIds = {de['id'] for de in self.targets[target]['library'].relationships['data_elements']}
+            stackDataElementIds = {de['id'] for de in self.targets[target]['libraryStack']['dataElements']}
+            newDataElements = list(stackDataElementIds - currentDataElementIds)
+            dataElementIdsToKeep = list(currentDataElementIds | stackDataElementIds)
+            if len(dataElementIdsToKeep) > 0:
+                self.targets[target]['library'].updateDataElements(dataElementIdsToKeep)
             if len(newDataElements)>0:
                 self.targets[target]['library'].addDataElements(newDataElements)
             ## taking care of the extensions
-            existingExtensions = [ext['id'] for ext in self.targets[target]['library'].relationships['extensions'] if ext['id'] in [e['id'] for e in self.targets[target]['libraryStack']['extensions']]]
-            newExtensions = [ext['id'] for ext in self.targets[target]['libraryStack']['extensions'] if ext['id'] not in existingExtensions]
-            if len(existingExtensions) > 0:
-                self.targets[target]['library'].updateExtensions(existingExtensions)
+            currentExtensionIds = {ext['id'] for ext in self.targets[target]['library'].relationships['extensions']}
+            stackExtensionIds = {ext['id'] for ext in self.targets[target]['libraryStack']['extensions']}
+            newExtensions = list(stackExtensionIds - currentExtensionIds)
+            extensionIdsToKeep = list(currentExtensionIds | stackExtensionIds)
+            if len(extensionIdsToKeep) > 0:
+                self.targets[target]['library'].updateExtensions(extensionIdsToKeep)
             if len(newExtensions)>0:
                 self.targets[target]['library'].addExtensions(newExtensions)
             if type(assignEnv) == bool and assignEnv == True:
@@ -506,7 +646,7 @@ class Synchronizer:
                     if libraryUsed is not None:
                         print(f'Environment is already used by library "{libraryUsed["attributes"]["name"]}" in "{target}" property. Removing the environment from that library.')
                         libraryUsedId = libraryUsed['id']
-                        tmp_lib = Library(libraryUsedId,config_object=self.targets[target]['api'].connector.config,header=self.targets[target]['api'].connector.header)
+                        tmp_lib = Library(libraryUsedId, _connector=self.targets[target]['api'].connector)
                         tmp_lib.removeEnvironment()
                     self.targets[target]['library'].setEnvironment(envId)
                     self.targets[target]['library'].build()
@@ -520,7 +660,6 @@ class Synchronizer:
                     response[target]['environment'] = f"Multiple environment with the name {assignEnv} to assign"
                     response[target]['script'] = None
         return response
-
 
     def upgradeTargetExtension(self,extensionName:str=None,platform:str="web",verbose:bool=False)->dict:
         """
@@ -782,7 +921,7 @@ class Synchronizer:
             base_library = [lib for lib in base_libraries if lib['id'] == library][0]
         else:
             raise ValueError('The library name or ID provided does not exist in the base property')
-        myLib = Library(base_library['id'],config_object=self.base['api'].connector.config,header=self.base['api'].connector.header)
+        myLib = Library(base_library['id'], _connector=self.base['api'].connector)
         components = myLib.getFullLibrary()
         rules = components['rules']
         dataElements = components['data_elements']
@@ -832,7 +971,7 @@ class Synchronizer:
         if len(extensions)>0:
             for ext in extensions:
                 try:
-                    self.upgradeTargetExtension(extensionName=ext['attributes']['name'],platform=ext['attributes']['platform'],publishedVersion=publishedVersion,verbose=verbose)
+                    self.upgradeTargetExtension(extensionName=ext['attributes']['name'],platform=ext['attributes']['platform'],verbose=verbose)
                 except:
                     print(f'Extension {ext["attributes"]["name"]} could not be updated in the target properties. Please check if the extension exist and if there is an update available.')
         if len(rules)>0:

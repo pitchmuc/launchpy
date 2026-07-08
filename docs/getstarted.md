@@ -23,17 +23,49 @@ import launchpy as lp
 lp.createConfigFile()
 ```
 
+It takes these parameters: 
+* filename : OPTIONAL : The name of the JSON file to create. Default: "config_launch.json"
+* auth_type : OPTIONAL : The type of authentication to use. Default: "oauthV2".
+* scope : OPTIONAL : The scope of the authentication. Default: "https://ims-na1.adobelogin.com/s/ent_reactor_admin_sdk".
+  if any problem occurs, you can update the scope to "https://ims-na1.adobelogin.com/s/ent_reactor_sdk"
+* multi_org : OPTIONAL : If set to True, it will create a multi-org config file. Default: False.
+
+
+The config JSON will look like: 
+
+```JSON
+{
+    "org_id": "<orgID>",
+    "client_id": "<client_id>",
+    "secret": "<YourSecret>",
+    "scopes": "<scopes>",
+}
+```
+
 This will create a JSON and you will need to fill it with the information available in your adobe io account.
 
 **NOTE**: scope in the config file has evolved over time so you can change it. Following this [link](https://www.adobe.io/authentication/auth-methods.html#!AdobeDocs/adobeio-auth/master/JWT/Scopes.md) to see the different scope possible.\
 You can change the `scope` attribute for one of these values: `"https://ims-na1.adobelogin.com/s/ent_reactor_admin_sdk"` or `"https://ims-na1.adobelogin.com/s/ent_reactor_sdk"`
 By default, I will test the dev scope if the scope provided fails. So normally nothing you need to do.
 
-**NOTE 2**: There is a possibility till end of 2024 to use the JWT.\
-launchpy supports both `jwt` and `oauthV2` authentication.\
-By default the latest version will try to use the `oauthV2`.\
-You can specify the keys generated in the config file by using the `auth_type` parameter.\
-Possible values : `oauthV2` (default) or `jwt`
+
+### 3. Bis Multi Org Setup
+
+In case you have a multi IMS Org setup and you would need to do synchronization between different IMS Org, you can use the `multi_org` parameter to create a multi-org config file.\
+This will change your JSON file into a list, and add the `org_name` attribute.\
+So your config file will look like this: 
+```JSON
+[
+    {
+    "org_id": "<orgID>",
+    "client_id": "<client_id>",
+    "secret": "<YourSecret>",
+    "scopes": "<scopes>",
+    "org_name": "<org_name>"
+    }
+]
+
+``` 
 
 
 ## 4. Import the configuration file
@@ -44,6 +76,30 @@ I would recommend to store the config file and the key in the folder that you ar
 ```python
 lp.importConfigFile('myconfig.json')
 ```
+
+### 4. Bis Multi Org Setup
+
+In case you are loading multi org setup, you need to have the `org_name` attribute filled.\
+So your config file will look like this: 
+```JSON
+[
+    {
+    "org_id": "<orgID>",
+    "client_id": "<client_id>",
+    "secret": "<YourSecret>",
+    "scopes": "<scopes>",
+    "org_name": "org_name1"
+    },
+    {
+    "org_id": "<orgID>",
+    "client_id": "<client_id>",
+    "secret": "<YourSecret>",
+    "scopes": "<scopes>",
+    "org_name": "org_name2"
+    }
+]
+```
+
 
 ## 5. Instantiate the Admin class & get Company ID to retrieve properties
 

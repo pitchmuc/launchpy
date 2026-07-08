@@ -10,6 +10,7 @@ This document provides an overview of the command line interface (CLI) for `laun
     - [Instantiation](#instantiation)
       - [create\_config\_file](#create_config_file)
       - [config](#config)
+      - [change\_org](#change_org)
       - [get\_properties](#get_properties)
       - [create\_property](#create_property)
       - [delete\_property](#delete_property)
@@ -34,6 +35,9 @@ This document provides an overview of the command line interface (CLI) for `laun
     - [Synchronizer Layer Commands](#synchronizer-layer-commands)
       - [check\_component](#check_component)
       - [sync](#sync)
+      - [sync\_rules](#sync_rules)
+      - [sync\_data\_elements](#sync_data_elements)
+      - [sync\_extensions](#sync_extensions)
       - [rename\_component](#rename_component)
       - [get\_targets](#get_targets)
       - [upgrade\_extension](#upgrade_extension)
@@ -99,8 +103,9 @@ The config method also take individual parameters as arguments, which would over
 
 #### create_config_file
 Create a config file to store your credentials and other necessary information for using `launchpy`. This is a one-time setup step that allows you to save your configuration for future use.\
-Arguments
-`-fn`, `--file_name`: The name of the config file to be created. If not provided, it defaults to `launchpy_config.json`.\
+Arguments:
+`-fn`, `--file_name`: The name of the config file to be created. If not provided, it defaults to `launchpy_config.json`.
+`-m`, `--multi_org`: Flag. If present, generate a config file template for multiple organizations (a JSON list, each entry with its own `org_name`) instead of the default single-organization template (a JSON object).
 
 You can create a config file by running the following command:
 
@@ -108,6 +113,29 @@ You can create a config file by running the following command:
 python -m launchpy.cli
 (Cmd) create_config_file
 ```
+
+If you need to connect to several Adobe Experience Platform organizations from the same CLI session, generate a multi-org template instead:
+
+```bash
+python -m launchpy.cli
+(Cmd) create_config_file --multi_org
+```
+
+This produces a JSON list of config blocks (instead of a single JSON object), where each block requires an `org_name` key used to reference that organization, for example:
+
+```json
+[
+    {
+        "org_id": "<orgID>",
+        "client_id": "<client_id>",
+        "secret": "<YourSecret>",
+        "scopes": "<scopes>",
+        "org_name": "<org_name>"
+    }
+]
+```
+
+You can duplicate that block for each organization you want to connect to, giving each a unique `org_name`. See the [config](#config) and [change_org](#change_org) commands below for how to use this file.
 
 
 #### config
@@ -119,6 +147,7 @@ Arguments
 `-sc`,`--scopes`: The scopes that define the permissions for your API connection. This is a required parameter.
 `-cf`,`--config_file`: The path to the config file that contains your credentials and other necessary information.
 `-p`,`--property` : The property name to be used and directly instantiated the property layer. This is an optional parameter.
+`-on`,`--org_name`: The organization name to use when your `--config_file` is a multi-org config file (see [create_config_file](#create_config_file)). This is an optional parameter, it defaults to the first organization found in the file (or `default` when using individual parameters).
 
 Example via parameters:
 ```bash
@@ -156,6 +185,27 @@ It also supports direct access to the property layer by providing the property n
 python -m launchpy.cli --config_file <path_to_your_config_file> --property <your_property_name>
 ```
 
+Example with a multi-org config file, connecting directly to the `client_a` organization:
+```bash
+python -m launchpy.cli
+(Cmd) config --config_file <path_to_your_multi_org_config_file> --org_name client_a
+launchpy:client_a>
+```
+
+When in a non-multi-org environment, the prompt of the CLI will be `launchpy>`, and when in a multi-org environment, the prompt will be `launchpy:<org_name>`, where `<org_name>` is the name of the organization you are currently connected to.\
+By default, the first organization found in the multi-org config file will be used if no `--org_name` is provided. You can switch between organizations using the `change_org` command.
+
+#### change_org
+Switch the current CLI session to another organization that has already been loaded from a multi-org config file (via `config` or `--config_file` at startup). This avoids re-running `config` when you need to move between organizations.\
+Arguments:
+`org_name`: The name of the organization to switch to, matching one of the `org_name` values in your multi-org config file. This is a required parameter.
+
+```bash
+python -m launchpy.cli
+(Cmd) config --config_file <path_to_your_multi_org_config_file>
+launchpy:client_a> change_org client_b
+launchpy:client_b>
+```
 
 #### get_properties
 Retrieve a list of properties associated with your Adobe Developer Project. This command allows you to view the properties that you have access to and can manage using `launchpy`.\
@@ -194,9 +244,11 @@ launchpy> delete_property "Property Name"
 
 #### extract_property
 This method allows you to extract the details of a specific property and save them to a folder.\
-The folder name would be the name of the property, it will contains sub folders for each rules.\
+By default, the folder name would be the name of the property, and it will contain sub folders for each rule.\
 Arguments:
 `name`: The name of the property to extract. This is a required parameter.
+`-p`, `--published_version`: Boolean. Extract only the latest published version of the components instead of the current (development) version. Default False. Possible values: `True`, `False`
+`-f`, `--folder`: The folder to extract the property into. This is an optional parameter, if not provided, it defaults to a folder named after the property in the current working directory.
 
 This can be useful for searching code or for backup purposes. 
 
@@ -204,6 +256,12 @@ This can be useful for searching code or for backup purposes.
 
 python -m launchpy.cli -cf <path_to_your_config_file>
 launchpy> extract_property "Property Name"
+```
+
+Example extracting the latest published version into a specific folder:
+```bash
+python -m launchpy.cli -cf <path_to_your_config_file>
+launchpy> extract_property "Property Name" --published_version True --folder "./exports/property_name"
 ```
 
 
@@ -248,62 +306,62 @@ Once you have instantiated the property layer for a specific property, you can a
 #### get_extensions
 Get all extensions in the property and list them.\
 Arguments:
-`-s`, `--save`: Boolean. Save extensions to a CSV file. Default False. Possible values: `True`, `False`
+`-s`, `--save`: Flag. Save extensions to a CSV file. Default False.
 
 ```bash
-property_name> get_extensions -s True
+property_name> get_extensions -s
 ```
 
 #### get_extension
 Get details of a specific extension in the property.\
 Arguments:
 `name`: The name of the extension to retrieve details for. This is a required parameter.
-`-s`, `--save`: Boolean. Save the extension details to a JSON file. Default False. Possible values: `True`, `False`
+`-s`, `--save`: Flag. Save the extension details to a JSON file. Default False.
 
 ```bash
-property_name> get_extension "Extension Name" -s True
+property_name> get_extension "Extension Name" -s
 ```
 
 #### get_rules
 Get all rules in the property and list them.\
 Arguments:
 `-n`, `--name`: The name of the rule to filter the results (partial match, non-case sensitive). This is an optional parameter.
-`-s`, `--save`: Boolean. Save rules to a CSV file. Default False. Possible values: `True`, `False`
+`-s`, `--save`: Flag. Save rules to a CSV file. Default False.
 
 ```bash
-property_name> get_rules -n "Rule Name" -s True
+property_name> get_rules -n "Rule Name" -s
 ```
 
 #### get_rule
 Get details of a specific rule in the property.\
 Arguments:
 `name`: The name of the rule to retrieve details for. This is a required parameter.
-`-s`, `--save`: Boolean. Save the rule details to a JSON file. Default False. Possible values: `True`, `False`
+`-s`, `--save`: Flag. Save the rule details to a JSON file. Default False.
 
 ```bash
-property_name> get_rule "Rule Name" -s True
+property_name> get_rule "Rule Name" -s
 ```
 
 #### get_rules_components
 Get all rule components, and save them to a CSV file if specified. Intended to be used for all components, but can be filtering.\
 Arguments:
-`-s`, `--save`: Boolean. Save rules components to a CSV file. Default False. Possible values: `True`, `False`
+`-s`, `--save`: Flag. Save rules components to a CSV file. Default False.
 `-rn`, `--rule_name`: (Partial) Name of the rule to get components for. This is an optional parameter.
 `-rid`, `--rule_id`: ID of the rule to get components for. This is an optional parameter, if both `rule_name` and `rule_id` are provided, it will use `rule_id`.
 
 ```bash
-property_name> get_rules_components -s True
+property_name> get_rules_components -s
 ```
 
 #### get_rule_components
 Get all components for a specific rule by name or ID. Way more effective than the other methods and provide more details.\
 Arguments:
-`-s`, `--save`: Boolean. Save the rule components to a JSON file. Default False. Possible values: `True`, `False`
+`-s`, `--save`: Flag. Save the rule components to a JSON file. Default False.
 `-rn`, `--rule_name`: (Partial) Name of the rule to get components for. This is an optional parameter.
 `-rid`, `--rule_id`: ID of the rule to get components for. This is an optional parameter, if both `rule_name` and `rule_id` are provided, it will use `rule_id`.
 
 ```bash
-property_name> get_rule_components -rn "Rule Name" -s True
+property_name> get_rule_components -rn "Rule Name" -s
 ```
 
 #### get_data_elements
@@ -320,10 +378,10 @@ property_name> get_data_elements -n "Data Element Name" -s True
 Get details of a specific data element in the property.\
 Arguments:
 `name`: The name of the data element to retrieve details for. This is a required parameter.
-`-s`, `--save`: Boolean. Save the data element details to a JSON file. Default False. Possible values: `True`, `False`
+`-s`, `--save`: Flag. Save the data element details to a JSON file. Default False.
 
 ```bash
-property_name> get_data_element "Data Element Name" -s True
+property_name> get_data_element "Data Element Name" -s
 ```
 
 #### get_latest_published_version
@@ -331,20 +389,20 @@ Get the latest published version of a specific component in the property.\
 Arguments:
 `-n`, `--name`: The name of the component to get the latest published version for. This is a required parameter.
 `-t`, `--type`: The type of the component (e.g. 'rule', 'data_element', 'extension') to get the latest published version for. This is a required parameter.
-`-s`, `--save`: Boolean. Save the latest published version details to a JSON file. Default False. Possible values: `True`, `False`
+`-s`, `--save`: Flag. Save the latest published version details to a JSON file. Default False.
 
 ```bash
-property_name> get_latest_published_version -n "Component Name" -t "rule" -s True
+property_name> get_latest_published_version -n "Component Name" -t "rule" -s
 ```
 
 #### get_libraries
 Get all libraries in the property and list them.\
 Arguments:
-`-s`, `--save`: Boolean. Save libraries to a CSV file. Default False. Possible values: `True`, `False`
+`-s`, `--save`: Flag. Save libraries to a CSV file. Default False.
 `-st`, `--state`: Filter by library state. Possible values: 'development' (default), 'submitted', 'approved', 'rejected', 'published'. This is an optional parameter.
 
 ```bash
-property_name> get_libraries -s True -st "development"
+property_name> get_libraries -s -st "development"
 ```
 
 #### delete_library
@@ -382,10 +440,10 @@ Check if a specific component is in sync between the base property and target pr
 Arguments:
 `-n`, `--name`: The name of the component to check for synchronization. This is a required parameter.
 `-id`, `--id`: ID of the component to check (overrides name if both provided)
-`-p`, `--published` : Boolean. Check the synchronization based on the latest published version of the component. Default False. Possible values: `True`, `False`
+`-p`, `--published` : Flag. Check the synchronization based on the latest published version of the component. Default False.
 
 ```bash
-synchronizer:Base_Property_Name> check_component -n "Component Name" -p True
+synchronizer:Base_Property_Name> check_component -n "Component Name" -p
 ```
 
 #### sync
@@ -393,11 +451,45 @@ Synchronize a specific component between the base property and target properties
 Arguments:
 `-n`, `--name`: The name of the component to synchronize. This is a required parameter.
 `-id`, `--id`: ID of the component to synchronize (overrides name if both provided)
-`-p`, `--published` : Boolean. Synchronize the latest published version of the component. Default `False`. Possible values: `True`, `False`
-`-c`, `--create` : Boolean. Create the component if it does not exist. Default `True`. Possible values: `True`, `False`
+`-p`, `--published` : Flag. Synchronize the latest published version of the component. Default False.
+`-c`, `--create` : Flag. Create the component if it does not exist. Default False.
+`-v`, `--verbose` : Flag. Print detailed information about the sync process. Default False.
 
 ```bash
-synchronizer:Base_Property_Name> sync -n "Component Name" -p True -c True
+synchronizer:Base_Property_Name> sync -n "Component Name" -p -c
+```
+
+#### sync_rules
+Synchronize all rules between the base property and target properties in a single call, instead of syncing them one by one with [sync](#sync).\
+Arguments:
+`-r`, `--regex`: Regex pattern to filter rules by name (partial match, non-case sensitive). This is an optional parameter, if not provided, all rules are synced.
+`-c`, `--create` : Flag. Create rules that do not exist in the destination property. Default False.
+`-p`, `--published` : Flag. Sync the latest published version of the rules. Default False.
+
+```bash
+synchronizer:Base_Property_Name> sync_rules -r "Rule Name" -c
+```
+
+#### sync_data_elements
+Synchronize all data elements between the base property and target properties in a single call, instead of syncing them one by one with [sync](#sync).\
+Arguments:
+`-r`, `--regex`: Regex pattern to filter data elements by name (partial match, non-case sensitive). This is an optional parameter, if not provided, all data elements are synced.
+`-c`, `--create` : Flag. Create data elements that do not exist in the destination property. Default False.
+`-p`, `--published` : Flag. Sync the latest published version of the data elements. Default False.
+
+```bash
+synchronizer:Base_Property_Name> sync_data_elements -r "Data Element Name" -c
+```
+
+#### sync_extensions
+Synchronize all extensions between the base property and target properties in a single call, instead of syncing them one by one with [sync](#sync).\
+Arguments:
+`-r`, `--regex`: Regex pattern to filter extensions by name (partial match, non-case sensitive). This is an optional parameter, if not provided, all extensions are synced.
+`-c`, `--create` : Flag. Create extensions that do not exist in the destination property. Default False.
+`-v`, `--verbose` : Flag. Print detailed information about the sync process. Default False.
+
+```bash
+synchronizer:Base_Property_Name> sync_extensions -r "Extension Name" -c
 ```
 
 #### rename_component

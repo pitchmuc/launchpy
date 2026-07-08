@@ -137,7 +137,7 @@ You can pass down a list of component names or componentIds.\
 It takes 3 arguments:\
 Arguments:
 * componentsName : REQUIRED : The list of component names to sync
-* componentsId : REQUIRED : The list of component ID to sync*
+* componentsId : REQUIRED : The list of component ID to sync
 * publishedVersion : OPTIONAL : if you want to take the version that has been published
 
 ## syncFromLibrary
@@ -157,6 +157,30 @@ Arguments:
 By default, the method will sync the components present in the library as they are in the library.
 If the `publishedVersion` is set to True, it will try to sync the version that has been published in the base property to the targets.\
 If the `libraryLinked` is set to `False` and the `publishedVersion` is set to `False` (default), it will try to sync the latest version of the components present in the base property library to the targets.\
+
+## syncExtensions
+
+This method allows you to sync the extension(s) from the base property to the target properties.\
+It will check if the extension is already installed in the target property, if not, it will install it if you have used the forceCreation parameter. Note that we cannot guarantee the same version as only the latest version is available for installation.\
+If the extension(s) is already installed, it will check if the settings are the same, if not, it will update the settings to match the base property.\
+Arguments:
+* regex : OPTIONAL : If you want to filter the extensions name to sync based on a regex pattern. Default: None (sync all extensions)
+* forceCreation : OPTIONAL : If set to True, will force the creation of the extension even if it already exists. Default: False
+
+## syncDataElements
+Synchronizing the data elements in the base property to the target properties.
+Arguments:
+*  regex : OPTIONAL : If you want to filter the data elements to sync based on a regex pattern. Default: None (sync all data elements)
+*  forceCreation : OPTIONAL : If set to True, it will sync the data elements even if they do not exist in the target properties. If set to False, it will only sync the data elements that already exist in the target properties. Default: False.
+*  publishedVersion : OPTIONAL : If set to True, it will sync the latest published version of the data elements. Default: False.
+
+## SyncRules
+It will synchronize the rules in the base property to the target properties.
+Arguments:
+*  regex : OPTIONAL : If you want to filter the rules to sync based on a regex pattern. Default: None (sync all rules)
+*  forceCreation : OPTIONAL : If set to True, it will sync the rules even if they do not exist in the target properties. If set to False, it will only sync the rules that already exist in the target properties. Default: False.
+*  publishedVersion : OPTIONAL : If set to True, it will sync the latest published version of the rules. Default: False.
+
 
 ## createTargetsLibrary
 

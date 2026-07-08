@@ -60,7 +60,15 @@ async def write_all_data_elements(data_elements_list, folder, header):
             json.dump(data_element, f, indent=4)
 
 
-def extractProperty(property: dict | Property):
+def extractProperty(property: dict | Property, publishedVersion: bool = False,folder: str = None):
+    """
+    Extract the rules, Data Elements and Extensions configuration for a given property and save them in a folder named after the property.
+    Arguments:
+        property: dict | Property: The property to extract. Can be a Property object or a dictionary containing the property data.
+        publishedVersion: bool: If True, only the latest published version of each rule will be extracted. If False, all rules as latest state will be extracted.
+            For rules that are not yet published, the latest state will be extracted regardless of the value of this parameter.
+        folder : str: The folder where the property will be extracted. If None, a folder named after the property will be created in the current working directory.
+    """
     if property is None:
         raise ValueError("Property is None")
     elif type(property) is not Property and type(property) is dict:
@@ -68,17 +76,48 @@ def extractProperty(property: dict | Property):
             property = Property(property)
         else:
             raise ValueError("Property is not of type Property")
-    folder = __safe_name__(property.name)
+    if folder is None:
+        folder = __safe_name__(property.name)
     Path(folder).mkdir(parents=True, exist_ok=True)
     rules = property.getRules()
+    if publishedVersion:
+        published_rules = []
+        for rule in rules:
+            revisions = property.getRevisions(rule)
+            try:
+                publishedRule = property.getLatestPublishedVersion(revisions)
+                published_rules.append(publishedRule)
+            except Exception as e:
+                published_rules.append(rule)
+        rules = published_rules
     asyncio.run(process_all_rules(rules, folder, property.header))
     dataElements = property.getDataElements()
+    if publishedVersion:
+        published_data_elements = []
+        for data_element in dataElements:
+            revisions = property.getRevisions(data_element)
+            try:
+                publishedDataElement = property.getLatestPublishedVersion(revisions)
+                published_data_elements.append(publishedDataElement)
+            except Exception as e:
+                published_data_elements.append(data_element)
+        dataElements = published_data_elements
     dataElements_folder = Path(folder) / "data_elements"
     Path(dataElements_folder).mkdir(parents=True, exist_ok=True)
     asyncio.run(write_all_data_elements(dataElements, dataElements_folder, property.header))
     extension_folder = Path(folder) / "extensions"
     extension_folder.mkdir(parents=True, exist_ok=True)
     extensions = property.getExtensions()
+    if publishedVersion:
+        published_extensions = []
+        for extension in extensions:
+            revisions = property.getRevisions(extension)
+            try:
+                publishedExtension = property.getLatestPublishedVersion(revisions)
+                published_extensions.append(publishedExtension)
+            except Exception as e:
+                published_extensions.append(extension)
+        extensions = published_extensions
     for extension in extensions:
         extension_name = __safe_name__(extension['attributes']['name'])
         file_path = extension_folder / f"{extension_name}.json"

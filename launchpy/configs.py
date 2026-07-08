@@ -1,7 +1,7 @@
 import json, os
 from pathlib import Path
 from typing import Optional
-from launchpy.config import config_object, header
+from launchpy.config import config_objects, headers
 
 def find_path(path: str) -> Optional[Path]:
     """Checks if the file denoted by the specified `path` exists and returns the Path object
@@ -22,7 +22,7 @@ def find_path(path: str) -> Optional[Path]:
         return None
 
 
-def createConfigFile(filename:str='config_launch',auth_type: str = "oauthV2", scope: str = "https://ims-na1.adobelogin.com/s/ent_reactor_admin_sdk", verbose: object = False)->None:
+def createConfigFile(filename:str='config_launch',auth_type: str = "oauthV2", scope: str = "https://ims-na1.adobelogin.com/s/ent_reactor_admin_sdk", multi_org:bool=False, verbose: object = False)->None:
     """
     This function will create a 'config_launch_admin.json' file where you can store your access data. 
     Arguments:
@@ -39,6 +39,10 @@ def createConfigFile(filename:str='config_launch',auth_type: str = "oauthV2", sc
     }
     if auth_type == 'oauthV2':
         json_data['scopes'] = "<scopes>"
+    
+    if multi_org:
+        json_data['org_name'] = '<org_name>'
+        json_data = [json_data]
     if '.json' not in filename:
         filename = f"{filename}.json"
     with open(filename, 'w') as cf:
@@ -69,26 +73,52 @@ def importConfigFile(path: str = None,auth_type:str=None) -> None:
         )
     with open(config_file_path, 'r') as file:
         provided_config = json.load(file)
-        provided_keys = provided_config.keys()
-        if 'api_key' in provided_keys:
-            ## old naming for client_id
-            client_id = provided_config['api_key']
-        elif 'client_id' in provided_keys:
-            client_id = provided_config['client_id']
-        else:
-            raise RuntimeError(f"Either an `api_key` or a `client_id` should be provided.")
-        if auth_type is None:
-            if 'scopes' in provided_keys:
-                auth_type = 'oauthV2'
-        args = {
-            "org_id" : provided_config['org_id'],
-            "secret" : provided_config['secret'],
-            "client_id" : client_id,
-            "scope" : provided_config.get('scope')
-        }
-        if auth_type == 'oauthV2':
-            args["scopes"] = provided_config["scopes"].replace(' ','')
-        configure(**args)
+        if type(provided_config) == dict:
+            provided_keys = provided_config.keys()
+            if 'api_key' in provided_keys:
+                ## old naming for client_id
+                client_id = provided_config['api_key']
+            elif 'client_id' in provided_keys:
+                client_id = provided_config['client_id']
+            else:
+                raise RuntimeError(f"Either an `api_key` or a `client_id` should be provided.")
+            if auth_type is None:
+                if 'scopes' in provided_keys:
+                    auth_type = 'oauthV2'
+            args = {
+                "org_id" : provided_config['org_id'],
+                "secret" : provided_config['secret'],
+                "client_id" : client_id,
+                "scope" : provided_config.get('scope')
+            }
+            if auth_type == 'oauthV2':
+                args["scopes"] = provided_config["scopes"].replace(' ','')
+            configure(**args)
+        elif type(provided_config) == list:
+            for config in provided_config:
+                provided_keys = config.keys()
+                if 'api_key' in provided_keys:
+                    ## old naming for client_id
+                    client_id = config['api_key']
+                elif 'client_id' in provided_keys:
+                    client_id = config['client_id']
+                else:
+                    raise RuntimeError(f"Either an `api_key` or a `client_id` should be provided.")
+                if 'org_name' not in provided_keys:
+                    raise RuntimeError(f"An `org_name` should be provided for multi-org configuration.")
+                if auth_type is None:
+                    if 'scopes' in provided_keys:
+                        auth_type = 'oauthV2'
+                args = {
+                    "org_id" : config['org_id'],
+                    "secret" : config['secret'],
+                    "client_id" : client_id,
+                    "org_name" : config['org_name'],
+                    "scope" : config.get('scope')
+                }
+                if auth_type == 'oauthV2':
+                    args["scopes"] = config["scopes"].replace(' ','')
+                configure(**args)
 
 
 def saveFile(data:str,filename:str=None,type:str='txt',encoding:str='utf-8')->None:
@@ -116,12 +146,16 @@ def saveFile(data:str,filename:str=None,type:str='txt',encoding:str='utf-8')->No
         with open(Path(filename),'w',encoding=encoding) as f:
             f.write(json.dumps(data,indent=4))
 
+
+
+
 def configure(org_id: str = None,
               tech_id: str = None,
               secret: str = None,
               client_id: str = None,
               scopes : str= None,
               scope: str="https://ims-na1.adobelogin.com/s/ent_reactor_admin_sdk",
+              org_name: str = "default",
               **kwargs
               ):
     """Performs programmatic configuration of the API using provided values.
@@ -132,6 +166,7 @@ def configure(org_id: str = None,
         client_id : REQUIRED : The client_id (old api_key) provided by the Adobe Project. 
         scopes : REQUIRED : The scopes required for the Oauth connection
         scope : OPTIONAL : Scope that is needed for JWT auth.
+        org_name : OPTIONAL : The name of the org for multi-org configuration. If not provided, the "default" org will be used.
             Possible scope: https://www.adobe.io/authentication/auth-methods.html#!AdobeDocs/adobeio-auth/master/JWT/Scopes.md
     """
     if not org_id:
@@ -142,14 +177,35 @@ def configure(org_id: str = None,
         raise ValueError("`scopes` must be specified in the configuration.")
     if not secret:
         raise ValueError("`secret` must be specified in the configuration.")
-    config_object["org_id"] = org_id
+    header = {"Accept": "application/vnd.api+json;revision=1",
+          "Content-Type": "application/vnd.api+json",
+          "Authorization": "Bearer ",
+          "x-gw-ims-org-id": '',#config_object['org_id']
+          "x-api-key": ''#config_object['client_id']
+          }
+    config_object = {
+        org_name: {
+            "org_id": "",
+            "client_id": "",
+            "secret": "",
+            "oauthTokenEndpointV2" : "https://ims-na1.adobelogin.com/ims/token/v2",
+            "date_limit" : 0,
+            "scope_admin" : "https://ims-na1.adobelogin.com/s/ent_reactor_admin_sdk",
+            "scope_dev" : "https://ims-na1.adobelogin.com/s/ent_reactor_sdk",
+            "official_scope" :  "",
+            "scopes":""
+        }
+    }
+    config_object[org_name]["org_id"] = org_id
     header["x-gw-ims-org-id"] = org_id
-    config_object["client_id"] = client_id
+    config_object[org_name]["client_id"] = client_id
     header["x-api-key"] = client_id
-    config_object["tech_id"] = tech_id
-    config_object["secret"] = secret
-    config_object["official_scope"] = scope
-    config_object["scopes"] = scopes
+    config_object[org_name]["tech_id"] = tech_id
+    config_object[org_name]["secret"] = secret
+    config_object[org_name]["official_scope"] = scope
+    config_object[org_name]["scopes"] = scopes
     # ensure the reset of the state by overwriting possible values from previous import.
-    config_object["date_limit"] = 0
-    config_object["token"] = ""
+    config_object[org_name]["date_limit"] = 0
+    config_object[org_name]["token"] = ""
+    config_objects.update(config_object)
+    headers.update({org_name: header})

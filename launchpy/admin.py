@@ -6,12 +6,14 @@ from .property import Property
 
 class Admin:
 
-    def __init__(self,config_object:dict=config.config_object,header:dict=config.header):
+    def __init__(self, _connector: connector.AdobeRequest = None, org_name: str = None):
         """
-        Instantiate the connector for the Login class
+        Instantiate the connector for the Login class.
+        Arguments:
+            _connector : OPTIONAL : Pass an existing AdobeRequest instance (internal use / multi-org).
+            org_name : OPTIONAL : The name of the organization (internal use / multi-org).
         """
-        self.connector = connector.AdobeRequest(
-            config_object=config_object, header=header)
+        self.connector = _connector if _connector is not None else connector.AdobeRequest(org_name=org_name)
         self.header = self.connector.header
         self.COMPANY_ID = ""
         self.COMPANY_NAME  = ""

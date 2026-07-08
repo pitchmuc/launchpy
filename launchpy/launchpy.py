@@ -362,7 +362,10 @@ def copySettings(data: dict=None)->object:
         obj['name'] = data['attributes']['name']
         obj['settings'] = data['attributes']['settings']
         obj['descriptor'] = data['attributes']['delegate_descriptor_id']
-        obj['extension_id'] = data['relationships']['extension_package']['data']['id']
+        if 'upgrade_extension_package_id' in data['meta'].keys():
+            obj['extension_id'] = data['meta']['upgrade_extension_package_id']
+        else:
+            obj['extension_id'] = data['relationships']['extension_package']['data']['id']
     elif data['type'] == 'data_elements':
         obj['name'] = data['attributes']['name']
         obj['settings'] = data['attributes']['settings']
@@ -432,9 +435,6 @@ class Translator:
             property_name : REQUIRED : name of your base property.
         """
         self.baseExtensionIdName = {ext['id'] : ext['attributes']['name'] for ext in base_property_extensions}
-        #for extId, extName in self.baseExtensionIdName.items():
-        #    if extName in self.mapping_extension.keys():
-        #        self.baseExtensionIdName[extId] = self.mapping_extension[extName]
         self.extensions = {ext['attributes']['name']:{property_name:ext['id']} for ext in base_property_extensions}
 
     
@@ -452,13 +452,15 @@ class Translator:
                 extName = self.mapping_extension[extName]
             if extName in list(self.extensions.keys()):
                 self.extensions[extName][new_prop_name] = ext['id']
+            else:
+                self.extensions[extName] = {new_prop_name:ext['id']}
         return self.extensions
 
     def setBaseRules(self, base_property_rules: list, property_name: str):
         """
         Pass all the rules from the base property to start building the table. 
         Arguments: 
-            base_property : REQUIRED : list of all rules retrieve through getExtensions method
+            base_property_rules : REQUIRED : list of all rules retrieve through getRules method
             property_name : REQUIRED : name of your base property.
         """
         self.baseRuleIdName = {rule['id']:rule['attributes']['name'] for rule in base_property_rules}

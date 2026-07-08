@@ -13,36 +13,48 @@ class AdobeRequest:
     """
 
     def __init__(self,
-                 config_object: dict = config.config_object,
-                 header: dict = config.header,
+                 config_objects: dict = config.config_objects,
+                 headers: dict = config.headers,
+                 org_name: str = None,
                  verbose: bool = False,
                  retry: int = 0
                 ) -> None:
         """
         Set the connector to be used for handling request to AAM
         Arguments:
-            config_object : OPTIONAL : Require the importConfig file to have been used.
-            header : OPTIONAL : header of the config modules
+            config_objects : OPTIONAL : Require the importConfig file to have been used.
+            headers : OPTIONAL : header of the config modules
             verbose : OPTIONAL : display comment on the request.
             retry : OPTIONAL : If you wish to retry failed GET requests
         """
+        if org_name is None:
+            if len(config_objects) >= 1:
+                self.config_key = list(config_objects.keys())[0]
+                config_object = config_objects[self.config_key]
+        else:
+            if org_name in config_objects.keys():
+                self.config_key = org_name
+                config_object = config_objects[self.config_key]
+            else:
+                raise ValueError(f"Configuration for org_name '{org_name}' not found.")
         if config_object['org_id'] == '':
             raise Exception(
                 'You have to upload the configuration file with importConfigFile method.')
-        self.config = deepcopy(config_object)
+        self.config = {self.config_key: deepcopy(config_object)}
+        header = headers[self.config_key]
         self.header = deepcopy(header)
         self.retry = retry
-        if self.config['token'] == '' or time.time() > self.config['date_limit']:
-            if 'scopes' in self.config.keys() and self.config.get('scopes',None) is not None:
+        if self.config[self.config_key].get('token', '') == '' or time.time() > self.config[self.config_key].get('date_limit', 0):
+            if 'scopes' in self.config[self.config_key].keys() and self.config[self.config_key].get('scopes',None) is not None:
                 self.connectionType = 'oauthV2'
-                token_and_expiry = self.get_oauth_token_and_expiry_for_config(config=self.config, verbose=verbose)
+                token_and_expiry = self.get_oauth_token_and_expiry_for_config(config=self.config[self.config_key], verbose=verbose)
             else:
                 raise ValueError("Invalid configuration: missing 'scopes' for OAuth V2 authentication.")
             token = token_and_expiry['token']
             expiry = token_and_expiry['expiry']
             self.token = deepcopy(token)
-            self.config['token'] = deepcopy(token)
-            self.config['date_limit'] = deepcopy(time.time() + expiry - 500)
+            self.config[self.config_key]['token'] = deepcopy(token)
+            self.config[self.config_key]['date_limit'] = deepcopy(time.time() + expiry - 500)
             self.header.update({'Authorization': f'Bearer {token}'})
     
     def get_oauth_token_and_expiry_for_config(self,config:dict,verbose:bool=False,save:bool=False)->Dict[str,str]:
@@ -52,7 +64,7 @@ class AdobeRequest:
         Arguments :
             config : REQUIRED : Configuration object.
             verbose : OPTIONAL : Default False. If set to True, print information.
-            save : OPTIONAL : Default False. If set to True, save the toke in the .
+            save : OPTIONAL : Default False. If set to True, save the token in the 'token.txt' file.
         """
         if config is None:
             raise ValueError("config dictionary is required")
@@ -82,12 +94,12 @@ class AdobeRequest:
         Checking if the token is still valid
         """
         now = time.time()
-        if now > self.config['date_limit']:
+        if now > self.config[self.config_key]['date_limit']:
             if self.connectionType =='oauthV2':
-                token_and_expiry = self.get_oauth_token_and_expiry_for_config(config=self.config)
+                token_and_expiry = self.get_oauth_token_and_expiry_for_config(config=self.config[self.config_key], verbose=False)
             token = token_and_expiry['token']
-            self.config['token'] = deepcopy(token)
-            self.config['date_limit'] = deepcopy(time.time() + token_and_expiry['expiry'] - 500)
+            self.config[self.config_key]['token'] = deepcopy(token)
+            self.config[self.config_key]['date_limit'] = deepcopy(time.time() + token_and_expiry['expiry'] - 500)
             self.header.update({'Authorization': f'Bearer {token}'})
 
     def getData(self, endpoint: str, params: dict = None, data: dict = None, headers: dict = None, *args, **kwargs):
