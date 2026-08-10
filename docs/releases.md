@@ -4,7 +4,6 @@ This page gathered the changes made between version of the launchpy module.\
 This has been started after the 0.3.0 release.\
 
 ## 0.5.0
-* Adding option to extract only the latest published version of the artifacts when extracting a property. This is available in the CLI with the `-p` or `--published_version` flag and in the `extractProperty` function with the `publishedVersion` parameter. 
 * Fixing the `create_property` method in the CLI
 * Adding support for multi-org config files.
 * Adding support for multi-org instantiation in the synchronizer module.
