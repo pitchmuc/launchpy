@@ -10,7 +10,7 @@ authors = [
 description = "Adobe Launch API wrapper"
 dynamic = ["version"]
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.12"
 keywords = ["adobe", "analytics", "API", "python"]
 license = {text = "Apache License 2.0"}
 classifiers = [

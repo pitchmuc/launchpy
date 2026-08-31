@@ -164,6 +164,7 @@ class Synchronizer:
         """
         cmp_base=None
         componentBase = None
+        lib_cmp_base = None
         if componentId is not None:
             if componentId.startswith('DE'): ## if data element
                 if kwargs.get('libraryLinked',False):
@@ -232,7 +233,7 @@ class Synchronizer:
                     if cmp_baseDict['component']['type'] == 'data_elements':
                         self.base['dataElements'].append(publishedVersion)
             cmp_baseDict = {'id':publishedVersion['id'],'name':publishedVersion['attributes']['name'],'component':publishedVersion,'copy':copySettings(publishedVersion)}
-        if kwargs.get('libraryLinked',False) and cmp_baseDict['component']['type'] in ['rules','data_elements']:
+        if lib_cmp_base is not None and kwargs.get('libraryLinked',False) and cmp_baseDict['component']['type'] in ['rules','data_elements']:
             if lib_cmp_base['attributes']['name'] != cmp_baseDict['name']:
                 with self._base_lock:
                     if cmp_baseDict['component']['type'] == 'rules':
@@ -307,8 +308,7 @@ class Synchronizer:
                                 self.targets[target]['libraryStack']['dataElements'].append(comp)
                                 self.targets[target]['dataElements'].append(comp)
                             else:
-                                if verbose:
-                                    print(f'The data element "{cmp_baseDict["name"]}" does not exist in the target property "{target}". Set forceCreation to True if you want to create it.')
+                                print(f'The data element "{cmp_baseDict["name"]}" does not exist in the target property "{target}". Set forceCreation to True if you want to create it.')
                         else:
                             index,old_component = [(index,de) for index,de in enumerate(self.targets[target]['dataElements']) if de.get('attributes',{}).get('name') == cmp_baseDict['name']][0]
                             attributes = {
@@ -387,8 +387,7 @@ class Synchronizer:
                                     )
                             else:
                                 flagSkipCreation = True
-                                if verbose:
-                                    print(f'The rule "{cmp_baseDict["name"]}" does not exist in the target property "{target}". Not creating it')
+                                print(f'The rule "{cmp_baseDict["name"]}" does not exist in the target property "{target}". Not creating it')
                         else: ## if a rule exist with the same name
                             if verbose:
                                     print(f'The rule "{cmp_baseDict["name"]}" exists in the target property "{target}". Updating it')
@@ -449,7 +448,7 @@ class Synchronizer:
                         comp_base_settings = cmp_baseDict['copy']['settings']
                         comp_base_extension_id = cmp_baseDict['copy']['extension_id']
                         descriptor = cmp_baseDict['copy']['descriptor']
-                        if cmp_baseDict['name'] not in [ext['attributes']['name'] for ext in self.targets[target]['extensions']]:
+                        if cmp_baseDict['name'] not in [ext['attributes']['name'] for ext in self.targets[target]['extensions']]: ## if extension does not exist
                             if forceCreation:
                                 if verbose:
                                     print(f'The extension "{cmp_baseDict["name"]}" does not exist in the target property "{target}". Creating it')
@@ -464,8 +463,7 @@ class Synchronizer:
                                 self.targets[target]['extensions'].append(comp)
                                 self.translator.extendExtensions(self.targets[target]['extensions'],target)
                             else:
-                                if verbose:
-                                    print(f'The extension "{cmp_baseDict["name"]}" does not exist in the target property "{target}". Set forceCreation to True if you want to create it.')
+                                print(f'The extension "{cmp_baseDict["name"]}" does not exist in the target property "{target}". Set forceCreation to True if you want to create it.')
                         else: ## if extension exist, we will update it
                             if verbose:
                                 print(f'The extension "{cmp_baseDict["name"]}" exists in the target property "{target}". Updating it')
@@ -672,6 +670,7 @@ class Synchronizer:
         """
         if extensionName is None:
             raise ValueError("Require an extension name")
+        response = {}
         for prop, target in self.targets.items():
             try:
                 extensionUpdate = target['api'].checkExtensionUpdate(extensionName)
@@ -683,13 +682,18 @@ class Synchronizer:
                             index = [index for index, ext in enumerate(target['extensions']) if ext['attributes']['name'] == extName][0]
                             del target['extensions'][index]
                         target['extensions'].append(res)
+                        response[prop] = f"Extension '{extName}' upgraded successfully."
                         if verbose:
                             print(f"Extension '{extName}' upgraded successfully in '{prop}' property.")
                     else:
+                        response[prop] = f"Extension '{extName}' is already up to date."
                         if verbose:
                             print(f"Extension '{extName}' is already up to date in '{prop}' property.")
-            except:
-                raise ValueError(f"Could not find an extension name: {extensionName}")
+            except Exception as e:
+                response[prop] = f"Could not upgrade extension '{extensionName}': {e}"
+                if verbose:
+                    print(f"Could not upgrade extension '{extensionName}' in '{prop}' property: {e}")
+        return response
 
 
     def renameComponent(self,old_name:str=None,new_name:str=None)->None:
