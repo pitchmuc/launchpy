@@ -247,12 +247,13 @@ class Synchronizer:
             cmp_baseDict = {'id':lib_cmp_base['id'],'name':lib_cmp_base['attributes']['name'],'component':lib_cmp_base,'copy':copySettings(lib_cmp_base)}
         return cmp_baseDict
 
-    def syncComponent(self,componentName:str=None,componentId:str=None,publishedVersion:bool=False,forceCreation:bool=False,**kwargs)->None:
+    def syncComponent(self,componentName:str=None,componentId:str=None,publishedVersion:bool=False,forceCreation:bool=False,**kwargs)->dict:
         """
         Synchronize a component from the base property to the different target properties.
         It will detect the component with the same name in target properties.
         It will delete the components related objects (ruleComponents, data element code) in the target property and push the template version.
-        If you uploaded a dynamicRuleComponent data element config during the init method, any element that are not sync because of the exclComponentList will return a dict: {componentName:False} 
+        If you uploaded a dynamicRuleComponent data element config during the init method, any element that are not sync because of the exclComponentList will return a dict: {componentName:False}
+        Returns a dictionary keyed by target property name, with the status message for that target (created, updated, or not synced because the component does not exist and forceCreation is False).
         Arguments:
             componentName : REQUIRED : the name of the component to sync
             componentID : REQUIRED : the id of the component to sync
@@ -268,6 +269,7 @@ class Synchronizer:
         verbose = kwargs.get('verbose',False)
         if componentName is None and componentId is None:
             raise ValueError('Require a component Name of a component ID')
+        response = {}
         cmp_baseDict = self.__prepareBaseComponent__(componentName=componentName,componentId=componentId,publishedVersion=publishedVersion,libraryLinked=libraryLinked)
         ## handling the data element
         if cmp_baseDict['component']['type'] == 'data_elements':
@@ -307,8 +309,11 @@ class Synchronizer:
                                         attr_dict=translatedComponent)
                                 self.targets[target]['libraryStack']['dataElements'].append(comp)
                                 self.targets[target]['dataElements'].append(comp)
+                                response[target] = f'Data element "{cmp_baseDict["name"]}" created in "{target}".'
                             else:
-                                print(f'The data element "{cmp_baseDict["name"]}" does not exist in the target property "{target}". Set forceCreation to True if you want to create it.')
+                                message = f'Data element "{cmp_baseDict["name"]}" does not exist in the target property "{target}". Not synced, set forceCreation to True if you want to create it.'
+                                print(message)
+                                response[target] = message
                         else:
                             index,old_component = [(index,de) for index,de in enumerate(self.targets[target]['dataElements']) if de.get('attributes',{}).get('name') == cmp_baseDict['name']][0]
                             attributes = {
@@ -328,6 +333,7 @@ class Synchronizer:
                             del self.targets[target]['dataElements'][index]
                             self.targets[target]['dataElements'].append(comp)
                             self.targets[target]['libraryStack']['dataElements'].append(comp)
+                            response[target] = f'Data element "{cmp_baseDict["name"]}" updated in "{target}".'
         ## Rules part
         if cmp_baseDict['component']['type'] == 'rules':
             ## fetching all rule components associated with a rule.
@@ -385,9 +391,12 @@ class Synchronizer:
                                         delay_next=translatedComponent['delay_next'],
                                         timeout=translatedComponent['timeout'],
                                     )
+                                response[target] = f'Rule "{cmp_baseDict["name"]}" created in "{target}".'
                             else:
                                 flagSkipCreation = True
-                                print(f'The rule "{cmp_baseDict["name"]}" does not exist in the target property "{target}". Not creating it')
+                                message = f'The rule "{cmp_baseDict["name"]}" does not exist in the target property "{target}". Not synced, set forceCreation to True if you want to create it.'
+                                print(message)
+                                response[target] = message
                         else: ## if a rule exist with the same name
                             if verbose:
                                     print(f'The rule "{cmp_baseDict["name"]}" exists in the target property "{target}". Updating it')
@@ -423,6 +432,7 @@ class Synchronizer:
                                     delay_next=translatedComponent['delay_next'],
                                     timeout=translatedComponent['timeout'],
                                 )
+                            response[target] = f'Rule "{cmp_baseDict["name"]}" updated in "{target}".'
                         ## updating rule attribute if difference between base and target
                         if not flagSkipCreation: ## if the rule was created or updated, we want to make sure that the attribute are the same as the template
                             if cmp_baseDict['component']['attributes']['enabled'] != targetRule['attributes']['enabled']:
@@ -462,8 +472,11 @@ class Synchronizer:
                                 self.targets[target]['libraryStack']['extensions'].append(comp)
                                 self.targets[target]['extensions'].append(comp)
                                 self.translator.extendExtensions(self.targets[target]['extensions'],target)
+                                response[target] = f'Extension "{cmp_baseDict["name"]}" created in "{target}".'
                             else:
-                                print(f'The extension "{cmp_baseDict["name"]}" does not exist in the target property "{target}". Set forceCreation to True if you want to create it.')
+                                message = f'The extension "{cmp_baseDict["name"]}" does not exist in the target property "{target}". Not synced, set forceCreation to True if you want to create it.'
+                                print(message)
+                                response[target] = message
                         else: ## if extension exist, we will update it
                             if verbose:
                                 print(f'The extension "{cmp_baseDict["name"]}" exists in the target property "{target}". Updating it')
@@ -478,27 +491,32 @@ class Synchronizer:
                             self.targets[target]['extensions'].append(comp)
                             self.targets[target]['libraryStack']['extensions'].append(comp)
                             self.translator.extendExtensions(self.targets[target]['extensions'],target)
+                            response[target] = f'Extension "{cmp_baseDict["name"]}" updated in "{target}".'
+        return response
 
-
-    def syncComponents(self,componentsName:list=None,componentsId:list=None,publishedVersion:bool=False,forceCreation:bool=False)->None:
+    def syncComponents(self,componentsName:list=None,componentsId:list=None,publishedVersion:bool=False,forceCreation:bool=False)->dict:
         """
         Sync multiple components by looping through the list of name passed.
+        Returns a dictionary keyed by component name (or id), with the per-target status returned by syncComponent.
         Arguments:
             componentsName : REQUIRED : The list of component names to sync
             componentsId : REQUIRED : The list of component ID to sync
             publishedVersion : OPTIONAL : if you want to take the version that has been published
             forceCreation : OPTIONAL : If set to True, it will sync the components even if they do not exist in the target properties. If set to False, it will only sync the components that already exist in the target properties. Default: False.
         """
+        results = {}
         if componentsName is not None:
             for component in componentsName:
-                self.syncComponent(componentName=component,publishedVersion=publishedVersion,forceCreation=forceCreation)
+                results[component] = self.syncComponent(componentName=component,publishedVersion=publishedVersion,forceCreation=forceCreation)
         if componentsId is not None:
             for component in componentsId:
-                self.syncComponent(componentId=component,publishedVersion=publishedVersion,forceCreation=forceCreation)
-    
-    def syncRules(self,regex:str=None,forceCreation:bool=False,publishedVersion:bool=False)->None:
+                results[component] = self.syncComponent(componentId=component,publishedVersion=publishedVersion,forceCreation=forceCreation)
+        return results
+
+    def syncRules(self,regex:str=None,forceCreation:bool=False,publishedVersion:bool=False)->dict:
         """
         Synchronizing the rules in the base property to the target properties.
+        Returns a dictionary keyed by rule name, with the per-target status (created, updated, or not synced because the rule does not exist and forceCreation is False).
         Arguments:
             regex : OPTIONAL : If you want to filter the rules to sync based on a regex pattern. Default: None (sync all rules)
             forceCreation : OPTIONAL : If set to True, it will sync the rules even if they do not exist in the target properties. If set to False, it will only sync the rules that already exist in the target properties. Default: False.
@@ -507,14 +525,17 @@ class Synchronizer:
         base_rule_names = [rule['attributes']['name'] for rule in self.base['rules']]
         if regex is not None:
             base_rule_names = [rule for rule in base_rule_names if re.search(regex,rule)]
+        results = {}
         with ThreadPoolExecutor() as executor:
-            futures = [executor.submit(self.syncComponent, componentName=rule, forceCreation=forceCreation, publishedVersion=publishedVersion) for rule in base_rule_names]
-            for future in futures:
-                future.result()
+            future_to_name = {executor.submit(self.syncComponent, componentName=rule, forceCreation=forceCreation, publishedVersion=publishedVersion): rule for rule in base_rule_names}
+            for future in future_to_name:
+                results[future_to_name[future]] = future.result()
+        return results
 
-    def syncDataElements(self,regex:str=None,forceCreation:bool=False,publishedVersion:bool=False)->None:
+    def syncDataElements(self,regex:str=None,forceCreation:bool=False,publishedVersion:bool=False)->dict:
         """
         Synchronizing the data elements in the base property to the target properties.
+        Returns a dictionary keyed by data element name, with the per-target status (created, updated, or not synced because the data element does not exist and forceCreation is False).
         Arguments:
             regex : OPTIONAL : If you want to filter the data elements to sync based on a regex pattern. Default: None (sync all data elements)
             forceCreation : OPTIONAL : If set to True, it will sync the data elements even if they do not exist in the target properties. If set to False, it will only sync the data elements that already exist in the target properties. Default: False.
@@ -523,15 +544,18 @@ class Synchronizer:
         base_de_names = [de['attributes']['name'] for de in self.base['dataElements']]
         if regex is not None:
             base_de_names = [de for de in base_de_names if re.search(regex,de)]
+        results = {}
         with ThreadPoolExecutor() as executor:
-            futures = [executor.submit(self.syncComponent, componentName=de, forceCreation=forceCreation, publishedVersion=publishedVersion) for de in base_de_names]
-            for future in futures:
-                future.result()
-    
-    def syncExtensions(self,regex:str=None,forceCreation:bool=False, **kwargs)->None:
+            future_to_name = {executor.submit(self.syncComponent, componentName=de, forceCreation=forceCreation, publishedVersion=publishedVersion): de for de in base_de_names}
+            for future in future_to_name:
+                results[future_to_name[future]] = future.result()
+        return results
+
+    def syncExtensions(self,regex:str=None,forceCreation:bool=False, **kwargs)->dict:
         """
         Take extensions from the Base and try to install them on the target properties.
         It will check if the extension is already installed in the target property, if not it will install it.
+        Returns a dictionary keyed by extension name, with the per-target status (created, updated, or not synced because the extension does not exist and forceCreation is False).
         Arguments:
             regex : OPTIONAL : If you want to filter the extensions name to sync based on a regex pattern. Default: None (sync all extensions)
             forceCreation : OPTIONAL : If set to True, will force the creation of the extension even if it already exists. Default: False
@@ -540,8 +564,10 @@ class Synchronizer:
         base_extension_names = [ext['attributes']['name'] for ext in base_extensions]
         if regex is not None:
             base_extension_names = [ext for ext in base_extension_names if re.search(regex,ext)]
+        results = {}
         for ext_name in base_extension_names:
-            self.syncComponent(componentName=ext_name,forceCreation=forceCreation,**kwargs)
+            results[ext_name] = self.syncComponent(componentName=ext_name,forceCreation=forceCreation,**kwargs)
+        return results
 
     
     def createTargetsLibrary(self,name:str="syncComponents",assignEnv:bool|str=False,**kwargs)->None:
@@ -673,7 +699,7 @@ class Synchronizer:
         response = {}
         for prop, target in self.targets.items():
             try:
-                extensionUpdate = target['api'].checkExtensionUpdate(extensionName)
+                extensionUpdate = target['api'].checkExtensionUpdate(extensionName,platform=platform)
                 for extName, extUpdateDict in extensionUpdate.items():
                     if extUpdateDict["update"]:
                         res = target['api'].upgradeExtension(extUpdateDict['internal_id'],extUpdateDict["package_id"])
@@ -943,9 +969,10 @@ class Synchronizer:
             dict_check[element_name] = self.checkComponentSync(componentId=element_id, excludeSimilar=excludeSimilar,publishedVersion=publishedVersion,libraryLinked=libraryLink)
         return dict_check
     
-    def syncFromLibrary(self,library:str=None,state='published',forceCreation:bool=False,libraryLinked:bool=True,publishedVersion:bool=False,dryRun:bool=False,**kwargs)->None:
+    def syncFromLibrary(self,library:str=None,state='published',forceCreation:bool=False,libraryLinked:bool=True,publishedVersion:bool=False,dryRun:bool=False,**kwargs)->dict:
         """
         Sync the components in a library, from the base property, to the different target properties by using the createTargetsLibrary method.
+        Returns a dictionary keyed by component name, with the per-target status (created, updated, or not synced because the component does not exist and forceCreation is False), or the error message if the sync failed.
         Arguments:
             library : REQUIRED : the library name or the library ID to get the components.
             state : OPTIONAL : the state of the library to compare. Default: 'published', possible states: "development", "submitted", "approved", "rejected", "published"
@@ -953,7 +980,7 @@ class Synchronizer:
             libraryLinked : OPTIONAL : If set to True, it will sync the components using the library version. Default: False.
             publishedVersion : OPTIONAL : if you want to sync the version of the library that has been published in your base vs the published version of your target. Default: False.
             dryRun : OPTIONAL : If set to True, it will not actually sync the components but will return a dictionary with the components that would be synced and the target properties they would be synced to. Default: False.
-        Possible kwargs: 
+        Possible kwargs:
             verbose : bool : If set to True, it will print the name of the components and the property that are being synced and the target property. Default: False.
         """
         verbose = kwargs.get('verbose', False)
@@ -972,12 +999,15 @@ class Synchronizer:
         rules = myLib.getRules()
         dataelements = myLib.getDataElements()
         extensions = myLib.getExtensions()
+        results = {}
         if len(extensions)>0:
             for ext in extensions:
                 try:
-                    self.upgradeTargetExtension(extensionName=ext['attributes']['name'],platform=ext['attributes']['platform'],verbose=verbose)
-                except:
-                    print(f'Extension {ext["attributes"]["name"]} could not be updated in the target properties. Please check if the extension exist and if there is an update available.')
+                    results[ext['attributes']['name']] = self.upgradeTargetExtension(extensionName=ext['attributes']['name'],platform=ext['attributes']['platform'],verbose=verbose)
+                except Exception as e:
+                    message = f'Extension {ext["attributes"]["name"]} could not be updated in the target properties: {e}'
+                    print(message)
+                    results[ext['attributes']['name']] = message
         if len(rules)>0:
             for rule in rules:
                 try:
@@ -985,9 +1015,11 @@ class Synchronizer:
                         ruleId = rule['links']['self'].split('/').pop()
                     else:
                         ruleId = rule['id']
-                    self.syncComponent(componentId=ruleId,publishedVersion=publishedVersion, forceCreation=forceCreation,libraryLinked=libraryLinked,verbose=verbose)
-                except:
-                    print(f'Rule {rule["attributes"]["name"]} could not be updated in the target properties. Please check if the rule exist.')
+                    results[rule['attributes']['name']] = self.syncComponent(componentId=ruleId,publishedVersion=publishedVersion, forceCreation=forceCreation,libraryLinked=libraryLinked,verbose=verbose)
+                except Exception as e:
+                    message = f'Rule {rule["attributes"]["name"]} could not be updated in the target properties: {e}'
+                    print(message)
+                    results[rule['attributes']['name']] = message
         if len(dataelements)>0:
             for de in dataelements:
                 try:
@@ -995,7 +1027,9 @@ class Synchronizer:
                         deId = de['links']['self'].split('/').pop()
                     else:
                         deId = de['id']
-                    self.syncComponent(componentId=deId,publishedVersion=publishedVersion,forceCreation=forceCreation,libraryLinked=libraryLinked,verbose=verbose)
-                except:
-                    print(f'Data Element {de["attributes"]["name"]} could not be updated in the target properties. Please check if the data element exist.')
-        return 
+                    results[de['attributes']['name']] = self.syncComponent(componentId=deId,publishedVersion=publishedVersion,forceCreation=forceCreation,libraryLinked=libraryLinked,verbose=verbose)
+                except Exception as e:
+                    message = f'Data Element {de["attributes"]["name"]} could not be updated in the target properties: {e}'
+                    print(message)
+                    results[de['attributes']['name']] = message
+        return results

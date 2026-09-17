@@ -578,7 +578,11 @@ class SynchronizerCLI(cmd.Cmd):
                 result = self.synchronizer.syncComponent(componentId=args.id, publishedVersion=args.published, forceCreation=args.create, verbose=args.verbose)
             else:
                 result = self.synchronizer.syncComponent(componentName=args.name, publishedVersion=args.published, forceCreation=args.create, verbose=args.verbose)
-            console.print(f"Component '{args.name or args.id}' synced successfully.", style="green")
+            for prop, message in result.items():
+                if "does not exist" in message:
+                    console.print(f"[{prop}] {message}", style="yellow")
+                elif args.verbose:
+                    console.print(f"[{prop}] {message}", style="green")
         except Exception as e:
             console.print(f"(!) Error: {str(e)}", style="red")
             return
@@ -590,32 +594,44 @@ class SynchronizerCLI(cmd.Cmd):
         parser.add_argument("-r", "--regex", help="Regex pattern to filter rules by name (partial match, non-case sensitive). Default None.", type=str, default=None)
         parser.add_argument("-c", "--create", help="Create rules that do not exist in the destination property. Default False.", action="store_true", default=False)
         parser.add_argument("-p", "--published", help="Sync the latest published version of the rules. Default False.", action="store_true", default=False)
+        parser.add_argument("-v", "--verbose", help="Print detailed information about the sync process, including successes. Default False.", action="store_true", default=False)
         try:
             args = parser.parse_args(shlex.split(args))
             result = self.synchronizer.syncRules(regex=args.regex, forceCreation=args.create, publishedVersion=args.published)
-            console.print(f"All rules synced successfully.", style="green")
+            for ruleName, targetResults in result.items():
+                for prop, message in (targetResults or {}).items():
+                    if "does not exist" in message:
+                        console.print(f"[{ruleName}][{prop}] {message}", style="yellow")
+                    elif args.verbose:
+                        console.print(f"[{ruleName}][{prop}] {message}", style="green")
         except Exception as e:
             console.print(f"(!) Error: {str(e)}", style="red")
             return
         except SystemExit:
             return
-    
+
     def do_sync_data_elements(self,args:Any):
         """Sync all data elements between source and destination properties."""
         parser = argparse.ArgumentParser(prog='sync_data_elements', add_help=True)
         parser.add_argument("-r", "--regex", help="Regex pattern to filter data elements by name (partial match, non-case sensitive). Default None.", type=str, default=None)
         parser.add_argument("-c", "--create", help="Create data elements that do not exist in the destination property. Default False.", action="store_true", default=False)
         parser.add_argument("-p", "--published", help="Sync the latest published version of the data elements. Default False.", action="store_true", default=False)
+        parser.add_argument("-v", "--verbose", help="Print detailed information about the sync process, including successes. Default False.", action="store_true", default=False)
         try:
             args = parser.parse_args(shlex.split(args))
             result = self.synchronizer.syncDataElements(regex=args.regex, forceCreation=args.create, publishedVersion=args.published)
-            console.print(f"All data elements synced successfully.", style="green")
+            for deName, targetResults in result.items():
+                for prop, message in (targetResults or {}).items():
+                    if "does not exist" in message:
+                        console.print(f"[{deName}][{prop}] {message}", style="yellow")
+                    elif args.verbose:
+                        console.print(f"[{deName}][{prop}] {message}", style="green")
         except Exception as e:
             console.print(f"(!) Error: {str(e)}", style="red")
             return
         except SystemExit:
             return
-    
+
     def do_sync_extensions(self,args:Any):
         """Sync all extensions between source and destination properties."""
         parser = argparse.ArgumentParser(prog='sync_extensions', add_help=True)
@@ -625,13 +641,18 @@ class SynchronizerCLI(cmd.Cmd):
         try:
             args = parser.parse_args(shlex.split(args))
             result = self.synchronizer.syncExtensions(regex=args.regex, forceCreation=args.create, verbose=args.verbose)
-            console.print(f"All extensions synced successfully.", style="green")
+            for extName, targetResults in result.items():
+                for prop, message in (targetResults or {}).items():
+                    if "does not exist" in message:
+                        console.print(f"[{extName}][{prop}] {message}", style="yellow")
+                    elif args.verbose:
+                        console.print(f"[{extName}][{prop}] {message}", style="green")
         except Exception as e:
             console.print(f"(!) Error: {str(e)}", style="red")
             return
         except SystemExit:
             return
-        
+
     def do_rename_component(self,args:Any):
         """Rename a component in the destination property."""
         parser = argparse.ArgumentParser(prog='rename_component', add_help=True)
@@ -661,16 +682,22 @@ class SynchronizerCLI(cmd.Cmd):
         parser = argparse.ArgumentParser(prog='upgrade_extension', add_help=True)
         parser.add_argument("name", help="Name of the extension to upgrade", type=str)
         parser.add_argument("-p", "--platform", help="Platform to be used for extension upgrade. default 'web'. Possible values: web, app", type=str, default="web")
+        parser.add_argument("-v", "--verbose", help="Print detailed information about the upgrade process, including successes. Default False.", action="store_true", default=False)
         try:
             args = parser.parse_args(shlex.split(args))
-            self.synchronizer.upgradeTargetExtension(extensionName=args.name, platform=args.platform)
-            console.print(f"Extension '{args.name}' upgraded successfully.", style="green")
+            response = self.synchronizer.upgradeTargetExtension(extensionName=args.name, platform=args.platform, verbose=args.verbose)
+            for prop, message in response.items():
+                failed = message.startswith("Could not upgrade")
+                if failed:
+                    console.print(f"[{prop}] {message}", style="red")
+                elif args.verbose:
+                    console.print(f"[{prop}] {message}", style="green")
         except Exception as e:
             console.print(f"(!) Error: {str(e)}", style="red")
             return
         except SystemExit:
             return
-    
+
     def do_get_base_rules(self,args:Any):
         """Get the base rules that are available for synchronization."""
         parser = argparse.ArgumentParser(prog='get_base_rules', add_help=True)
@@ -848,8 +875,12 @@ class SynchronizerCLI(cmd.Cmd):
                 console.print(f"Upgrading {len(extensions)} extension{'s' if len(extensions) > 1 else ''} from library '{lib.name}'...", style="blue")
                 for ext in extensions:
                     try:
-                        self.synchronizer.upgradeTargetExtension(extensionName=ext['attributes']['name'], platform=ext['attributes']['platform'], publishedVersion=publishedVersion, verbose=args.verbose)
-                        console.print(f"Extension '{ext['attributes']['name']}' upgraded successfully.", style="green")
+                        response = self.synchronizer.upgradeTargetExtension(extensionName=ext['attributes']['name'], platform=ext['attributes']['platform'], verbose=args.verbose)
+                        for prop, message in response.items():
+                            if message.startswith("Could not upgrade"):
+                                console.print(f"[{prop}] {message}", style="red")
+                            elif args.verbose:
+                                console.print(f"[{prop}] {message}", style="green")
                     except Exception as e:
                         console.print(f"(!) Error upgrading extension '{ext['attributes']['name']}': {str(e)}", style="red")
             if len(rules)>0:
@@ -860,8 +891,12 @@ class SynchronizerCLI(cmd.Cmd):
                             ruleId = rule['links']['self'].split('/').pop()
                         else:
                             ruleId = rule['id']
-                        self.synchronizer.syncComponent(componentId=ruleId, publishedVersion=publishedVersion, forceCreation=args.create,libraryLinked=libraryLinked,verbose=args.verbose)
-                        console.print(f"Rule '{rule['attributes']['name']}' synced successfully.", style="green")
+                        response = self.synchronizer.syncComponent(componentId=ruleId, publishedVersion=publishedVersion, forceCreation=args.create,libraryLinked=libraryLinked,verbose=args.verbose)
+                        for prop, message in response.items():
+                            if "does not exist" in message:
+                                console.print(f"[{prop}] {message}", style="yellow")
+                            elif args.verbose:
+                                console.print(f"[{prop}] {message}", style="green")
                     except Exception as e:
                         console.print(f"(!) Error syncing rule '{rule['attributes']['name']}': {str(e)}", style="red")
             if len(dataelements)>0:
@@ -872,8 +907,12 @@ class SynchronizerCLI(cmd.Cmd):
                             deId = de['links']['self'].split('/').pop()
                         else:
                             deId = de['id']
-                        self.synchronizer.syncComponent(componentId=deId, publishedVersion=publishedVersion, forceCreation=args.create,libraryLinked=libraryLinked,verbose=args.verbose)
-                        console.print(f"Data element '{de['attributes']['name']}' synced successfully.", style="green")
+                        response = self.synchronizer.syncComponent(componentId=deId, publishedVersion=publishedVersion, forceCreation=args.create,libraryLinked=libraryLinked,verbose=args.verbose)
+                        for prop, message in response.items():
+                            if "does not exist" in message:
+                                console.print(f"[{prop}] {message}", style="yellow")
+                            elif args.verbose:
+                                console.print(f"[{prop}] {message}", style="green")
                     except Exception as e:
                         console.print(f"(!) Error syncing data element '{de['attributes']['name']}': {str(e)}", style="red")
         except Exception as e:

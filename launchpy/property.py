@@ -199,6 +199,9 @@ class Property:
                                                        'update': False,
                                                        'internal_id': ext['id']
                                                        } for ext in extensions if ext['attributes']['name'] == name}
+            if len(dict_extensions) == 0:
+                installed_names = [ext['attributes']['name'] for ext in extensions]
+                raise ValueError(f"No extension named '{name}' is installed on this property. Installed extensions: {installed_names}")
         for name in dict_extensions:
             new_id = self._getExtensionPackageIdByName(name, platform=platform, verbose=verbose)
             if new_id != dict_extensions[name]['package_id']:
