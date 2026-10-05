@@ -3,6 +3,12 @@
 This page gathered the changes made between version of the launchpy module.\
 This has been started after the 0.3.0 release.\
 
+## 0.5.2
+* Fixing recursive GET retries and always retrying HTTP 429 responses for GET, POST, PUT, PATCH, and DELETE.
+* Respecting `Retry-After` seconds and HTTP dates, with exponential backoff when the header is absent or invalid.
+* Keeping rate-limit retries independent of the connector's `retry` budget and per-call overrides, including when `retry=0`. Other retryable errors remain bounded by that budget.
+* Preserving DELETE request bodies when sending and retrying requests.
+
 ## 0.5.1
 * Raising the minimum supported Python version from 3.10 to 3.12.
 * `syncComponent` now returns a dictionary of per-target status messages. `syncComponents`, `syncRules`, `syncDataElements`, `syncExtensions`, and `syncFromLibrary` now return results grouped by component name or ID, including error messages when library synchronization fails.

@@ -1,7 +1,10 @@
 import os
 import json
+import logging
 import time
-from typing import Dict, Union
+from datetime import datetime, timezone
+from email.utils import parsedate_to_datetime
+from typing import Any, Dict, Union
 from copy import deepcopy
 # Non standard libraries
 import requests
@@ -25,7 +28,9 @@ class AdobeRequest:
             config_objects : OPTIONAL : Require the importConfig file to have been used.
             headers : OPTIONAL : header of the config modules
             verbose : OPTIONAL : display comment on the request.
-            retry : OPTIONAL : If you wish to retry failed GET requests
+            retry : OPTIONAL : Number of additional attempts for GET responses
+                that cannot be decoded as JSON. Default: 0.
+                Rate-limited requests always retry and do not consume this budget.
         """
         if org_name is None:
             if len(config_objects) >= 1:
@@ -102,136 +107,87 @@ class AdobeRequest:
             self.config[self.config_key]['date_limit'] = deepcopy(time.time() + token_and_expiry['expiry'] - 500)
             self.header.update({'Authorization': f'Bearer {token}'})
 
+    @staticmethod
+    def _retry_delay(response: requests.Response, attempt: int) -> float:
+        retry_after = response.headers.get("Retry-After")
+        if retry_after is not None:
+            try:
+                seconds = int(retry_after)
+                if seconds >= 0:
+                    return float(seconds)
+            except ValueError:
+                try:
+                    retry_at = parsedate_to_datetime(retry_after)
+                    return max(0.0, (retry_at - datetime.now(timezone.utc)).total_seconds())
+                except (TypeError, ValueError, OverflowError):
+                    pass
+        return min(45 * 2 ** min(attempt, 3), 300)
+
+    def _request(self, method: str, endpoint: str, params: dict | None = None,
+                 data: Any = None, headers: dict | None = None, *,
+                 retry: int | None = None, verbose: bool = False) -> Any:
+        retries = self.retry if retry is None else retry
+        if isinstance(retries, bool) or not isinstance(retries, int) or retries < 0:
+            raise ValueError("retry must be a non-negative integer")
+        request_kwargs: dict[str, Any] = {}
+        if params is not None:
+            request_kwargs["params"] = params
+        if data is not None:
+            request_kwargs["data"] = data if method == "get" else json.dumps(data)
+        attempt = 0
+        rate_limit_attempt = 0
+        while True:
+            self._checkingDate()
+            response = getattr(requests, method)(
+                endpoint, headers=self.header if headers is None else headers, **request_kwargs)
+            if verbose:
+                print(f"request URL : {response.request.url}")
+                print(f"status_code : {response.status_code}")
+            rate_limited = response.status_code == 429
+            if not rate_limited:
+                if method == "delete":
+                    return response.status_code
+                try:
+                    result = response.json()
+                except ValueError:
+                    if method == "get" and attempt < retries:
+                        time.sleep(30)
+                        attempt += 1
+                        continue
+                    logging.getLogger(__name__).warning(
+                        "%s request returned invalid JSON (HTTP %s)",
+                        method.upper(), response.status_code)
+                    return {"error": "Request Error"}
+                rate_limited = isinstance(result, dict) and result.get("error_code") == "429050"
+                if not rate_limited:
+                    return result
+            delay = self._retry_delay(response, rate_limit_attempt)
+            if verbose:
+                print(f"Rate limited; retrying in {delay:g} seconds")
+            time.sleep(delay)
+            rate_limit_attempt += 1
+
     def getData(self, endpoint: str, params: dict = None, data: dict = None, headers: dict = None, *args, **kwargs):
-        """
-        Abstraction for getting data
-        """
-        internRetry = self.retry - kwargs.get("retry", 0)
-        self._checkingDate()
-        if headers is None:
-            headers = self.header
-        if params is None and data is None:
-            res = requests.get(
-                endpoint, headers=headers)
-        elif params is not None and data is None:
-            res = requests.get(
-                endpoint, headers=headers, params=params)
-        elif params is None and data is not None:
-            res = requests.get(
-                endpoint, headers=headers, data=data)
-        elif params is not None and data is not None:
-            res = requests.get(endpoint, headers=headers, params=params, data=data)
-        if kwargs.get("verbose", False):
-            print(f"request URL : {res.request.url}")
-            print(f"statut_code : {res.status_code}")
-        try:
-            if res.status_code == 429:
-                if kwargs.get("verbose", False):
-                    print(f'Too many requests')
-                time.sleep(45)
-                res_json = self.getData(endpoint, params=params, data=data, headers=headers, retry=internRetry, **kwargs)
-                return res_json
-            res_json = res.json()
-        except:
-            res_json = {'error': 'Request Error'}
-            while internRetry > 0:
-                internRetry -= 1
-                if kwargs.get("verbose", False):
-                    print('Retry parameter activated')
-                    print(f'{internRetry} retry left')
-                if 'error' in res_json.keys():
-                    time.sleep(30)
-                    res_json = self.getData(endpoint, params=params, data=data, headers=headers, retry=internRetry, **kwargs)
-                    return res_json
-        return res_json
+        """Get JSON data, always retrying rate limits independently of retry."""
+        return self._request("get", endpoint, params, data, headers,
+                             retry=kwargs.get("retry"), verbose=kwargs.get("verbose", False))
 
     def postData(self, endpoint: str, params: dict = None, data: dict = None, headers: dict = None, *args, **kwargs):
-        """
-        Abstraction for posting data
-        """
-        self._checkingDate()
-        if headers is None:
-            headers = self.header
-        if params is None and data is None:
-            res = requests.post(endpoint, headers=headers)
-        elif params is not None and data is None:
-            res = requests.post(endpoint, headers=headers, params=params)
-        elif params is None and data is not None:
-            res = requests.post(endpoint, headers=headers, data=json.dumps(data))
-        elif params is not None and data is not None:
-            res = requests.post(endpoint, headers=headers, params=params, data=json.dumps(data))
-        try:
-            res_json = res.json()
-            if res.status_code == 429 or res_json.get('error_code', None) == "429050":
-                time.sleep(45)
-                res_json = self.postData(endpoint, params=params, data=data, headers=headers, **kwargs)
-                return res_json
-        except:
-            if kwargs.get("verbose", False):
-                print("status_code: {res.status_code}")
-                print(res.text)
-            res_json = {'error': 'Request Error'}
-        return res_json
+        """Post JSON data, always retrying rate limits."""
+        return self._request("post", endpoint, params, data, headers,
+                             retry=kwargs.get("retry"), verbose=kwargs.get("verbose", False))
 
     def patchData(self, endpoint: str, params: dict = None, data=None, headers: dict = None, *args, **kwargs):
-        """
-        Abstraction for deleting data
-        """
-        self._checkingDate()
-        if headers is None:
-            headers = self.header
-        if params is not None and data is None:
-            res = requests.patch(endpoint, headers=headers, params=params)
-        elif params is None and data is not None:
-            res = requests.patch(endpoint, headers=headers, data=json.dumps(data))
-        elif params is not None and data is not None:
-            res = requests.patch(endpoint, headers=headers, params=params, data=json.dumps(data))
-        try:
-            status_code = res.json()
-        except:
-            if kwargs.get("verbose", False):
-                print(res.text)
-            status_code = {'error': 'Request Error'}
-        return status_code
+        """Patch JSON data, always retrying rate limits."""
+        return self._request("patch", endpoint, params, data, headers,
+                             retry=kwargs.get("retry"), verbose=kwargs.get("verbose", False))
 
     def putData(self, endpoint: str, params: dict = None, data=None, headers: dict = None, *args, **kwargs):
-        """
-        Abstraction for deleting data
-        """
-        self._checkingDate()
-        if headers is None:
-            headers = self.header
-        if params is not None and data is None:
-            res = requests.put(endpoint, headers=headers, params=params)
-        elif params is None and data is not None:
-            res = requests.put(endpoint, headers=headers, data=json.dumps(data))
-        elif params is not None and data is not None:
-            res = requests.put(endpoint, headers=headers, params=params, data=json.dumps(data))
-        try:
-            status_code = res.json()
-        except:
-            if kwargs.get("verbose", False):
-                print(res.text)
-            status_code = {'error': 'Request Error'}
-        return status_code
+        """Put JSON data, always retrying rate limits."""
+        return self._request("put", endpoint, params, data, headers,
+                             retry=kwargs.get("retry"), verbose=kwargs.get("verbose", False))
 
     def deleteData(self, endpoint: str, params: dict = None, data=None, headers: dict = None, *args, **kwargs):
-        """
-        Abstraction for deleting data
-        """
-        self._checkingDate()
-        if headers is None:
-            headers = self.header
-        if params is None:
-            res = requests.delete(endpoint, headers=headers)
-        elif params is not None:
-            res = requests.delete(endpoint, headers=headers, params=params)
-        elif params is None and data is not None:
-            res = requests.delete(endpoint, headers=headers, data=json.dumps(data))
-        elif params is not None and data is not None:
-            res = requests.delete(endpoint, headers=headers, params=params, data=json.dumps(data))
-        try:
-            status_code = res.status_code
-        except:
-            status_code = {'error': 'Request Error'}
-        return status_code
+        """Delete data and return the HTTP status, always retrying rate limits."""
+        return self._request("delete", endpoint, params, data, headers,
+                             retry=kwargs.get("retry"), verbose=kwargs.get("verbose", False))
