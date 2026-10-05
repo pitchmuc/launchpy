@@ -3,6 +3,15 @@
 This page gathered the changes made between version of the launchpy module.\
 This has been started after the 0.3.0 release.\
 
+## 0.5.1
+* Raising the minimum supported Python version from 3.10 to 3.12.
+* `syncComponent` now returns a dictionary of per-target status messages. `syncComponents`, `syncRules`, `syncDataElements`, `syncExtensions`, and `syncFromLibrary` now return results grouped by component name or ID, including error messages when library synchronization fails.
+* Updating the CLI synchronization commands to report missing components instead of always reporting success. Successful per-target operations are displayed when verbose mode is enabled.
+* Adding the `-v` / `--verbose` flag to the `sync_rules`, `sync_data_elements`, and `upgrade_extension` CLI commands.
+* `checkExtensionUpdate` now raises a descriptive error when the requested extension is not installed, including the installed extension names.
+* `upgradeTargetExtension` now respects the `platform` parameter and returns per-target upgrade, already-up-to-date, or failure messages. The CLI displays upgrade failures instead of reporting success.
+* Fixing library-linked component preparation when no library component was retrieved, avoiding an uninitialized-variable error.
+
 ## 0.5.0
 * Fixing the `create_property` method in the CLI
 * Adding support for multi-org config files.
