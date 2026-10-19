@@ -1095,10 +1095,11 @@ class MainShell(cmd.Cmd):
         parser = argparse.ArgumentParser(prog='create_config_file', add_help=True)
         parser.add_argument("-fn", "--file_name", help="file name for your config file", default="launchpy_config.json",type=str)
         parser.add_argument("-m","--multi_org", help="Enable multi-org configuration", action="store_true", default=False)
+        parser.add_argument("-p","--proxy", help="Enable proxy for the connection", action="store_true", default=False) 
         try:
             args = parser.parse_args(shlex.split(arg))
             filename = args.file_name
-            launchpy.createConfigFile(filename=filename,multi_org=args.multi_org)
+            launchpy.createConfigFile(filename=filename,proxy=args.proxy,multi_org=args.multi_org)
             filename_json = filename + ".json" if not filename.endswith(".json") else filename
             console.print(f"Configuration file created at {Path.cwd() / Path(filename_json)}", style="green")
             return

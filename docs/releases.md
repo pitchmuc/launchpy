@@ -3,6 +3,14 @@
 This page gathered the changes made between version of the launchpy module.\
 This has been started after the 0.3.0 release.\
 
+## 0.5.3
+* Adding optional `proxy` support to `configure`, `importConfigFile`, `createConfigFile` and JSON configuration files. A single proxy URL is used for both HTTP and HTTPS, with separate settings per organization.
+* Applying proxy settings to OAuth token acquisition and refresh, all API requests and their retries, and asynchronous rule-component downloads during `extractProperty`.
+* Adding `--proxy` to CLI startup and the interactive `config` command. Explicit CLI and `importConfigFile` proxy arguments override file settings for all organizations loaded from the file.
+* Preserving environment-based proxy behavior when no explicit proxy is supplied. Existing configuration files require no changes; empty strings and non-string proxy values are rejected.
+* Fixing CLI configuration state and organization selection when `--org_name` is omitted. `change_org` now uses the shared connection setup and preserves each organization's proxy settings.
+* Adding proxy configuration examples and documentation for Python, JSON, and CLI usage.
+
 ## 0.5.2
 * Fixing recursive GET retries and always retrying HTTP 429 responses for GET, POST, PUT, PATCH, and DELETE.
 * Respecting `Retry-After` seconds and HTTP dates, with exponential backoff when the header is absent or invalid.

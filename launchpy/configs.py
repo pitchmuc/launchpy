@@ -30,7 +30,12 @@ def find_path(path: str) -> Optional[Path]:
         return None
 
 
-def createConfigFile(filename:str='config_launch',auth_type: str = "oauthV2", scope: str = "https://ims-na1.adobelogin.com/s/ent_reactor_admin_sdk", multi_org:bool=False, verbose: object = False)->None:
+def createConfigFile(filename:str='config_launch',
+                    auth_type: str = "oauthV2", 
+                    proxy:bool=False, 
+                    scope: str = "https://ims-na1.adobelogin.com/s/ent_reactor_admin_sdk",
+                    multi_org:bool=False, 
+                    verbose: object = False)->None:
     """
     This function will create a 'config_launch_admin.json' file where you can store your access data. 
     Arguments:
@@ -39,6 +44,9 @@ def createConfigFile(filename:str='config_launch',auth_type: str = "oauthV2", sc
             or 
             scope="https://ims-na1.adobelogin.com/s/ent_reactor_sdk"
         auth_type : OPTIONAL : The type of Oauth type you want to use for your config file. Possible value: "oauthV2"
+        proxy: OPTIONAL : Whether to use a proxy for the connection. Default is False.
+        multi_org: OPTIONAL : Whether to enable multi-organization configuration. Default is False.
+        verbose: OPTIONAL : Whether to print verbose output during the creation of the config file. Default is False.
     """
     json_data = {
         'org_id': '<orgID>',
@@ -47,7 +55,8 @@ def createConfigFile(filename:str='config_launch',auth_type: str = "oauthV2", sc
     }
     if auth_type == 'oauthV2':
         json_data['scopes'] = "<scopes>"
-    
+    if proxy:
+        json_data['proxy'] = "<proxy_url>"
     if multi_org:
         json_data['org_name'] = '<org_name>'
         json_data = [json_data]
@@ -58,6 +67,8 @@ def createConfigFile(filename:str='config_launch',auth_type: str = "oauthV2", sc
     if verbose:
         print(
             f" file created at this location : {os.getcwd()}{os.sep}{filename}")
+    if proxy and verbose:
+        print("Proxy has been enabled for the connection.")
 
 def importConfigFile(path: str = None,auth_type:str=None,
                      proxy: str | None = None) -> None:
