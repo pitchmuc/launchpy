@@ -40,6 +40,30 @@ Most of the documentation has been imported from the datanalyst website [here](.
 
 You can find release information [here](./docs/releases.md).
 
+## Proxy support
+
+Pass a `proxy` URL to `launchpy.configure(...)`, or add `"proxy"` to
+your JSON configuration file. The same proxy serves both HTTP and HTTPS.
+Proxy settings apply to OAuth authentication,
+API requests, and asynchronous property exports, with separate settings per
+organization.
+
+```python
+launchpy.configure(
+    org_id="your-org@AdobeOrg",
+    client_id="your-client-id",
+    secret="your-secret",
+    scopes="your-scopes",
+    proxy="http://proxy.example.com:8080",
+)
+```
+
+The CLI accepts `--proxy URL` at startup and in the interactive `config`
+command. An explicit CLI proxy overrides the file setting.
+Without an explicit proxy, existing environment-based proxy behavior is unchanged.
+See the [Python and JSON examples](./docs/getstarted.md#proxy-configuration)
+and [CLI examples](./docs/cli.md#proxy-configuration).
+
 ## HTTP retries
 
 The `AdobeRequest` connector always retries HTTP 429 responses for GET, POST,

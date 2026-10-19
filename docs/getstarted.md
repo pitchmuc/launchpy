@@ -101,6 +101,61 @@ So your config file will look like this:
 ```
 
 
+### Proxy configuration
+
+To connect through a proxy, pass the optional `proxy` URL to `configure`.
+The same proxy is used for both HTTP and HTTPS:
+
+```python
+lp.configure(
+    org_id="your-org@AdobeOrg",
+    client_id="your-client-id",
+    secret="your-secret",
+    scopes="your-scopes",
+    proxy="http://proxy.example.com:8080",
+)
+```
+
+Alternatively, add `proxy` to your configuration JSON and load it with
+`lp.importConfigFile("myconfig.json")` as usual:
+
+```json
+{
+    "org_id": "your-org@AdobeOrg",
+    "client_id": "your-client-id",
+    "secret": "your-secret",
+    "scopes": "your-scopes",
+    "proxy": "http://proxy.example.com:8080"
+}
+```
+
+The proxy URL includes its scheme and port.
+An HTTPS destination commonly uses an `http://` proxy
+URL, which tunnels HTTPS with CONNECT; use `https://` only if the proxy itself
+requires TLS. TLS certificate verification remains enabled.
+
+For proxy authentication, use `http://username:password@proxy.example.com:8080`,
+URL-encoding special characters in the username and password. Treat files and
+command-line arguments containing proxy credentials as secrets.
+
+In a multi-org JSON file, put `proxy` inside each organization's object.
+Organizations can use different proxies, or omit the field independently.
+To override the file's proxy for every imported organization, use
+`lp.importConfigFile("myconfig.json", proxy="http://other-proxy:8080")`.
+
+The settings apply to initial OAuth token acquisition, token refresh, all API
+methods and their retries, and asynchronous rule-component downloads during
+`extractProperty`. Configure before creating `Admin`, `Property`, `Library`,
+or `Synchronizer` instances; existing connectors retain their configuration.
+Calling `configure` again without `proxy` clears the previous explicit
+proxy for that organization.
+
+Omitting `proxy` or passing `None` preserves the HTTP libraries'
+normal environment-based behavior (`HTTP_PROXY`, `HTTPS_PROXY`, `ALL_PROXY`,
+and `NO_PROXY`). This does **not** disable environment proxies.
+Empty strings and non-string proxy values are rejected.
+Existing configuration files without a proxy require no changes.
+
 ## 5. Instantiate the Admin class & get Company ID to retrieve properties
 
 Once all of these setup steps are completed, you can instantiate the `Admin` class.

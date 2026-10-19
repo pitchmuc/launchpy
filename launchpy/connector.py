@@ -46,6 +46,7 @@ class AdobeRequest:
             raise Exception(
                 'You have to upload the configuration file with importConfigFile method.')
         self.config = {self.config_key: deepcopy(config_object)}
+        self.proxy = configs._validate_proxy(config_object.get("proxy"))
         header = headers[self.config_key]
         self.header = deepcopy(header)
         self.retry = retry
@@ -79,8 +80,10 @@ class AdobeRequest:
             "client_secret": config["secret"],
             "scope": config["scopes"]
         }
+        proxy = configs._validate_proxy(config.get("proxy"))
+        proxy_kwargs = {"proxies": {"http": proxy, "https": proxy}} if proxy is not None else {}
         response = requests.post(
-            config["oauthTokenEndpointV2"], data=oauth_payload)
+            config["oauthTokenEndpointV2"], data=oauth_payload, **proxy_kwargs)
         json_response = response.json()
         if 'access_token' in json_response.keys():
             token = json_response['access_token']
@@ -130,6 +133,8 @@ class AdobeRequest:
         if isinstance(retries, bool) or not isinstance(retries, int) or retries < 0:
             raise ValueError("retry must be a non-negative integer")
         request_kwargs: dict[str, Any] = {}
+        if self.proxy is not None:
+            request_kwargs["proxies"] = {"http": self.proxy, "https": self.proxy}
         if params is not None:
             request_kwargs["params"] = params
         if data is not None:

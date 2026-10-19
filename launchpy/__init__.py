@@ -5,6 +5,7 @@ May  15 12:04:49 2019
 """
 from launchpy.__version__ import __version__
 from launchpy.configs import *
+from launchpy.configs import _validate_proxy
 from launchpy.library import Library
 from launchpy.admin import Admin
 from launchpy.property import Property
@@ -42,10 +43,13 @@ async def __extractRuleComponents__(rule: dict, client: httpx.AsyncClient, folde
                 json.dump(component, f, indent=4)
 
 # 3. Use an orchestrator instead of ThreadPoolExecutor
-async def process_all_rules(rules_list, folder, header):
+async def process_all_rules(rules_list, folder, header,
+                           proxy: str | None = None):
+    proxy = _validate_proxy(proxy)
     timeout = httpx.Timeout(10.0, read=120.0)
     limits = httpx.Limits(max_connections=100, max_keepalive_connections=50)
-    async with httpx.AsyncClient(timeout=timeout, limits=limits) as client:
+    proxy_kwargs = {"proxy": proxy} if proxy is not None else {}
+    async with httpx.AsyncClient(timeout=timeout, limits=limits, **proxy_kwargs) as client:
         # Create a list of "tasks" to run
         tasks = [__extractRuleComponents__(rule, client, folder, header) for rule in rules_list]
         # 'gather' runs them all concurrently
@@ -90,7 +94,7 @@ def extractProperty(property: dict | Property, publishedVersion: bool = False,fo
             except Exception as e:
                 published_rules.append(rule)
         rules = published_rules
-    asyncio.run(process_all_rules(rules, folder, property.header))
+    asyncio.run(process_all_rules(rules, folder, property.header, property.connector.proxy))
     dataElements = property.getDataElements()
     if publishedVersion:
         published_data_elements = []

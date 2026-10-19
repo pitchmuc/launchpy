@@ -37,6 +37,11 @@ launchpy.importConfigFile('myConfig.json')
 launchpy.config.config_object
 ```
 
+Configuration JSON files can include an optional `proxy` URL, independently
+for each organization in multi-org files. `importConfigFile` also accepts
+`proxy=...` to override the file's proxy for all imported organizations.
+See [Proxy configuration](./getstarted.md#proxy-configuration) for examples.
+
 ### Configure method
 
 The configure method enables you to configure the `config_object` directly from the python console with environment.\
@@ -55,6 +60,12 @@ lp.configure(
   scope ="https://ims-na1.adobelogin.com/s/ent_reactor_admin_sdk",
 )
 ```
+
+`configure` also accepts `proxy="http://proxy.example.com:8080"`.
+This single URL is used for both HTTP and HTTPS destinations. These settings
+apply to OAuth, API requests, and property exports. Omit the argument to retain
+normal environment-based proxy behavior; configuring an organization again
+without it clears that organization's previous explicit proxy.
 
 ## 1. The Admin class
 

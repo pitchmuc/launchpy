@@ -3,6 +3,14 @@ from pathlib import Path
 from typing import Optional
 from launchpy.config import config_objects, headers
 
+def _validate_proxy(proxy: str | None) -> str | None:
+    if proxy is None:
+        return None
+    if not isinstance(proxy, str) or not proxy.strip():
+        raise ValueError("`proxy` must be a non-empty proxy URL string.")
+    return proxy
+
+
 def find_path(path: str) -> Optional[Path]:
     """Checks if the file denoted by the specified `path` exists and returns the Path object
     for the file.
@@ -51,7 +59,8 @@ def createConfigFile(filename:str='config_launch',auth_type: str = "oauthV2", sc
         print(
             f" file created at this location : {os.getcwd()}{os.sep}{filename}")
 
-def importConfigFile(path: str = None,auth_type:str=None) -> None:
+def importConfigFile(path: str = None,auth_type:str=None,
+                     proxy: str | None = None) -> None:
     """Reads the file denoted by the supplied `path` and retrieves the configuration information
     from it.
 
@@ -59,6 +68,7 @@ def importConfigFile(path: str = None,auth_type:str=None) -> None:
         path: REQUIRED : path to the configuration file. Can be either a fully-qualified or relative.
         auth_type : OPTIONAL : The type of Auth to be used by default. Detected if none is passed, OauthV2 takes precedence.
                         Possible values: "jwt" or "oauthV2"
+        proxy : OPTIONAL : Proxy URL overriding the file's proxy for all organizations.
     Example of path value.
     "config.json"
     "./config.json"
@@ -89,7 +99,8 @@ def importConfigFile(path: str = None,auth_type:str=None) -> None:
                 "org_id" : provided_config['org_id'],
                 "secret" : provided_config['secret'],
                 "client_id" : client_id,
-                "scope" : provided_config.get('scope')
+                "scope" : provided_config.get('scope'),
+                "proxy": provided_config.get("proxy") if proxy is None else proxy
             }
             if auth_type == 'oauthV2':
                 args["scopes"] = provided_config["scopes"].replace(' ','')
@@ -114,7 +125,8 @@ def importConfigFile(path: str = None,auth_type:str=None) -> None:
                     "secret" : config['secret'],
                     "client_id" : client_id,
                     "org_name" : config['org_name'],
-                    "scope" : config.get('scope')
+                    "scope" : config.get('scope'),
+                    "proxy": config.get("proxy") if proxy is None else proxy
                 }
                 if auth_type == 'oauthV2':
                     args["scopes"] = config["scopes"].replace(' ','')
@@ -156,6 +168,7 @@ def configure(org_id: str = None,
               scopes : str= None,
               scope: str="https://ims-na1.adobelogin.com/s/ent_reactor_admin_sdk",
               org_name: str = "default",
+              proxy: str | None = None,
               **kwargs
               ):
     """Performs programmatic configuration of the API using provided values.
@@ -168,6 +181,8 @@ def configure(org_id: str = None,
         scope : OPTIONAL : Scope that is needed for JWT auth.
         org_name : OPTIONAL : The name of the org for multi-org configuration. If not provided, the "default" org will be used.
             Possible scope: https://www.adobe.io/authentication/auth-methods.html#!AdobeDocs/adobeio-auth/master/JWT/Scopes.md
+        proxy : OPTIONAL : A single proxy URL for both HTTP and HTTPS.
+            Used for OAuth, API calls, and property exports. None preserves environment settings.
     """
     if not org_id:
         raise ValueError("`org_id` must be specified in the configuration.")
@@ -177,6 +192,7 @@ def configure(org_id: str = None,
         raise ValueError("`scopes` must be specified in the configuration.")
     if not secret:
         raise ValueError("`secret` must be specified in the configuration.")
+    proxy = _validate_proxy(proxy)
     header = {"Accept": "application/vnd.api+json;revision=1",
           "Content-Type": "application/vnd.api+json",
           "Authorization": "Bearer ",
@@ -204,6 +220,7 @@ def configure(org_id: str = None,
     config_object[org_name]["secret"] = secret
     config_object[org_name]["official_scope"] = scope
     config_object[org_name]["scopes"] = scopes
+    config_object[org_name]["proxy"] = proxy
     # ensure the reset of the state by overwriting possible values from previous import.
     config_object[org_name]["date_limit"] = 0
     config_object[org_name]["token"] = ""

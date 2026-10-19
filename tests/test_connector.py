@@ -17,6 +17,7 @@ class ConnectorRetryTests(unittest.TestCase):
         self.connector = AdobeRequest.__new__(AdobeRequest)
         self.connector.header = {"Authorization": "test"}
         self.connector.retry = 2
+        self.connector.proxy = None
         self.connector._checkingDate = Mock()
         sleep_patch = patch("launchpy.connector.time.sleep")
         self.sleep = sleep_patch.start()

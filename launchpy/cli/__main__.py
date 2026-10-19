@@ -1,5 +1,6 @@
 ﻿import launchpy
 from launchpy.config import config_objects, headers
+from launchpy.configs import _validate_proxy
 import argparse, cmd, shlex, json
 from functools import wraps
 from rich.console import Console
@@ -961,6 +962,7 @@ class MainShell(cmd.Cmd):
 
     def __init__(self, **kwargs:ParamSpecKwargs) -> None:
         super().__init__()
+        proxy = _validate_proxy(kwargs.get("proxy"))
         self.admin = None
         self.cid = None
         self.properties = None
@@ -988,12 +990,13 @@ class MainShell(cmd.Cmd):
             with open(config_path, "rb") as f:
                 dict_config = json.load(f)
             if type(dict_config) == dict:
-                config_key = kwargs.get("org_name", "default")
+                config_key = kwargs.get("org_name") or "default"
                 self.config = {config_key: deepcopy(self.config_template)}
                 self.config[config_key]['secret'] = dict_config.get("secret", kwargs.get("secret"))
                 self.config[config_key]['org_id'] = dict_config.get("org_id", kwargs.get("org_id"))
                 self.config[config_key]['client_id'] = dict_config.get("client_id", dict_config.get("api_key", kwargs.get("client_id", kwargs.get("api_key"))))
                 self.config[config_key]['scopes'] = dict_config.get("scopes", kwargs.get("scopes"))
+                self.config[config_key]['proxy'] = proxy if proxy is not None else _validate_proxy(dict_config.get("proxy"))
                 config_objects.update(self.config)
             elif type(dict_config) == list:
                 self.config = {}
@@ -1007,15 +1010,17 @@ class MainShell(cmd.Cmd):
                     self.config[config_key]['org_id'] = config.get("org_id", kwargs.get("org_id"))
                     self.config[config_key]['client_id'] = config.get("client_id", config.get("api_key", kwargs.get("client_id", kwargs.get("api_key"))))
                     self.config[config_key]['scopes'] = config.get("scopes", kwargs.get("scopes"))
+                    self.config[config_key]['proxy'] = proxy if proxy is not None else _validate_proxy(config.get("proxy"))
                 config_objects.update(self.config)
                 config_key = dict_config[0].get("org_name", "default")
         else:
-            config_key = kwargs.get("org_name", "default")
+            config_key = kwargs.get("org_name") or "default"
             self.config = {config_key: deepcopy(self.config_template)}
             self.config[config_key]['secret'] = kwargs.get("secret")
             self.config[config_key]['org_id'] = kwargs.get("org_id")
             self.config[config_key]['client_id'] = kwargs.get("client_id",kwargs.get("api_key"))
             self.config[config_key]['scopes'] = kwargs.get("scopes")
+            self.config[config_key]['proxy'] = proxy
             config_objects.update(self.config)
         if self.config[config_key]['secret'] is not None and self.config[config_key]['org_id'] is not None and self.config[config_key]['client_id'] is not None and self.config[config_key]['scopes'] is not None:
             myheaders = {}
@@ -1024,7 +1029,7 @@ class MainShell(cmd.Cmd):
                 myheaders[org_name]["x-gw-ims-org-id"] = config['org_id']
                 myheaders[org_name]["x-api-key"] = config['client_id']
             headers.update(myheaders)
-            config_key = kwargs.get("org_name", config_key)
+            config_key = kwargs.get("org_name") or config_key
             console.print("Configuring connection...", style="blue")
             self._configure_connection(config_key)
             if kwargs.get("property") is not None:
@@ -1051,13 +1056,15 @@ class MainShell(cmd.Cmd):
         else:
             config_key = list(self.config.keys())[0]
         self.org_name = config_key
-        self.config = launchpy.configure(
+        launchpy.configure(
             secret=config_objects[config_key]['secret'],
             org_id=config_objects[config_key]['org_id'],
             client_id=config_objects[config_key]['client_id'],
             scopes=config_objects[config_key]['scopes'],
-            org_name=config_key
+            org_name=config_key,
+            proxy=config_objects[config_key].get("proxy")
         )
+        self.config = config_objects
         self.admin = launchpy.Admin(org_name=config_key)
         self.cid = self.admin.getCompanyId()
         if config_key == 'default' or config_key is None:
@@ -1075,16 +1082,7 @@ class MainShell(cmd.Cmd):
             if org_name not in config_objects.keys():
                 console.print(f"(!) Error: Organization '{org_name}' not found in the configuration.", style="red")
                 return
-            self.config = launchpy.configure(
-                secret=config_objects[org_name]['secret'],
-                org_id=config_objects[org_name]['org_id'],
-                client_id=config_objects[org_name]['client_id'],
-                scopes=config_objects[org_name]['scopes'],
-                org_name=org_name
-            )
-            self.admin = launchpy.Admin(org_name=org_name)
-            self.cid = self.admin.getCompanyId()
-            self.prompt = f"launchpy:{org_name}> "
+            self._configure_connection(org_name)
             console.print(f"Switched to organization '{org_name}'.", style="green")
         except Exception as e:
             console.print(f"(!) Error: {str(e)}", style="red")
@@ -1121,8 +1119,10 @@ class MainShell(cmd.Cmd):
         parser.add_argument("-cf", "--config_file", help="Path to config file", default=None)
         parser.add_argument("-p", "--property", help="Property Name to auto-load on startup", default=None)
         parser.add_argument("-on", "--org_name", help="Organization Name to use from config file", default=None)
+        parser.add_argument("--proxy", help="Proxy URL for both HTTP and HTTPS")
         try:
             args = parser.parse_args(shlex.split(arg))
+            proxy = _validate_proxy(args.proxy)
             if args.config_file is not None:
                 config_path = Path(args.config_file)
                 if not config_path.is_absolute():
@@ -1136,6 +1136,7 @@ class MainShell(cmd.Cmd):
                     self.config[config_key]['org_id'] = dict_config.get("org_id", args.org_id)
                     self.config[config_key]['client_id'] = dict_config.get("client_id", dict_config.get("api_key", args.client_id))
                     self.config[config_key]['scopes'] = dict_config.get("scopes", args.scopes)
+                    self.config[config_key]['proxy'] = proxy if proxy is not None else _validate_proxy(dict_config.get("proxy"))
                     config_objects.update(self.config)
                 elif type(dict_config) == list:
                     self.config = {}
@@ -1149,6 +1150,7 @@ class MainShell(cmd.Cmd):
                         self.config[config_key]['org_id'] = config.get("org_id", args.org_id)
                         self.config[config_key]['client_id'] = config.get("client_id", config.get("api_key", args.client_id))
                         self.config[config_key]['scopes'] = config.get("scopes", args.scopes)
+                        self.config[config_key]['proxy'] = proxy if proxy is not None else _validate_proxy(config.get("proxy"))
                     config_objects.update(self.config)
                     config_key = dict_config[0].get("org_name")
             else:
@@ -1160,6 +1162,7 @@ class MainShell(cmd.Cmd):
                 if args.org_id: self.config[config_key]['org_id'] = str(args.org_id)
                 if args.scopes: self.config[config_key]['scopes'] = str(args.scopes)
                 if args.client_id: self.config[config_key]['client_id'] = str(args.client_id)
+                self.config[config_key]['proxy'] = proxy
                 config_objects.update(self.config)
             missing = [
                 key for key, value in {
@@ -1423,6 +1426,7 @@ def main():
     parser.add_argument("-cf", "--config_file", help="Path to config file", default=None)
     parser.add_argument("-p", "--property", help="Property Name to auto-load on startup", default=None)
     parser.add_argument("-on", "--org_name", help="Organization Name to use from config file", default=None)
+    parser.add_argument("--proxy", help="Proxy URL for both HTTP and HTTPS")
     args = parser.parse_args() 
     shell = MainShell(**vars(args))
     try:

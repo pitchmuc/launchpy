@@ -10,6 +10,7 @@ This document provides an overview of the command line interface (CLI) for `laun
     - [Instantiation](#instantiation)
       - [create\_config\_file](#create_config_file)
       - [config](#config)
+      - [Proxy configuration](#proxy-configuration)
       - [change\_org](#change_org)
       - [get\_properties](#get_properties)
       - [create\_property](#create_property)
@@ -148,6 +149,7 @@ Arguments
 `-cf`,`--config_file`: The path to the config file that contains your credentials and other necessary information.
 `-p`,`--property` : The property name to be used and directly instantiated the property layer. This is an optional parameter.
 `-on`,`--org_name`: The organization name to use when your `--config_file` is a multi-org config file (see [create_config_file](#create_config_file)). This is an optional parameter, it defaults to the first organization found in the file (or `default` when using individual parameters).
+`--proxy`: Proxy URL for both HTTP and HTTPS destinations.
 
 Example via parameters:
 ```bash
@@ -194,6 +196,47 @@ launchpy:client_a>
 
 When in a non-multi-org environment, the prompt of the CLI will be `launchpy>`, and when in a multi-org environment, the prompt will be `launchpy:<org_name>`, where `<org_name>` is the name of the organization you are currently connected to.\
 By default, the first organization found in the multi-org config file will be used if no `--org_name` is provided. You can switch between organizations using the `change_org` command.
+
+#### Proxy configuration
+
+The single `--proxy` option works both at startup and in the interactive `config` command,
+with either a config file or individual credentials:
+
+```bash
+python -m launchpy.cli --config_file config.json --proxy http://proxy.example.com:8080
+```
+
+```text
+(Cmd) config --config_file config.json --proxy http://proxy.example.com:8080
+(Cmd) config --client_id <client_id> --secret <secret> --org_id <org_id> --scopes <scopes> --proxy http://proxy.example.com:8080
+```
+
+You can also store a single `proxy` URL in the JSON file:
+
+```json
+{
+    "org_id": "your-org@AdobeOrg",
+    "client_id": "your-client-id",
+    "secret": "your-secret",
+    "scopes": "your-scopes",
+    "proxy": "http://proxy.example.com:8080"
+}
+```
+
+The same proxy is used for both HTTP and HTTPS destinations. `--proxy` overrides
+the file's proxy URL. For multi-org files, put `proxy` in each organization's
+object; `--proxy` overrides it for every organization loaded from that file.
+`change_org` preserves each organization's effective proxy settings.
+
+The proxy covers authentication, token refresh, API calls, and property
+exports. Existing files and commands without proxy options continue to work,
+including environment-based proxy settings. Omitting `proxy` or setting it to
+`null` in JSON does not disable environment proxies. Empty strings and non-string
+values are rejected. TLS verification remains
+enabled. For URL schemes, authentication, and Python configuration examples,
+see [Proxy configuration in Getting Started](./getstarted.md#proxy-configuration).
+Avoid putting proxy credentials on a shared terminal's command line or in
+committed configuration files.
 
 #### change_org
 Switch the current CLI session to another organization that has already been loaded from a multi-org config file (via `config` or `--config_file` at startup). This avoids re-running `config` when you need to move between organizations.\
