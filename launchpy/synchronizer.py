@@ -263,6 +263,7 @@ class Synchronizer:
             timeout : OPTIONAL : The timeout to be used for the rule component. If not provided, the existing timeout will be used.
             libraryLinked : OPTIONAL : If you want to take a component ID that are associated to a specific library. Default: False. If set to True, the method will look for the component in the library and take the version linked to the library instead of the latest version in the property. Do not work for Extensions.
             verbose : OPTIONAL : If set to True, it will print the synchronization status of each property. Default: False.
+            ignoreDisabled : OPTIONAL : Skip disabled source rules and data elements, returning an empty dictionary. Uses the selected revision. Default: False.
         """
         timeout = kwargs.get('timeout',None)
         libraryLinked = kwargs.get('libraryLinked',False)
@@ -271,6 +272,10 @@ class Synchronizer:
             raise ValueError('Require a component Name of a component ID')
         response = {}
         cmp_baseDict = self.__prepareBaseComponent__(componentName=componentName,componentId=componentId,publishedVersion=publishedVersion,libraryLinked=libraryLinked)
+        if (kwargs.get('ignoreDisabled',False)
+                and cmp_baseDict['component']['type'] in ('rules','data_elements')
+                and not cmp_baseDict['component']['attributes']['enabled']):
+            return response
         ## handling the data element
         if cmp_baseDict['component']['type'] == 'data_elements':
             for target in list(self.targets.keys()):
@@ -288,6 +293,16 @@ class Synchronizer:
                 if len(self.target_configs.get(target,{}).get('inclComponents',[]))==0 or flagAllowList:
                     with self._target_locks[target]:
                         translatedComponent = self.translator.translate(target,data_element=cmp_baseDict['copy'])
+                        attributes = {
+                            "name" : translatedComponent['name'],
+                            "enabled" : translatedComponent["enabled"],
+                            "delegate_descriptor_id" : translatedComponent["descriptor"],
+                            "storage_duration" : translatedComponent["storage_duration"],
+                            "force_lower_case" : translatedComponent["force_lower_case"],
+                            "clean_text" : translatedComponent["clean_text"],
+                            "settings" : translatedComponent["settings"],
+                            "default_value": translatedComponent["default_value"]
+                        }
                         ## if it does not exist
                         if cmp_baseDict['name'] not in [de.get('attributes',{}).get('name') for de in self.targets[target]['dataElements']]:
                             if forceCreation:
@@ -304,9 +319,9 @@ class Synchronizer:
                                     default_value= translatedComponent["default_value"]
                                     )
                                 if cmp_baseDict['component']['attributes']['enabled'] != comp['attributes']['enabled']:
-                                    updateDE = self.targets[target]['api'].updateDataElement(
+                                    comp = self.targets[target]['api'].updateDataElement(
                                         dataElement_id=comp['id'],
-                                        attr_dict=translatedComponent)
+                                        attr_dict=attributes)
                                 self.targets[target]['libraryStack']['dataElements'].append(comp)
                                 self.targets[target]['dataElements'].append(comp)
                                 response[target] = f'Data element "{cmp_baseDict["name"]}" created in "{target}".'
@@ -316,16 +331,6 @@ class Synchronizer:
                                 response[target] = message
                         else:
                             index,old_component = [(index,de) for index,de in enumerate(self.targets[target]['dataElements']) if de.get('attributes',{}).get('name') == cmp_baseDict['name']][0]
-                            attributes = {
-                                "name" : translatedComponent['name'],
-                                "enabled" : translatedComponent["enabled"],
-                                "delegate_descriptor_id" : translatedComponent["descriptor"],
-                                "storage_duration" : translatedComponent["storage_duration"],
-                                "force_lower_case" : translatedComponent["force_lower_case"],
-                                "clean_text" : translatedComponent["clean_text"],
-                                "settings" : translatedComponent["settings"],
-                                "default_value": translatedComponent["default_value"]
-                            }
                             comp = self.targets[target]['api'].updateDataElement(
                                 dataElement_id=old_component['id'],
                                 attr_dict=attributes,
@@ -513,7 +518,7 @@ class Synchronizer:
                 results[component] = self.syncComponent(componentId=component,publishedVersion=publishedVersion,forceCreation=forceCreation)
         return results
 
-    def syncRules(self,regex:str=None,forceCreation:bool=False,publishedVersion:bool=False)->dict:
+    def syncRules(self,regex:str=None,forceCreation:bool=False,publishedVersion:bool=False,ignoreDisabled:bool=False)->dict:
         """
         Synchronizing the rules in the base property to the target properties.
         Returns a dictionary keyed by rule name, with the per-target status (created, updated, or not synced because the rule does not exist and forceCreation is False).
@@ -521,18 +526,19 @@ class Synchronizer:
             regex : OPTIONAL : If you want to filter the rules to sync based on a regex pattern. Default: None (sync all rules)
             forceCreation : OPTIONAL : If set to True, it will sync the rules even if they do not exist in the target properties. If set to False, it will only sync the rules that already exist in the target properties. Default: False.
             publishedVersion : OPTIONAL : If set to True, it will sync the latest published version of the rules. Default: False.
+            ignoreDisabled : OPTIONAL : Skip rules whose selected source revision is disabled. Skipped rules have an empty per-target result. Default: False.
         """
         base_rule_names = [rule['attributes']['name'] for rule in self.base['rules']]
         if regex is not None:
             base_rule_names = [rule for rule in base_rule_names if re.search(regex,rule)]
         results = {}
         with ThreadPoolExecutor() as executor:
-            future_to_name = {executor.submit(self.syncComponent, componentName=rule, forceCreation=forceCreation, publishedVersion=publishedVersion): rule for rule in base_rule_names}
+            future_to_name = {executor.submit(self.syncComponent, componentName=rule, forceCreation=forceCreation, publishedVersion=publishedVersion, ignoreDisabled=ignoreDisabled): rule for rule in base_rule_names}
             for future in future_to_name:
                 results[future_to_name[future]] = future.result()
         return results
 
-    def syncDataElements(self,regex:str=None,forceCreation:bool=False,publishedVersion:bool=False)->dict:
+    def syncDataElements(self,regex:str=None,forceCreation:bool=False,publishedVersion:bool=False,ignoreDisabled:bool=False)->dict:
         """
         Synchronizing the data elements in the base property to the target properties.
         Returns a dictionary keyed by data element name, with the per-target status (created, updated, or not synced because the data element does not exist and forceCreation is False).
@@ -540,13 +546,14 @@ class Synchronizer:
             regex : OPTIONAL : If you want to filter the data elements to sync based on a regex pattern. Default: None (sync all data elements)
             forceCreation : OPTIONAL : If set to True, it will sync the data elements even if they do not exist in the target properties. If set to False, it will only sync the data elements that already exist in the target properties. Default: False.
             publishedVersion : OPTIONAL : If set to True, it will sync the latest published version of the data elements. Default: False.
+            ignoreDisabled : OPTIONAL : Skip data elements whose selected source revision is disabled. Skipped data elements have an empty per-target result. Default: False.
         """
         base_de_names = [de['attributes']['name'] for de in self.base['dataElements']]
         if regex is not None:
             base_de_names = [de for de in base_de_names if re.search(regex,de)]
         results = {}
         with ThreadPoolExecutor() as executor:
-            future_to_name = {executor.submit(self.syncComponent, componentName=de, forceCreation=forceCreation, publishedVersion=publishedVersion): de for de in base_de_names}
+            future_to_name = {executor.submit(self.syncComponent, componentName=de, forceCreation=forceCreation, publishedVersion=publishedVersion, ignoreDisabled=ignoreDisabled): de for de in base_de_names}
             for future in future_to_name:
                 results[future_to_name[future]] = future.result()
         return results
@@ -793,21 +800,23 @@ class Synchronizer:
                 else:
                     index,target_de = [(index,de) for index,de in enumerate(self.targets[target]['dataElements']) if de['attributes']['name'] == cmp_baseDict['name']][0]
                     issue_pub = ""
+                    differences: list[str] = []
                     if publishedVersion:
                         try:
                             revisions_dataElement = self.targets[target]["api"].getRevisions(target_de)
                             target_de = self.targets[target]["api"].getLatestPublishedVersion(revisions_dataElement) 
                         except:
                             issue_pub = " (draft)"
-                        if target_de['attributes']['enabled'] != cmp_baseDict['component']['attributes']['enabled']:
-                            dict_result[target] = "Data Element enabled status is different"+issue_pub
-                        if target_de['attributes']['published'] != cmp_baseDict['component']['attributes']['published']:
-                            dict_result[target] = "Data Element published status is different"+issue_pub
-                    if target_de['attributes']['settings'] == cmp_baseDict['component']['attributes']['settings']:
-                        if not excludeSimilar:
-                            dict_result[target] = "Similar"+issue_pub
-                    else:
-                        dict_result[target] = "Data Element settings are different"+issue_pub
+                    if target_de['attributes']['enabled'] != cmp_baseDict['component']['attributes']['enabled']:
+                        differences.append("Data Element enabled status is different")
+                    if publishedVersion and target_de['attributes']['published'] != cmp_baseDict['component']['attributes']['published']:
+                        differences.append("Data Element published status is different")
+                    if target_de['attributes']['settings'] != cmp_baseDict['component']['attributes']['settings']:
+                        differences.append("Data Element settings are different")
+                    if differences:
+                        dict_result[target] = ','.join(differences) + issue_pub
+                    elif not excludeSimilar:
+                        dict_result[target] = "Similar"+issue_pub
         if cmp_baseDict['component']['type'] == 'rules':
             rcsLink = cmp_baseDict['component'].get('relationships',{}).get('rule_components',{}).get('links',{}).get('related')
             resResource = self.base['api'].getRessource(rcsLink)
@@ -829,10 +838,10 @@ class Synchronizer:
                             targetRule = self.targets[target]["api"].getLatestPublishedVersion(revisions_targetRule) 
                         except:
                             issue_pub = " (not published)"
-                        if targetRule['attributes']['enabled'] != cmp_baseDict['component']['attributes']['enabled']:
-                            componentsDifferences.append("Rule enabled status is different")
-                        if targetRule['attributes']['published'] != cmp_baseDict['component']['attributes']['published']:
-                            componentsDifferences.append("Rule published status is different")
+                    if targetRule['attributes']['enabled'] != cmp_baseDict['component']['attributes']['enabled']:
+                        componentsDifferences.append("Rule enabled status is different")
+                    if publishedVersion and targetRule['attributes']['published'] != cmp_baseDict['component']['attributes']['published']:
+                        componentsDifferences.append("Rule published status is different")
                     rcsLinkTarget = targetRule.get('relationships',{}).get('rule_components',{}).get('links',{}).get('related')
                     resResource = self.targets[target]['api'].getRessource(rcsLinkTarget)
                     target_rule_components:list = resResource['data']

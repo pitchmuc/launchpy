@@ -3,6 +3,13 @@
 This page gathered the changes made between version of the launchpy module.\
 This has been started after the 0.3.0 release.\
 
+## 0.5.4
+* Fixing enabled state handling for rules, data elements, and extensions during synchronization. Before release, state enablement was respected only during -published synchronization.
+* Ensuring that the verbose flag correctly displays detailed information for all synchronized entities, including those with enabled state changes.
+* Adding the `ignore_disabled` flag to the synchronization commands to allow skipping disabled source entities.
+* Adding `-i` / `--ignore_disabled` flag to the CLI synchronization commands.
+
+
 ## 0.5.3
 * Adding optional `proxy` support to `configure`, `importConfigFile`, `createConfigFile` and JSON configuration files. A single proxy URL is used for both HTTP and HTTPS, with separate settings per organization.
 * Applying proxy settings to OAuth token acquisition and refresh, all API requests and their retries, and asynchronous rule-component downloads during `extractProperty`.

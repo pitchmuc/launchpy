@@ -533,9 +533,12 @@ Arguments:
 `-r`, `--regex`: Regex pattern to filter rules by name (partial match, non-case sensitive). This is an optional parameter, if not provided, all rules are synced.
 `-c`, `--create` : Flag. Create rules that do not exist in the destination property. Default False.
 `-p`, `--published` : Flag. Sync the latest published version of the rules. Default False.
+`-i`, `--ignore_disabled` : Optional boolean. Skip disabled source rules. Default False; a bare flag means True. With `-p`, checks the latest published source revision.
 
 ```bash
 synchronizer:Base_Property_Name> sync_rules -r "Rule Name" -c
+synchronizer:Base_Property_Name> sync_rules -i
+synchronizer:Base_Property_Name> sync_rules --ignore_disabled True -p
 ```
 
 #### sync_data_elements
@@ -544,9 +547,12 @@ Arguments:
 `-r`, `--regex`: Regex pattern to filter data elements by name (partial match, non-case sensitive). This is an optional parameter, if not provided, all data elements are synced.
 `-c`, `--create` : Flag. Create data elements that do not exist in the destination property. Default False.
 `-p`, `--published` : Flag. Sync the latest published version of the data elements. Default False.
+`-i`, `--ignore_disabled` : Optional boolean. Skip disabled source data elements. Default False; a bare flag means True. With `-p`, checks the latest published source revision.
 
 ```bash
 synchronizer:Base_Property_Name> sync_data_elements -r "Data Element Name" -c
+synchronizer:Base_Property_Name> sync_data_elements -i
+synchronizer:Base_Property_Name> sync_data_elements --ignore_disabled False
 ```
 
 #### sync_extensions

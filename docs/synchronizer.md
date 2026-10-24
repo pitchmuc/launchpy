@@ -150,6 +150,7 @@ synchronizor.syncComponent('my Component Name',publishedVersion=True)
 #### Data Elements
 The method will replace the existing configuration of a data element by the template configuration.\
 Completely overriding the existing element configuration in the target properties.
+When a data element is created, its enabled state is updated if needed to match the selected source revision. The response from that update is retained in the target cache and library stack.
 
 #### Rules
 The method will delete all rule components existing in the Target property for that rule.\
@@ -198,6 +199,7 @@ Arguments:
 *  regex : OPTIONAL : If you want to filter the data elements to sync based on a regex pattern. Default: None (sync all data elements)
 *  forceCreation : OPTIONAL : If set to True, it will sync the data elements even if they do not exist in the target properties. If set to False, it will only sync the data elements that already exist in the target properties. Default: False.
 *  publishedVersion : OPTIONAL : If set to True, it will sync the latest published version of the data elements. Default: False.
+*  ignoreDisabled : OPTIONAL : If set to True, skip data elements whose selected source revision has `enabled=False`. Default: False.
 
 ## SyncRules
 It will synchronize the rules in the base property to the target properties.
@@ -205,7 +207,14 @@ Arguments:
 *  regex : OPTIONAL : If you want to filter the rules to sync based on a regex pattern. Default: None (sync all rules)
 *  forceCreation : OPTIONAL : If set to True, it will sync the rules even if they do not exist in the target properties. If set to False, it will only sync the rules that already exist in the target properties. Default: False.
 *  publishedVersion : OPTIONAL : If set to True, it will sync the latest published version of the rules. Default: False.
+*  ignoreDisabled : OPTIONAL : If set to True, skip rules whose selected source revision has `enabled=False`. Default: False.
 
+For both methods, `ignoreDisabled=True` checks the source revision being synchronized, not the target's enabled state. With `publishedVersion=True`, it checks the latest published source revision rather than the current draft. Disabled components are not created or updated, even with `forceCreation=True`, and retain an empty per-target dictionary in the returned results.
+
+```python
+synchronizor.syncRules(ignoreDisabled=True)
+synchronizor.syncDataElements(ignoreDisabled=True, publishedVersion=True)
+```
 
 ## createTargetsLibrary
 
@@ -238,6 +247,7 @@ Check if the component,from the base property, is synced to the different target
 It can also check for the Extensions.\
 It will return a dictionary with the key being the target property and the value being the result of the evaluation, such as {targetProperty: 'similar'} when component have same settings or {targetPropery : '<difference>'} when component do not have same settings.\
 See below for differences.\
+For rules and data elements, enabled-state differences are checked in both current and published modes. A matching configuration does not override an enabled-state difference with `"Similar"`. When a data element has multiple differences, they are returned together as a comma-separated message. Library dry runs use the same comparison logic.
 Arguments:
 * componentName : REQUIRED : the name of the component to compare
 * componentID : REQUIRED : the id of the component to compare

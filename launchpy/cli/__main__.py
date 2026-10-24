@@ -595,10 +595,11 @@ class SynchronizerCLI(cmd.Cmd):
         parser.add_argument("-r", "--regex", help="Regex pattern to filter rules by name (partial match, non-case sensitive). Default None.", type=str, default=None)
         parser.add_argument("-c", "--create", help="Create rules that do not exist in the destination property. Default False.", action="store_true", default=False)
         parser.add_argument("-p", "--published", help="Sync the latest published version of the rules. Default False.", action="store_true", default=False)
+        parser.add_argument("-i", "--ignore_disabled", help="Skip disabled source rules. Default False. A bare flag means True.", type=str2bool, nargs="?", const=True, default=False)
         parser.add_argument("-v", "--verbose", help="Print detailed information about the sync process, including successes. Default False.", action="store_true", default=False)
         try:
             args = parser.parse_args(shlex.split(args))
-            result = self.synchronizer.syncRules(regex=args.regex, forceCreation=args.create, publishedVersion=args.published)
+            result = self.synchronizer.syncRules(regex=args.regex, forceCreation=args.create, publishedVersion=args.published, ignoreDisabled=args.ignore_disabled)
             for ruleName, targetResults in result.items():
                 for prop, message in (targetResults or {}).items():
                     if "does not exist" in message:
@@ -617,10 +618,11 @@ class SynchronizerCLI(cmd.Cmd):
         parser.add_argument("-r", "--regex", help="Regex pattern to filter data elements by name (partial match, non-case sensitive). Default None.", type=str, default=None)
         parser.add_argument("-c", "--create", help="Create data elements that do not exist in the destination property. Default False.", action="store_true", default=False)
         parser.add_argument("-p", "--published", help="Sync the latest published version of the data elements. Default False.", action="store_true", default=False)
+        parser.add_argument("-i", "--ignore_disabled", help="Skip disabled source data elements. Default False. A bare flag means True.", type=str2bool, nargs="?", const=True, default=False)
         parser.add_argument("-v", "--verbose", help="Print detailed information about the sync process, including successes. Default False.", action="store_true", default=False)
         try:
             args = parser.parse_args(shlex.split(args))
-            result = self.synchronizer.syncDataElements(regex=args.regex, forceCreation=args.create, publishedVersion=args.published)
+            result = self.synchronizer.syncDataElements(regex=args.regex, forceCreation=args.create, publishedVersion=args.published, ignoreDisabled=args.ignore_disabled)
             for deName, targetResults in result.items():
                 for prop, message in (targetResults or {}).items():
                     if "does not exist" in message:
