@@ -7,7 +7,9 @@ This has been started after the 0.3.0 release.\
 * Fixing enabled state handling for rules, data elements, and extensions during synchronization. Before release, state enablement was respected only during -published synchronization.
 * Ensuring that the verbose flag correctly displays detailed information for all synchronized entities, including those with enabled state changes.
 * Adding the `ignore_disabled` flag to the synchronization commands to allow skipping disabled source entities.
-* Adding `-i` / `--ignore_disabled` flag to the CLI synchronization commands.
+* Adding `-i` / `--ignore_disabled` flag to the CLI synchronization commands.\
+Patch:
+* Fixing the header used in multi-organization API requests.
 
 
 ## 0.5.3
