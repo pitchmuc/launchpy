@@ -1,9 +1,13 @@
 from copy import deepcopy
+import json
+from pathlib import Path
+import tempfile
 import threading
 import unittest
 from unittest.mock import Mock, patch
 
-from launchpy.cli.__main__ import SynchronizerCLI
+from launchpy.cli.__main__ import MainShell, SynchronizerCLI
+from launchpy.config import config_objects, headers
 from launchpy.launchpy import Translator
 from launchpy.property import Property
 from launchpy.synchronizer import Synchronizer
@@ -422,6 +426,41 @@ class SynchronizerCLITests(unittest.TestCase):
                     getattr(shell, command)("--ignore_disabled invalid")
                 getattr(sync, method_name).assert_not_called()
                 self.assertTrue(stderr.write.called)
+
+    def test_interactive_multi_org_config_sets_headers_for_all_organizations(self):
+        configs = [
+            {
+                "org_id": "orgA@AdobeOrg",
+                "client_id": "client-a",
+                "secret": "secret-a",
+                "scopes": "scope-a",
+                "org_name": "org_a",
+            },
+            {
+                "org_id": "orgB@AdobeOrg",
+                "api_key": "client-b",
+                "secret": "secret-b",
+                "scopes": "scope-b",
+                "org_name": "org_b",
+            },
+        ]
+        with (
+            tempfile.TemporaryDirectory() as tmp_dir,
+            patch.dict(config_objects, {}, clear=True),
+            patch.dict(headers, {}, clear=True),
+            patch("launchpy.cli.__main__.console"),
+            patch("launchpy.Admin"),
+        ):
+            config_path = Path(tmp_dir) / "multi_org.json"
+            config_path.write_text(json.dumps(configs), encoding="utf-8")
+            shell = MainShell()
+            shell.do_config(f'--config_file "{config_path}"')
+
+            self.assertEqual(shell.org_name, "org_a")
+            self.assertEqual(headers["org_a"]["x-gw-ims-org-id"], "orgA@AdobeOrg")
+            self.assertEqual(headers["org_a"]["x-api-key"], "client-a")
+            self.assertEqual(headers["org_b"]["x-gw-ims-org-id"], "orgB@AdobeOrg")
+            self.assertEqual(headers["org_b"]["x-api-key"], "client-b")
 
 
 if __name__ == "__main__":

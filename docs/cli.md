@@ -50,6 +50,13 @@ This document provides an overview of the command line interface (CLI) for `laun
       - [sync\_from\_library](#sync_from_library)
     - [Behaviors for sync\_from\_library](#behaviors-for-sync_from_library)
       - [create\_libraries](#create_libraries)
+    - [Multi-Organization Synchronization](#multi-organization-synchronization)
+      - [1. Create and populate a multi-org config file](#1-create-and-populate-a-multi-org-config-file)
+      - [2. Connect the CLI with the multi-org config](#2-connect-the-cli-with-the-multi-org-config)
+      - [3. Load the synchronizer across organizations](#3-load-the-synchronizer-across-organizations)
+      - [4. End-to-end cross-org synchronization workflow](#4-end-to-end-cross-org-synchronization-workflow)
+      - [5. Dynamic component filtering across organizations](#5-dynamic-component-filtering-across-organizations)
+      - [6. Multi-org limitations and notes](#6-multi-org-limitations-and-notes)
 
 
 
@@ -343,29 +350,23 @@ synchronizer:Base_Property_Name>
 ```
 
 **Synchronizing across organizations**\
-The synchronizer also supports a base property and/or target properties that live in a *different* Adobe organization than the one currently active in the CLI. This is useful when you manage several IMS orgs and want to push the same rules, data elements and extensions from a single base property to properties in other orgs.
+The synchronizer supports a base property and/or target properties across multiple Adobe IMS organizations. Append `@<org_name>` to any property name to resolve it against that `org_name` entry from a multi-org config file (see [create_config_file](#create_config_file)).
 
-To reference a property in another organization, append `@<org_name>` to its name, where `<org_name>` matches an `org_name` entry from a multi-org config file (see [create_config_file](#create_config_file)). Any property name without `@<org_name>` is resolved against the organization that is currently active in the session (the one last set via [config](#config) or [change_org](#change_org)).
+Any property name **without** `@<org_name>` defaults to the **first** organization defined in the multi-org config file (regardless of `--org_name` or `change_org`).
 
-First, load a multi-org config file so every organization you want to reference is available in the session:
 ```bash
-python -m launchpy.cli -cf <path_to_your_multi_org_config_file> --org_name client_a
-launchpy:client_a>
-```
-
-Then load the synchronizer using `@org_name` on the base and/or the targets:
-```bash
+python -m launchpy.cli -cf <path_to_your_multi_org_config_file>
 launchpy:client_a> load_synchronizer "Base Property Name@client_a" -t "Target Property 1@client_b" "Target Property 2@client_c"
-synchronizer:Base_Property_Name>
+synchronizer:Base Property Name>
 ```
 
-Organizations can be mixed freely; targets that omit `@org_name` resolve to the currently active organization (`client_a` below):
+Organizations can be mixed freely; properties omitting `@org_name` resolve to the first organization in the config file (`client_a` below):
 ```bash
 launchpy:client_a> load_synchronizer "Base Property Name" -t "Target Property 1" "Target Property 2@client_b"
-synchronizer:Base_Property_Name>
+synchronizer:Base Property Name>
 ```
 
-**Note**: if a private extension used by the base property is named differently in a target organization, the CLI cannot map the two names for you — this requires passing a `mapping_extensions` dictionary (`{"target-extension-name": "base-extension-name"}`) to `launchpy.Synchronizer` directly through the Python API, usually done via a Notebook, since that option is not exposed as a CLI flag.
+See [Multi-Organization Synchronization](#multi-organization-synchronization) for the complete end-to-end workflow, dynamic filtering behavior, and cross-org limitations.
 
 ### Property Layer Commands
 
@@ -675,11 +676,158 @@ Arguments:
 `-env`, `--environment`: String. If set to `True`, it will try to find a free environment and assign it to the library. If none is available, it will not assign any environment to the library. If the name of the environment is provided, it will try to assign it to that library. If the environment is already used in a Library, it will remove that association and assign it to the new library. Default False. Possible values: `True`, `False` or a `string` which is the (partial) name of the environment you want to assign to the library.
 
 ```bash
-synchronizer:Base_Property_Name> create_library "Library Name" -env True
+synchronizer:Base_Property_Name> create_libraries "Library Name" -env True
 ```
 
 ```bash
-synchronizer:Base_Property_Name> create_library "Library Name" -env "Environment Name
-
+synchronizer:Base_Property_Name> create_libraries "Library Name" -env "Environment Name"
 ```
-        
+
+### Multi-Organization Synchronization
+
+The `launchpy` CLI can synchronize extensions, data elements, rules, and libraries from a base property in one Adobe IMS organization to target properties in one or more other IMS organizations within a single interactive session.
+
+#### 1. Create and populate a multi-org config file
+
+Generate a multi-org configuration template from the main CLI prompt:
+
+```bash
+python -m launchpy.cli
+(Cmd) create_config_file --multi_org -fn multi_org_config.json
+```
+
+Add `--proxy` (`-p`) if you also want a `"proxy"` placeholder added to the template.
+
+Unlike a single-org config file (a JSON object), a multi-org config file is a **JSON array** where each element represents one IMS organization and **must** include a unique `"org_name"` alias:
+
+```json
+[
+    {
+        "org_id": "11111111111111110A495C00@AdobeOrg",
+        "client_id": "<client_id_source>",
+        "secret": "<secret_source>",
+        "scopes": "openid,AdobeID,read_organizations,additional_info.projectedProductContext,additional_info.job_function,https://ims-na1.adobelogin.com/s/ent_reactor_admin_sdk",
+        "org_name": "org_source"
+    },
+    {
+        "org_id": "22222222222222220A495C00@AdobeOrg",
+        "client_id": "<client_id_eu>",
+        "secret": "<secret_eu>",
+        "scopes": "openid,AdobeID,read_organizations,additional_info.projectedProductContext,additional_info.job_function,https://ims-na1.adobelogin.com/s/ent_reactor_admin_sdk",
+        "org_name": "org_eu",
+        "proxy": "http://proxy.example.com:8080"
+    },
+    {
+        "org_id": "33333333333333330A495C00@AdobeOrg",
+        "client_id": "<client_id_us>",
+        "secret": "<secret_us>",
+        "scopes": "openid,AdobeID,read_organizations,additional_info.projectedProductContext,additional_info.job_function,https://ims-na1.adobelogin.com/s/ent_reactor_admin_sdk",
+        "org_name": "org_us"
+    }
+]
+```
+
+* `org_name` is a short alias you choose (for example `org_source`, `client_a`), **not** the Adobe `org_id` (`...@AdobeOrg`). Do **not** include `@` in `org_name`.
+* Each entry can use `client_id` (or legacy `api_key`) and an optional per-organization `proxy`.
+
+#### 2. Connect the CLI with the multi-org config
+
+Load the multi-org file either when launching the CLI (`launchpy` or `python -m launchpy.cli`) or interactively with `config`:
+
+```bash
+python -m launchpy.cli -cf multi_org_config.json
+launchpy:org_source>
+```
+
+Or interactively:
+
+```text
+(Cmd) config -cf multi_org_config.json -on org_source
+launchpy:org_source>
+```
+
+All organizations in the JSON array are registered in memory at once. Before starting the synchronizer, you can optionally verify property names in each organization using `change_org` and `get_properties`:
+
+```text
+launchpy:org_source> get_properties
+launchpy:org_source> change_org org_eu
+launchpy:org_eu> get_properties
+```
+
+#### 3. Load the synchronizer across organizations
+
+Run `load_synchronizer` from the main shell (`launchpy:<org_name>>`) using `<Property Name>@<org_name>` for any base or target property:
+
+```text
+launchpy:org_source> load_synchronizer "Global Template@org_source" -t "Brand Web@org_eu" "Brand Web@org_us"
+synchronizer:Global Template>
+```
+
+**Organization resolution rules:**
+* **With `@<org_name>`** (`"Property Name@org_eu"`): `launchpy` creates a dedicated connector for `org_eu` and looks up `"Property Name"` in that organization.
+* **Without `@<org_name>`** (`"Property Name"`): `launchpy` resolves the property against the **first organization** in the multi-org config file (`org_source` in the example above). Changing the active CLI prompt via `--org_name` or `change_org` does **not** change this default fallback.
+* **Prompt and target identifiers**:
+  * The synchronizer prompt strips `@<org_name>` from the base property (`synchronizer:Global Template>`).
+  * Target identifiers keep their exact input string (`"Brand Web@org_eu"`, `"Brand Web@org_us"`), which you can inspect with `get_targets`. Because `@<org_name>` stays part of each target key, target properties in different organizations can safely share the exact same property name.
+
+#### 4. End-to-end cross-org synchronization workflow
+
+Once inside `synchronizer:<Base Property>>`, all synchronizer commands automatically route API calls and translate extension/rule IDs per target organization:
+
+```text
+# 1. Verify configured targets
+synchronizer:Global Template> get_targets
+
+# 2. Install/align extensions in target orgs first (required before syncing dependent components)
+synchronizer:Global Template> sync_extensions -c -v
+synchronizer:Global Template> upgrade_extension "core" -v
+
+# 3. Compare a component across target orgs before syncing
+synchronizer:Global Template> check_component -n "DE - Page Name" -p
+
+# 4a. Sync data elements and rules (skipping disabled source components)
+synchronizer:Global Template> sync_data_elements -c -p -i -v
+synchronizer:Global Template> sync_rules -c -p -i -v
+
+# 4b. Or preview and sync everything from a specific library in the base property
+synchronizer:Global Template> sync_from_library -n "Release 2026.11" -dr True
+synchronizer:Global Template> sync_from_library -n "Release 2026.11" -c True -v True
+
+# 5. Bundle all synced changes into a development library in each target org and build it
+synchronizer:Global Template> create_libraries "Cross-Org Sync 2026.11" -env True
+
+# 6. Return to the main CLI prompt
+synchronizer:Global Template> exit
+```
+
+#### 5. Dynamic component filtering across organizations
+
+If you pass `-dy "<Data Element Name>"` to `load_synchronizer`, the JSON filter rules are read from that Data Element in the **base** property:
+
+```text
+launchpy:org_source> load_synchronizer "Global Template@org_source" -t "Brand Web@org_eu" "Brand Web@org_us" -dy "DE - Sync Config"
+```
+
+Each filter object's `"targetProperties"` regular expression is matched (`re.search`) against the **target key** stored in the synchronizer — including `@<org_name>` when `@<org_name>` was specified in `-t`. For example, you can exclude GDPR-specific rules for US organization targets:
+
+```json
+[
+    {
+        "name": "US exclusions",
+        "targetProperties": "@org_us$",
+        "exclComponents": ["^RL - GDPR .*"],
+        "inclComponents": []
+    }
+]
+```
+
+If you write a `"targetProperties"` regex with an end-of-string anchor (`$`), remember to include `@<org_name>` when targets are loaded with `@<org_name>`.
+
+#### 6. Multi-org limitations and notes
+
+* **First organization credentials are always queried on init**: `Synchronizer` initializes a default `Admin` connection against the first organization in the config file even when `base` and all `targets` include `@<org_name>`, so ensure the first entry in your multi-org config file has valid credentials.
+* **No `@` in property names or `org_name`**: `@` is split using `split('@')`, so neither `org_name` nor property names passed with `@<org_name>` may contain `@`.
+* **Unique component names & aligned extensions**: Rules and data elements are matched by exact name across organizations, and any extension referenced by synced rules or data elements must exist in the target property (use `sync_extensions -c` for catalog extensions).
+* **Private extensions**:
+  * A private extension published only to one IMS organization cannot be auto-installed in another IMS organization unless its package is also available there.
+  * If equivalent private extensions have **different names** in two organizations, the CLI cannot map them; use `launchpy.Synchronizer(..., mapping_extensions={"target_ext_name": "base_ext_name"})` from Python instead.

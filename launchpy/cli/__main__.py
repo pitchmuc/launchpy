@@ -1189,7 +1189,7 @@ class MainShell(cmd.Cmd):
             for org_name, config in config_objects.items():
                 myheaders[org_name] = deepcopy(self.header_template)
                 myheaders[org_name]["x-gw-ims-org-id"] = config['org_id']
-                myheaders[org_name]["x-gw-ims-org-id"] = config['org_id']
+                myheaders[org_name]["x-api-key"] = config['client_id']
             headers.update(myheaders)
             config_key = args.org_name if args.org_name else config_key
             self._configure_connection(org_name=config_key)
