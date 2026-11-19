@@ -35,6 +35,7 @@ You can find a more detail description functionalities at [datanalyst.info](http
 ## Main documentation
 
 Most of the documentation has been imported from the datanalyst website [here](./docs/main.md).
+Introduction Video: [Watch here](https://youtu.be/_AsDMeTXADs)
 
 ## Release information
 
