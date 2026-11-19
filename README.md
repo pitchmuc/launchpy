@@ -29,12 +29,12 @@ This module is built around 7 main parts:
 
 ## Get Started
 
-A [get started guide](./docs/getstarted.md) has been created to explain the different functionality.
+A [get started guide](./docs/getstarted.md) has been created to explain the different functionality.\
 You can find a more detail description functionalities at [datanalyst.info](https://datanalyst.info).
 
 ## Main documentation
 
-Most of the documentation has been imported from the datanalyst website [here](./docs/main.md).
+Most of the documentation has been imported from the datanalyst website [here](./docs/main.md).\
 Introduction Video: [Watch here](https://youtu.be/_AsDMeTXADs)
 
 ## Release information
