@@ -3,6 +3,7 @@ from concurrent import futures
 import datetime
 from .configs import saveFile
 from .property import Property
+import re
 
 class Admin:
 
@@ -19,6 +20,7 @@ class Admin:
         self.COMPANY_NAME  = ""
         self.properties = []
         self.endpoint = config.endpoints['global']
+        self.cacheProperties = {}  # cache for searchComponent results
         
 
     def getCompanyId(self)->str:
@@ -265,7 +267,7 @@ class Admin:
                 },
                 "type": "extension_package_usage_authorizations"
             }
-}
+        }
         res = self.connector.postData(self.endpoint+path,data=obj)
         return res
     
@@ -326,3 +328,49 @@ class Admin:
             raise Exception("You must provide a resource url")
         res = self.connector.getData(res_url, params=params)
         return res
+
+    def searchComponent(self, componentName: str = None, filterProperty: str = None) -> list:
+        """
+        Search for a specific component by name across all the properties.
+        Errors searching an individual property are printed without stopping other searches.
+        Arguments:
+            componentName : REQUIRED : The name of the component to search for (or part of name)
+            filterProperty : OPTIONAL : A regular expression to filter property names.
+        """
+        if componentName is None:
+            raise ValueError("A component name is required")
+        properties = self.getProperties(self.getCompanyId())
+        if filterProperty is not None:
+            properties = [prop for prop in properties if re.search(filterProperty, prop['attributes']['name'])]
+        results = []
+
+        def search_in_property(prop: dict) -> list:
+            property_name = prop['attributes']['name']
+            try:
+                components = self.cacheProperties.get(property_name)
+                if components is None:
+                    myprop = Property(prop, _connector=self.connector)
+                    components = {
+                        'rules': myprop.getRules(),
+                        'dataelements': myprop.getDataElements(),
+                        'extensions': myprop.getExtensions()
+                    }
+                    self.cacheProperties[property_name] = components
+                return [
+                    {'property': property_name, 'type': component_type}
+                    for cache_key, component_type in (
+                        ('rules', 'rule'),
+                        ('dataelements', 'dataElement'),
+                        ('extensions', 'extension')
+                    )
+                    for component in components[cache_key]
+                    if componentName in component['attributes']['name']
+                ]
+            except Exception as error:
+                print(f'Error searching components in property "{property_name}": {error}')
+                return []
+
+        with futures.ThreadPoolExecutor() as executor:
+            for matches in executor.map(search_in_property, properties):
+                results.extend(matches)
+        return results

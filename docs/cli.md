@@ -15,7 +15,9 @@ This document provides an overview of the command line interface (CLI) for `laun
       - [get\_properties](#get_properties)
       - [create\_property](#create_property)
       - [delete\_property](#delete_property)
+      - [search\_component](#search_component)
       - [extract\_property](#extract_property)
+      - [extract\_properties](#extract_properties)
       - [load\_property](#load_property)
       - [get\_extensions](#get_extensions)
       - [load\_synchronizer](#load_synchronizer)
@@ -292,6 +294,21 @@ launchpy> delete_property "Property Name"
 ```
 
 
+#### search_component
+Search for rules, data elements and extensions by name across the current organization's properties.\
+Arguments:
+`component_name`: Required. The component name or part of its name to search for (case-sensitive).
+`-fp`, `--filter_property`: Optional regular expression matching property names.
+`-s`, `--save`: Optional string value to enable saving results as JSON. A value is required; the output filename is derived from the sanitized component name, not the supplied value.
+
+```bash
+launchpy> search_component "Checkout" --filter_property "^Production"
+launchpy> search_component "Checkout" -s True
+```
+
+Results are displayed as JSON entries containing `property` and `type` (`rule`, `dataElement`, or `extension`), without component names, IDs or definitions. The second example saves matching results to `checkout.json` in the current working directory. No file is written when no components match.
+Component lists are cached for subsequent searches. Errors searching one property are printed and the remaining properties continue to be searched. See [Admin.searchComponent](./admin.md#searchcomponent).
+
 #### extract_property
 This method allows you to extract the details of a specific property and save them to a folder.\
 By default, the folder name would be the name of the property, and it will contain sub folders for each rule.\
@@ -299,8 +316,10 @@ Arguments:
 `name`: The name of the property to extract. This is a required parameter.
 `-p`, `--published_version`: Boolean. Extract only the latest published version of the components instead of the current (development) version. Default False. Possible values: `True`, `False`
 `-f`, `--folder`: The folder to extract the property into. This is an optional parameter, if not provided, it defaults to a folder named after the property in the current working directory.
+`-sp`, `--strict_published`: Optional boolean. With `--published_version True`, skip rules, data elements and extensions for which no published revision can be selected. Default True; a bare flag means True. Set to False to fall back to current versions.
 
-This can be useful for searching code or for backup purposes. 
+This can be useful for searching code or for backup purposes. Rule components are saved in a folder per rule, with separate `data_elements` and `extensions` folders.
+`--strict_published` has no effect without published-version extraction. Its default is True in the CLI, unlike the Python [extractProperty](./main.md#extractproperty) function, where `strictPublished` defaults to False.
 
 ```bash
 
@@ -314,6 +333,25 @@ python -m launchpy.cli -cf <path_to_your_config_file>
 launchpy> extract_property "Property Name" --published_version True --folder "./exports/property_name"
 ```
 
+To include current versions of components without a published revision:
+```bash
+launchpy> extract_property "Property Name" -p True --strict_published False
+```
+
+#### extract_properties
+Extract all properties, or only properties whose names match a regular expression, concurrently. Each property is saved to a folder named after its sanitized property name in the current working directory.\
+Arguments:
+`-f`, `--filter`: Optional regular expression matching property names. Omit to export all properties.
+`-p`, `--published_version`: Optional boolean. Export the latest published versions where available. Default False; a bare flag means True. Components without a selectable published revision fall back to their current versions.
+`-sp`, `--strict_published`: Optional boolean. If set to `True`, skip rules, data elements and extensions for which a published revision cannot be selected. Default `False`.
+
+```bash
+launchpy> extract_properties
+launchpy> extract_properties --filter "^Production" -p True
+```
+
+This command uses the Python [extractProperties](./main.md#extractproperties) helper with up to five concurrent property exports. It waits for the exports to finish and displays errors if an export fails. There are no CLI options for the worker count, output folder or strict publication filtering.
+In a multi-org configuration, it uses the first configured organization, regardless of `--org_name` or `change_org`. Use [extract_property](#extract_property) to export a property from the current CLI organization.
 
 #### load_property
 This method load the property layer for a specific property, allowing you to access and manage that property directly.
@@ -395,11 +433,16 @@ property_name> get_extension "Extension Name" -s
 Get all rules in the property and list them.\
 Arguments:
 `-n`, `--name`: The name of the rule to filter the results (partial match, non-case sensitive). This is an optional parameter.
+`-p`, `--published`: Optional value. True selects rules with a published revision; False selects rules that have never been published. Omit to list all rules.
 `-s`, `--save`: Flag. Save rules to a CSV file. Default False.
 
 ```bash
 property_name> get_rules -n "Rule Name" -s
+property_name> get_rules --published True
+property_name> get_rules --published False
 ```
+
+The filter checks publication history but lists the current rule definitions. The Published column describes the current revision, so a rule selected with `--published True` can still display Unpublished if its latest changes are drafts. Published current revisions are shown in green.
 
 #### get_rule
 Get details of a specific rule in the property.\
@@ -437,11 +480,16 @@ property_name> get_rule_components -rn "Rule Name" -s
 Get all data elements in the property and list them.\
 Arguments:
 `-n`, `--name`: The name of the data element to filter the results (partial match, non-case sensitive). This is an optional parameter.
+`-p`, `--published`: Optional value. True selects data elements with a published revision; False selects data elements that have never been published. Omit to list all data elements.
 `-s`, `--save`: Boolean. Save data elements to a CSV file. Default False. Possible values: `True`, `False`
 
 ```bash
 property_name> get_data_elements -n "Data Element Name" -s True
+property_name> get_data_elements --published True
+property_name> get_data_elements --published False
 ```
+
+As with [get_rules](#get_rules), the filter checks publication history while the table shows current definitions and the current revision's Published status.
 
 #### get_data_element
 Get details of a specific data element in the property.\
@@ -535,12 +583,16 @@ Arguments:
 `-c`, `--create` : Flag. Create rules that do not exist in the destination property. Default False.
 `-p`, `--published` : Flag. Sync the latest published version of the rules. Default False.
 `-i`, `--ignore_disabled` : Optional boolean. Skip disabled source rules. Default False; a bare flag means True. With `-p`, checks the latest published source revision.
+`-v`, `--verbose` : Flag. Display successful per-target status messages in green. Default False.
 
 ```bash
 synchronizer:Base_Property_Name> sync_rules -r "Rule Name" -c
 synchronizer:Base_Property_Name> sync_rules -i
 synchronizer:Base_Property_Name> sync_rules --ignore_disabled True -p
+synchronizer:Base_Property_Name> sync_rules -p -v
 ```
+
+With `-p`, rules without a published source revision are skipped with a yellow warning, even without verbose output. Status messages are displayed directly, without additional component and property prefixes. Missing-target messages remain yellow and are displayed without `-v`.
 
 #### sync_data_elements
 Synchronize all data elements between the base property and target properties in a single call, instead of syncing them one by one with [sync](#sync).\
@@ -549,12 +601,16 @@ Arguments:
 `-c`, `--create` : Flag. Create data elements that do not exist in the destination property. Default False.
 `-p`, `--published` : Flag. Sync the latest published version of the data elements. Default False.
 `-i`, `--ignore_disabled` : Optional boolean. Skip disabled source data elements. Default False; a bare flag means True. With `-p`, checks the latest published source revision.
+`-v`, `--verbose` : Flag. Display successful per-target status messages in green. Default False.
 
 ```bash
 synchronizer:Base_Property_Name> sync_data_elements -r "Data Element Name" -c
 synchronizer:Base_Property_Name> sync_data_elements -i
 synchronizer:Base_Property_Name> sync_data_elements --ignore_disabled False
+synchronizer:Base_Property_Name> sync_data_elements -p -v
 ```
+
+With `-p`, data elements without a published source revision are skipped with a yellow warning, even without verbose output. Status messages are displayed directly, without additional component and property prefixes. Missing-target messages remain yellow and are displayed without `-v`.
 
 #### sync_extensions
 Synchronize all extensions between the base property and target properties in a single call, instead of syncing them one by one with [sync](#sync).\
@@ -566,6 +622,8 @@ Arguments:
 ```bash
 synchronizer:Base_Property_Name> sync_extensions -r "Extension Name" -c
 ```
+
+As with `sync_rules` and `sync_data_elements`, status messages are displayed without additional component and property prefixes. Missing-target messages are yellow; successful operations are green when `-v` is enabled.
 
 #### rename_component
 Rename a component in the destination property.
@@ -646,7 +704,7 @@ synchronizer:Base_Property_Name> get_base_library -n "Library Name"
 
 #### sync_from_library
 This command allows you to synchronize a library from the base property to the target properties.\
-**IMPORTANT**:By default it will use the published version of the elements that are part of the library. 
+**IMPORTANT**: By default, rules and data elements use the versions linked to the selected published library. Extensions use the current base property's configuration.
 * `-n`, `--name`: Name of the library to sync from. This is a required parameter.
 * `-id`, `--id`: ID of the library to sync from (overrides name if both provided). This is an optional parameter.
 * `-c`, `--create`: Boolean. Create the component if it does not exist. Default `False`. Possible values: True, False
@@ -660,10 +718,11 @@ synchronizer:Base_Property_Name> sync_from_library -id "LibraryId" -ll False -p 
 
 
 ### Behaviors for sync_from_library
-By default, the method will sync the components present in the library as they are in the library.
+By default, the method will sync the rules and data elements present in the library as they are in the library.
 If the `published` is set to True, it will try to sync the version that has been published in the base property to the targets.\
 If the `library_linked` is set to `False` and the `published` is set to `False` (default), it will try to sync the latest version of the components present in the base property library to the targets.\
 
+Extensions included in the library are synchronized first using the current base property's extension configuration, rather than only being upgraded. Existing target extensions are updated; missing extensions are created only with `--create True`. They are matched by name and do not use library-linked or published extension revisions. See [syncFromLibrary](./synchronizer.md#syncfromlibrary).
 
 ```bash
 synchronizer:Base_Property_Name> sync_from_library -n "Library Name"

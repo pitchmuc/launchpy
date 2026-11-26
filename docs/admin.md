@@ -42,6 +42,22 @@ admin.properties
 
 ```
 
+### searchComponent
+
+Search for rules, data elements, and extensions whose names contain a given string across the organization's properties.
+
+* `componentName`: Required. The component name or part of its name to search for (case-sensitive).
+* `filterProperty`: Optional. A regular expression used to filter property names.
+
+```python
+matches = admin.searchComponent("Checkout", filterProperty=r"^Production")
+```
+
+Returns a list of dictionaries containing `property` (the property name) and `type` (`rule`, `dataElement`, or `extension`). Component names, IDs and definitions are not included. Each matching component contributes an entry, so the same property and type can appear more than once.
+If an exception occurs while searching a property, the property name and error are printed, that property is skipped, and the remaining searches continue.
+
+The same search is available in the CLI through [search_component](./cli.md#search_component).
+
 ### getAuditEvents
 
 You can request Audit Events directly from the Admin instance.\

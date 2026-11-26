@@ -3,6 +3,18 @@
 This page gathered the changes made between version of the launchpy module.\
 This has been started after the 0.3.0 release.\
 
+## 0.5.5
+* Adding [searchComponent](./admin.md#searchcomponent) to search rules, data elements and extensions by name across an organization's properties, with a regular-expression property filter, concurrent searches and cached component lists. Results contain the property name and component type; errors in one property do not stop the remaining searches.
+* Adding the [search_component](./cli.md#search_component) CLI command, including JSON output and saving results to a file named after the searched component.
+* Adding [extractProperties](./main.md#extractproperties) and the [extract_properties](./cli.md#extract_properties) CLI command for concurrent property exports with a regular-expression name filter. The Python helper accepts `max_workers` (default 5), waits for exports to finish and propagates worker errors.
+* Adding `strictPublished` to [extractProperty](./main.md#extractproperty), and `-sp` / `--strict_published` to the CLI. With published-version extraction, rules, data elements and extensions without a selectable published revision can be skipped instead of falling back to current versions. The default is False in Python and True in the single-property CLI command; bulk exports retain the fallback behavior.
+* Adding the optional `published` filter to [getRules](./property.md#getrules) and [getDataElements](./property.md#getdataelements), with up to five concurrent revision checks that preserve result order. True selects components with publication history, False selects components that have never been published, and None returns all components without revision checks. Returned definitions remain the current versions.
+* Adding `-p` / `--published` to the CLI `get_rules` and `get_data_elements` commands, with green labels for published current revisions. The new Python `published` parameter precedes `verbose` in both method signatures; existing callers passing verbosity positionally should pass `verbose` by keyword.
+* Improving [syncRules](./synchronizer.md#syncrules) and [syncDataElements](./synchronizer.md#syncdataelements) to warn and skip source components without a published revision when `publishedVersion=True`, returning an empty per-target result for each skipped component. Other errors still raise, and direct `syncComponent` calls still raise an IndexError for missing published revisions.
+* Adding a keyword-only `warningHandler` callback to those bulk synchronization methods. Library warnings use plain print by default; the CLI displays them in yellow even without verbose output.
+* Simplifying CLI status output for `sync_rules`, `sync_data_elements` and `sync_extensions` by removing redundant component/property prefixes. Missing-target messages remain yellow, and successful per-target messages are shown in green with `-v` / `--verbose`.
+* Fixing [syncFromLibrary](./synchronizer.md#syncfromlibrary) when extensions are part of the library: extensions now use `syncComponent` to synchronize the current base extension configuration, respect component filters and `forceCreation`, and return synchronization statuses rather than only attempting upgrades.
+
 ## 0.5.4
 * Fixing enabled state handling for rules, data elements, and extensions during synchronization. Before release, state enablement was respected only during -published synchronization.
 * Ensuring that the verbose flag correctly displays detailed information for all synchronized entities, including those with enabled state changes.

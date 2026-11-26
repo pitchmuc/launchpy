@@ -284,10 +284,34 @@ class Property:
         return res['data']
 
 
-    def getRules(self,filter:dict=None,verbose:bool=False)->object:
+    def _filterByPublished(self, data: list[dict], published: bool) -> list[dict]:
+        def has_published_version(component: dict) -> bool:
+            try:
+                self.getLatestPublishedVersion(component)
+            except IndexError:
+                return False
+            return True
+
+        with futures.ThreadPoolExecutor(max_workers=5) as executor:
+            states = executor.map(has_published_version, data)
+            return [
+                component
+                for component, state in zip(data, states)
+                if state == published
+            ]
+
+    def getRules(self,filter:dict|None=None,published:bool|None=None,verbose:bool=False)->object:
         """
         Return the list of the rules data.
         On top, it fills the ruleComponents attribute with a dictionnary based on rule id and their rule name and the ruleComponent of each.
+        Arguments: 
+            filter : OPTIONAL : dictionary of filters to apply to the rules query
+            verbose : OPTIONAL : boolean to enable verbose output for pagination handling
+            published : OPTIONAL : boolean to filter rules by their published status. 
+                True: only returned the rule if they have been published.
+                False: only returned the rule if they have not been published.
+                None: return all rules regardless of their published status.
+                Publication checks use up to five workers and preserve result order.
         """
         params = {}
         if filter is not None:
@@ -325,6 +349,8 @@ class Property:
                 }
         except:
             data = rules
+        if published is not None:
+            return self._filterByPublished(data, published)
         return data
 
     def searchRules(self, name: str = None,name_contains:str=None, enabled: bool = None, published: bool = None, dirty: bool = None, verbose:bool = False, **kwargs)->object:
@@ -488,10 +514,17 @@ class Property:
         res:dict = self.connector.getData(self.endpoint+path).get('data',[])
         return res
 
-    def getDataElements(self,verbose:bool=False)->object:
+    def getDataElements(self,published:bool|None=None,verbose:bool=False)->list:
         """
         Retrieve data elements of that property.
         Returns a list.
+        Arguments: 
+            verbose : OPTIONAL : whether to print progress messages (default False)
+            published : OPTIONAL : whether to filter by published status
+                        True: only return published data elements
+                        False: only return unpublished data elements
+                        None: return all data elements regardless of published status
+                        Publication checks use up to five workers and preserve result order.
         """
         dataElements = self.connector.getData(self._DataElement)
         try:
@@ -519,6 +552,8 @@ class Property:
                 data = data + append_data
         except:
             data = dataElements
+        if published is not None:
+            return self._filterByPublished(data, published)
         return data
     
     def getDataElement(self,dataElementId:str=None,verbose:bool=False)->dict:

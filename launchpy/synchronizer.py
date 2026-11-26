@@ -7,7 +7,13 @@ from launchpy.launchpy import Translator, copySettings
 from launchpy import connector
 from copy import deepcopy
 from aepp import som
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
+
+
+class _NoPublishedVersionError(IndexError):
+    """The source component has no published revision to synchronize."""
+
 
 class Synchronizer:
     """
@@ -77,12 +83,12 @@ class Synchronizer:
                     new_properties = new_admin.getProperties(new_cid)
                     tmp_target = [prop for prop in new_properties if prop['attributes']['name'] == prop_name]
                     if len(tmp_target) == 0:
-                        raise KeyError(f"The target property : {prop_name} cannot be found. Please, fix it")
+                        raise KeyError(f"The target property : {prop_name} cannot be found. Please check")
                     self.targets[target] = {'api' : Property(tmp_target[0],_connector=new_connector,org_name=new_org),'name':prop_name}
                 else:
                     tmp_target = [prop for prop in properties if prop['attributes']['name'] == target]
                     if len(tmp_target) == 0:
-                        raise KeyError(f"The target property : {target} cannot be found. Please, fix it")
+                        raise KeyError(f"The target property : {target} cannot be found. Please check")
                     self.targets[target] = {'api' : Property(tmp_target[0]),'name':target}
             elif isinstance(target,Property):
                 self.targets[target.name] = {'api' : deepcopy(target),'name':target.name}
@@ -220,7 +226,14 @@ class Synchronizer:
             cmp_baseDict['version'] = cmp_base['attributes'].get('version','1.0.0')
         if publishedVersion and cmp_baseDict['component']['type'] not in ['extensions']:
             data = self.base['api'].getRevisions(cmp_baseDict['component'])
-            publishedVersion = self.base['api'].getLatestPublishedVersion(data)
+            try:
+                publishedVersion = self.base['api'].getLatestPublishedVersion(data)
+            except IndexError as error:
+                component_type = 'rule' if cmp_baseDict['component']['type'] == 'rules' else 'data element'
+                raise _NoPublishedVersionError(
+                    f'The {component_type} "{cmp_baseDict["name"]}" '
+                    f'in base property "{self.base["name"]}" has no published version.'
+                ) from error
             if publishedVersion['attributes']['name'] != cmp_baseDict['name']:
                 ## Updating mapping table with old name when published version name diff than last version name.
                 with self._base_lock:
@@ -518,16 +531,23 @@ class Synchronizer:
                 results[component] = self.syncComponent(componentId=component,publishedVersion=publishedVersion,forceCreation=forceCreation)
         return results
 
-    def syncRules(self,regex:str=None,forceCreation:bool=False,publishedVersion:bool=False,ignoreDisabled:bool=False)->dict:
+    def syncRules(
+        self, regex:str=None, forceCreation:bool=False,
+        publishedVersion:bool=False, ignoreDisabled:bool=False,
+        *, warningHandler:Callable[[str], None] | None=None,
+    )->dict:
         """
         Synchronizing the rules in the base property to the target properties.
         Returns a dictionary keyed by rule name, with the per-target status (created, updated, or not synced because the rule does not exist and forceCreation is False).
         Arguments:
             regex : OPTIONAL : If you want to filter the rules to sync based on a regex pattern. Default: None (sync all rules)
             forceCreation : OPTIONAL : If set to True, it will sync the rules even if they do not exist in the target properties. If set to False, it will only sync the rules that already exist in the target properties. Default: False.
-            publishedVersion : OPTIONAL : If set to True, it will sync the latest published version of the rules. Default: False.
+            publishedVersion : OPTIONAL : If set to True, sync the latest published version of the rules. Rules without a published version are warned about and skipped with an empty per-target result. Default: False.
             ignoreDisabled : OPTIONAL : Skip rules whose selected source revision is disabled. Skipped rules have an empty per-target result. Default: False.
+            warningHandler : OPTIONAL : A keyword-only callback receiving warning text instead of printing it. Default: None (plain print).
         """
+        if warningHandler is None:
+            warningHandler = print
         base_rule_names = [rule['attributes']['name'] for rule in self.base['rules']]
         if regex is not None:
             base_rule_names = [rule for rule in base_rule_names if re.search(regex,rule)]
@@ -535,19 +555,31 @@ class Synchronizer:
         with ThreadPoolExecutor() as executor:
             future_to_name = {executor.submit(self.syncComponent, componentName=rule, forceCreation=forceCreation, publishedVersion=publishedVersion, ignoreDisabled=ignoreDisabled): rule for rule in base_rule_names}
             for future in future_to_name:
-                results[future_to_name[future]] = future.result()
+                name = future_to_name[future]
+                try:
+                    results[name] = future.result()
+                except _NoPublishedVersionError as error:
+                    warningHandler(f'Warning: {error} Skipping synchronization to target properties: {", ".join(self.targets)}.')
+                    results[name] = {}
         return results
 
-    def syncDataElements(self,regex:str=None,forceCreation:bool=False,publishedVersion:bool=False,ignoreDisabled:bool=False)->dict:
+    def syncDataElements(
+        self, regex:str=None, forceCreation:bool=False,
+        publishedVersion:bool=False, ignoreDisabled:bool=False,
+        *, warningHandler:Callable[[str], None] | None=None,
+    )->dict:
         """
         Synchronizing the data elements in the base property to the target properties.
         Returns a dictionary keyed by data element name, with the per-target status (created, updated, or not synced because the data element does not exist and forceCreation is False).
         Arguments:
             regex : OPTIONAL : If you want to filter the data elements to sync based on a regex pattern. Default: None (sync all data elements)
             forceCreation : OPTIONAL : If set to True, it will sync the data elements even if they do not exist in the target properties. If set to False, it will only sync the data elements that already exist in the target properties. Default: False.
-            publishedVersion : OPTIONAL : If set to True, it will sync the latest published version of the data elements. Default: False.
+            publishedVersion : OPTIONAL : If set to True, sync the latest published version of the data elements. Data elements without a published version are warned about and skipped with an empty per-target result. Default: False.
             ignoreDisabled : OPTIONAL : Skip data elements whose selected source revision is disabled. Skipped data elements have an empty per-target result. Default: False.
+            warningHandler : OPTIONAL : A keyword-only callback receiving warning text instead of printing it. Default: None (plain print).
         """
+        if warningHandler is None:
+            warningHandler = print
         base_de_names = [de['attributes']['name'] for de in self.base['dataElements']]
         if regex is not None:
             base_de_names = [de for de in base_de_names if re.search(regex,de)]
@@ -555,7 +587,12 @@ class Synchronizer:
         with ThreadPoolExecutor() as executor:
             future_to_name = {executor.submit(self.syncComponent, componentName=de, forceCreation=forceCreation, publishedVersion=publishedVersion, ignoreDisabled=ignoreDisabled): de for de in base_de_names}
             for future in future_to_name:
-                results[future_to_name[future]] = future.result()
+                name = future_to_name[future]
+                try:
+                    results[name] = future.result()
+                except _NoPublishedVersionError as error:
+                    warningHandler(f'Warning: {error} Skipping synchronization to target properties: {", ".join(self.targets)}.')
+                    results[name] = {}
         return results
 
     def syncExtensions(self,regex:str=None,forceCreation:bool=False, **kwargs)->dict:
@@ -1012,9 +1049,9 @@ class Synchronizer:
         if len(extensions)>0:
             for ext in extensions:
                 try:
-                    results[ext['attributes']['name']] = self.upgradeTargetExtension(extensionName=ext['attributes']['name'],platform=ext['attributes']['platform'],verbose=verbose)
+                    results[ext['attributes']['name']] = self.syncComponent(componentName=ext['attributes']['name'],verbose=verbose,forceCreation=forceCreation,libraryLinked=libraryLinked,publishedVersion=publishedVersion)
                 except Exception as e:
-                    message = f'Extension {ext["attributes"]["name"]} could not be updated in the target properties: {e}'
+                    message = f'Extension {ext["attributes"]["name"]} could not be synchronized in the target properties: {e}'
                     print(message)
                     results[ext['attributes']['name']] = message
         if len(rules)>0:
@@ -1026,7 +1063,7 @@ class Synchronizer:
                         ruleId = rule['id']
                     results[rule['attributes']['name']] = self.syncComponent(componentId=ruleId,publishedVersion=publishedVersion, forceCreation=forceCreation,libraryLinked=libraryLinked,verbose=verbose)
                 except Exception as e:
-                    message = f'Rule {rule["attributes"]["name"]} could not be updated in the target properties: {e}'
+                    message = f'Rule {rule["attributes"]["name"]} could not be synchronized in the target properties: {e}'
                     print(message)
                     results[rule['attributes']['name']] = message
         if len(dataelements)>0:
@@ -1038,7 +1075,7 @@ class Synchronizer:
                         deId = de['id']
                     results[de['attributes']['name']] = self.syncComponent(componentId=deId,publishedVersion=publishedVersion,forceCreation=forceCreation,libraryLinked=libraryLinked,verbose=verbose)
                 except Exception as e:
-                    message = f'Data Element {de["attributes"]["name"]} could not be updated in the target properties: {e}'
+                    message = f'Data Element {de["attributes"]["name"]} could not be synchronized in the target properties: {e}'
                     print(message)
                     results[de['attributes']['name']] = message
         return results

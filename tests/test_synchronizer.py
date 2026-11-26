@@ -1,10 +1,13 @@
 from copy import deepcopy
+from io import StringIO
 import json
 from pathlib import Path
 import tempfile
 import threading
 import unittest
 from unittest.mock import Mock, patch
+
+from rich.console import Console
 
 from launchpy.cli.__main__ import MainShell, SynchronizerCLI
 from launchpy.config import config_objects, headers
@@ -373,6 +376,186 @@ class SynchronizerTests(unittest.TestCase):
                         self.assertEqual(result[source["attributes"]["name"]], {})
                         self.assertEqual(sync.targets["Target"]["api"].mock_calls, [])
 
+    def test_bulk_published_sync_warns_and_skips_unpublished_components(self):
+        for kind, label in (("rules", "rule"), ("data_elements", "data element")):
+            for ignore_disabled in (False, True):
+                for include_published in (False, True):
+                    with self.subTest(
+                        kind=kind, ignore_disabled=ignore_disabled,
+                        include_published=include_published,
+                    ):
+                        sync, source, target = self.make_sync(kind, True, False)
+                        key = "rules" if kind == "rules" else "dataElements"
+                        source_api = sync.base["api"]
+                        source_api.name = "Base"
+                        source_api.getRevisions.side_effect = lambda item: [item]
+                        source_api.getLatestPublishedVersion.side_effect = (
+                            lambda revisions: Property.getLatestPublishedVersion(
+                                source_api, revisions
+                            )
+                        )
+                        target_api = sync.targets["Target"]["api"]
+                        expected = {source["attributes"]["name"]: {}}
+                        if include_published:
+                            published_source = deepcopy(source)
+                            published_source["id"] += "published"
+                            published_source["attributes"].update(
+                                name="Published component", published=True
+                            )
+                            published_target = deepcopy(target)
+                            published_target["id"] += "published"
+                            published_target["attributes"]["name"] = "Published component"
+                            sync.base[key].append(published_source)
+                            sync.targets["Target"][key].append(published_target)
+                            update = (
+                                target_api.updateRule
+                                if kind == "rules"
+                                else target_api.updateDataElement
+                            )
+                            update.side_effect = lambda **kwargs: self.updated(
+                                published_target, kwargs["attr_dict"]
+                            )
+                            expected["Published component"] = {
+                                "Target": f'{label.capitalize()} "Published component" '
+                                'updated in "Target".'
+                            }
+                        method = sync.syncRules if kind == "rules" else sync.syncDataElements
+
+                        with patch("builtins.print") as output:
+                            result = method(
+                                publishedVersion=True, forceCreation=True,
+                                ignoreDisabled=ignore_disabled,
+                            )
+
+                        self.assertEqual(result, expected)
+                        output.assert_called_once()
+                        warning = output.call_args.args[0]
+                        for detail in (
+                            "Warning", label, source["attributes"]["name"], source["id"],
+                            "Base", "Target", "no published version",
+                        ):
+                            self.assertIn(detail, warning)
+                        self.assertIs(sync.targets["Target"][key][0], target)
+                        self.assertIs(target["attributes"]["enabled"], False)
+                        if include_published:
+                            update.assert_called_once()
+                            id_key = "rule_id" if kind == "rules" else "dataElement_id"
+                            self.assertEqual(
+                                update.call_args.kwargs[id_key], published_target["id"]
+                            )
+                        else:
+                            self.assertEqual(target_api.mock_calls, [])
+                        self.assertEqual(
+                            [
+                                item["attributes"]["name"]
+                                for item in sync.targets["Target"]["libraryStack"][key]
+                            ],
+                            ["Published component"] if include_published else [],
+                        )
+
+    def test_bulk_published_sync_routes_warnings_and_preserves_plain_print(self):
+        for kind in ("rules", "data_elements"):
+            messages = []
+            for use_callback in (False, True):
+                with self.subTest(kind=kind, use_callback=use_callback):
+                    sync, source, target = self.make_sync(kind)
+                    sync.base["api"].getLatestPublishedVersion.side_effect = IndexError(
+                        "No published version"
+                    )
+                    method = sync.syncRules if kind == "rules" else sync.syncDataElements
+                    callback = Mock()
+                    kwargs = {"warningHandler": callback} if use_callback else {}
+                    with patch("builtins.print") as output:
+                        result = method(publishedVersion=True, **kwargs)
+
+                    self.assertEqual(result, {source["attributes"]["name"]: {}})
+                    self.assertEqual(sync.targets["Target"]["api"].mock_calls, [])
+                    handler = callback if use_callback else output
+                    handler.assert_called_once()
+                    messages.append(handler.call_args.args[0])
+                    if use_callback:
+                        output.assert_not_called()
+                    else:
+                        callback.assert_not_called()
+            self.assertEqual(messages[0], messages[1])
+            self.assertTrue(messages[0].startswith("Warning: "))
+
+    def test_cli_bulk_sync_renders_unpublished_warnings_in_yellow(self):
+        for kind, command in (
+            ("rules", "do_sync_rules"),
+            ("data_elements", "do_sync_data_elements"),
+        ):
+            for verbose in ("", " -v"):
+                with self.subTest(kind=kind, verbose=verbose):
+                    sync, source, target = self.make_sync(kind)
+                    source["attributes"]["name"] = "[red]Sample component[/red]"
+                    sync.base["api"].getLatestPublishedVersion.side_effect = IndexError(
+                        "No published version"
+                    )
+                    shell = SynchronizerCLI(sync)
+                    output = StringIO()
+                    cli_console = Console(
+                        file=output, force_terminal=True, color_system="standard",
+                        width=1000,
+                    )
+                    with (
+                        patch("launchpy.cli.__main__.console", cli_console),
+                        patch("builtins.print") as plain_print,
+                    ):
+                        getattr(shell, command)("-p" + verbose)
+
+                    label = "rule" if kind == "rules" else "data element"
+                    message = (
+                        f'Warning: The {label} "{source["attributes"]["name"]}" '
+                        'in base property "Base" has no published version. '
+                        'Skipping synchronization to target properties: Target.'
+                    )
+                    self.assertEqual(output.getvalue(), f"\x1b[33m{message}\x1b[0m\n")
+                    plain_print.assert_not_called()
+                    self.assertEqual(sync.targets["Target"]["api"].mock_calls, [])
+
+    def test_single_published_sync_still_raises_for_unpublished_components(self):
+        for kind in ("rules", "data_elements"):
+            with self.subTest(kind=kind):
+                sync, source, target = self.make_sync(kind)
+                source_api = sync.base["api"]
+                source_api.name = "Base"
+                source_api.getLatestPublishedVersion.side_effect = (
+                    lambda revisions: Property.getLatestPublishedVersion(
+                        source_api, revisions
+                    )
+                )
+
+                with patch("builtins.print") as output:
+                    with self.assertRaisesRegex(IndexError, "no published version"):
+                        sync.syncComponent(
+                            componentId=source["id"], publishedVersion=True
+                        )
+
+                output.assert_not_called()
+                self.assertEqual(sync.targets["Target"]["api"].mock_calls, [])
+
+    def test_bulk_published_sync_does_not_hide_unrelated_index_errors(self):
+        for kind in ("rules", "data_elements"):
+            for failure_stage in ("revisions", "target"):
+                with self.subTest(kind=kind, failure_stage=failure_stage):
+                    sync, source, target = self.make_sync(kind)
+                    if failure_stage == "revisions":
+                        sync.base["api"].getRevisions.side_effect = IndexError(
+                            "Unrelated failure"
+                        )
+                    else:
+                        api = sync.targets["Target"]["api"]
+                        update = api.updateRule if kind == "rules" else api.updateDataElement
+                        update.side_effect = IndexError("Unrelated failure")
+                    method = sync.syncRules if kind == "rules" else sync.syncDataElements
+
+                    with patch("builtins.print") as output:
+                        with self.assertRaisesRegex(IndexError, "Unrelated failure"):
+                            method(publishedVersion=True)
+
+                    output.assert_not_called()
+
     def test_bulk_sync_keeps_regex_filtering(self):
         for kind in ("rules", "data_elements"):
             with self.subTest(kind=kind):
@@ -409,7 +592,7 @@ class SynchronizerCLITests(unittest.TestCase):
                         getattr(shell, command)(arguments + " -r Sample -c -p")
                     method.assert_called_once_with(
                         regex="Sample", forceCreation=True, publishedVersion=True,
-                        ignoreDisabled=expected,
+                        ignoreDisabled=expected, warningHandler=shell._print_warning,
                     )
                     console.print.assert_not_called()
 

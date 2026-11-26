@@ -125,10 +125,18 @@ class PropertyCLI(cmd.Cmd):
         """Get all rules for the property."""
         parser = argparse.ArgumentParser(prog='get_rules', add_help=True)
         parser.add_argument("-n", "--name", help="Filter rules by name (partial match, non-case sensitive)", type=str, default=None)
+        parser.add_argument("-p", "--published", help="Filter rules by published status (True/False/None). True filter for published rules only, False for unpublished rules, None returns everything", type=str, default=None)
         parser.add_argument("-s", "--save", help="Save rules to a CSV file. Default False.", action="store_true", default=False)
         try:
             args = parser.parse_args(shlex.split(arg))
-            rules = self.property.getRules()
+            arg_published = args.published
+            if arg_published is None:
+                arg_published = None
+            elif arg_published.lower() == 'true':
+                arg_published = True
+            elif arg_published.lower() == 'false':
+                arg_published = False
+            rules = self.property.getRules(published=arg_published)
             self.rules = rules
             if args.name:
                 rules = [rule for rule in rules if args.name.lower() in rule['attributes']['name'].lower()]
@@ -139,7 +147,10 @@ class PropertyCLI(cmd.Cmd):
             for rule in rules:
                 rule_id = rule['id']
                 rule_name = rule['attributes']['name']
-                rule_published = str(rule['attributes']['published'])
+                if rule['attributes']['published']:
+                    rule_published = "[green]Published[/green]"
+                else:
+                    rule_published = "Unpublished"
                 table.add_row(rule_id, rule_name, rule_published)
             console.print(table)
             if args.save:
@@ -303,10 +314,18 @@ class PropertyCLI(cmd.Cmd):
         """Get all data elements, or only the ones matching a name filter, for the property. Can save them in CSV file."""
         parser = argparse.ArgumentParser(prog='get_data_elements', add_help=True)
         parser.add_argument("-n", "--name", help="Filter data elements by name (partial match, non-case sensitive)", type=str, default=None)
+        parser.add_argument("-p", "--published", help="Filter data elements by published status (True/False/None). True filter for published data elements only, False for unpublished data elements, None returns everything", type=str, default=None)
         parser.add_argument("-s", "--save", help="Boolean. Save data elements to a CSV file. Default False. Possible values: True, False", type=str2bool, nargs="?", const=True, default=False)
         try:
             args = parser.parse_args(shlex.split(args))
-            des = self.property.getDataElements()
+            arg_published = args.published
+            if arg_published is None:
+                arg_published = None
+            elif arg_published.lower() == 'true':
+                arg_published = True
+            elif arg_published.lower() == 'false':
+                arg_published = False
+            des = self.property.getDataElements(published=arg_published)
             if args.name:
                 des = [de for de in des if args.name.lower() in de['attributes']['name'].lower()]
             self.data_elements = des
@@ -317,7 +336,10 @@ class PropertyCLI(cmd.Cmd):
             for de in des:
                 de_id = de['id']
                 de_name = de['attributes']['name']
-                de_published = str(de['attributes']['published'])
+                if de['attributes']['published']:
+                    de_published = "[green]Published[/green]"
+                else:
+                    de_published = "Unpublished"
                 table.add_row(de_id, de_name, de_published)
             console.print(table)
             if args.save:
@@ -546,6 +568,9 @@ class SynchronizerCLI(cmd.Cmd):
         self.synchronizer = synchronizer
         self.prompt = f"synchronizer:{self.synchronizer.base['name']}> "
 
+    def _print_warning(self, message: str) -> None:
+        console.print(message, style="yellow", markup=False, highlight=False)
+
     def do_check_component(self,ars:Any):
         """Check if a specific component is in sync between source and destination properties."""
         parser = argparse.ArgumentParser(prog='check_component', add_help=True)
@@ -599,13 +624,13 @@ class SynchronizerCLI(cmd.Cmd):
         parser.add_argument("-v", "--verbose", help="Print detailed information about the sync process, including successes. Default False.", action="store_true", default=False)
         try:
             args = parser.parse_args(shlex.split(args))
-            result = self.synchronizer.syncRules(regex=args.regex, forceCreation=args.create, publishedVersion=args.published, ignoreDisabled=args.ignore_disabled)
+            result = self.synchronizer.syncRules(regex=args.regex, forceCreation=args.create, publishedVersion=args.published, ignoreDisabled=args.ignore_disabled, warningHandler=self._print_warning)
             for ruleName, targetResults in result.items():
                 for prop, message in (targetResults or {}).items():
                     if "does not exist" in message:
-                        console.print(f"[{ruleName}][{prop}] {message}", style="yellow")
+                        console.print(f"{message}", style="yellow")
                     elif args.verbose:
-                        console.print(f"[{ruleName}][{prop}] {message}", style="green")
+                        console.print(f"{message}", style="green")
         except Exception as e:
             console.print(f"(!) Error: {str(e)}", style="red")
             return
@@ -622,13 +647,13 @@ class SynchronizerCLI(cmd.Cmd):
         parser.add_argument("-v", "--verbose", help="Print detailed information about the sync process, including successes. Default False.", action="store_true", default=False)
         try:
             args = parser.parse_args(shlex.split(args))
-            result = self.synchronizer.syncDataElements(regex=args.regex, forceCreation=args.create, publishedVersion=args.published, ignoreDisabled=args.ignore_disabled)
+            result = self.synchronizer.syncDataElements(regex=args.regex, forceCreation=args.create, publishedVersion=args.published, ignoreDisabled=args.ignore_disabled, warningHandler=self._print_warning)
             for deName, targetResults in result.items():
                 for prop, message in (targetResults or {}).items():
                     if "does not exist" in message:
-                        console.print(f"[{deName}][{prop}] {message}", style="yellow")
+                        console.print(f"{message}", style="yellow")
                     elif args.verbose:
-                        console.print(f"[{deName}][{prop}] {message}", style="green")
+                        console.print(f"{message}", style="green")
         except Exception as e:
             console.print(f"(!) Error: {str(e)}", style="red")
             return
@@ -647,9 +672,9 @@ class SynchronizerCLI(cmd.Cmd):
             for extName, targetResults in result.items():
                 for prop, message in (targetResults or {}).items():
                     if "does not exist" in message:
-                        console.print(f"[{extName}][{prop}] {message}", style="yellow")
+                        console.print(f"{message}", style="yellow")
                     elif args.verbose:
-                        console.print(f"[{extName}][{prop}] {message}", style="green")
+                        console.print(f"{message}", style="green")
         except Exception as e:
             console.print(f"(!) Error: {str(e)}", style="red")
             return
@@ -1300,12 +1325,48 @@ class MainShell(cmd.Cmd):
             return
 
     @login_required
+    def do_search_component(self,arg:Any)->None:
+        """
+        Search for a specific component by name across all properties.
+        Arguments:
+            component_name : REQUIRED : The name of the component to search for (or part of name)
+            filter_property : OPTIONAL : If you want to filter by a specific property name. (regex compatible)
+            save : OPTIONAL : If you want to save the search results to a file.
+        """
+        parser = argparse.ArgumentParser(prog='search_component', add_help=True)
+        parser.add_argument("component_name", help="Name of the component to search for", type=str)
+        parser.add_argument("-fp", "--filter_property", help="Filter by specific property name", type=str, default=None)
+        parser.add_argument("-s", "--save", help="Save the search results to a file", type=str, default=None)
+        try:
+            args = parser.parse_args(shlex.split(arg))
+            component_name = args.component_name
+            filter_property = args.filter_property
+            results = self.admin.searchComponent(component_name, filter_property)
+            if not results:
+                console.print("No components found.", style="yellow")
+            else:
+                console.print_json(data=results)
+                if args.save:
+                    try:
+                        namefile = launchpy.__safe_name__(component_name)
+                        with open(f"{namefile}.json", "w") as f:
+                            json.dump(results, f, indent=4)
+                        console.print(f"Results saved to {namefile}.json", style="green")
+                    except Exception as e:
+                        console.print(f"(!) Error saving results: {str(e)}", style="red")
+        except Exception as e:
+            console.print(f"(!) Error: {str(e)}", style="red")
+        except SystemExit:
+            return
+
+    @login_required
     def do_extract_property(self, arg:Any) -> None:
         """Extract all rules and components for a given property into folder."""
         parser = argparse.ArgumentParser(prog='extract_property', add_help=True)
         parser.add_argument("name", help="Name of the property to extract", type=str)
         parser.add_argument("-p","--published_version", help="Whether to extract only the latest published version for the components (default False)", type=str2bool, nargs="?", const=True, default=False)
         parser.add_argument("-f","--folder", help="Folder to extract the property into (default is current working directory)", type=str, default=None)
+        parser.add_argument("-sp","--strict_published", help="Whether to strictly use only published versions (default False)", type=str2bool, nargs="?", const=True, default=True)
         try:
             args = parser.parse_args(shlex.split(arg))
             if self.properties is None:
@@ -1318,8 +1379,28 @@ class MainShell(cmd.Cmd):
             prop_def = matching_props[0]
             myproperty = launchpy.Property(prop_def, org_name=self.org_name)
             console.print(f"Extracting property '{args.name}'...", style="blue")
-            launchpy.extractProperty(myproperty, publishedVersion=args.published_version, folder=args.folder)
+            launchpy.extractProperty(myproperty, publishedVersion=args.published_version, folder=args.folder, strictPublished=args.strict_published)
             console.print(f"Extraction completed for property '{args.name}'. Check the folder '{args.folder if args.folder else launchpy.__safe_name__(args.name)}' for the output files.", style="green")
+        except Exception as e:
+            console.print(f"(!) Error: {str(e)}", style="red")
+            return
+        except SystemExit:
+            return
+
+    @login_required
+    def do_extract_properties(self,arg:Any)->None:
+        """
+        Extract all properties concurrently.
+        Arguments:
+            filter : OPTIONAL : If you want to filter by a specific property name. (regex compatible)
+            publishedVersion : OPTIONAL : If you want to extract the published version of the properties.
+        """
+        parser = argparse.ArgumentParser(prog='extract_properties', add_help=True)
+        parser.add_argument("-f", "--filter", help="Filter by property name (regex compatible)", type=str, default=None)
+        parser.add_argument("-p", "--published_version", help="Whether to extract only the latest published version for the components (default False)", type=str2bool, nargs="?", const=True, default=False)
+        try:
+            args = parser.parse_args(shlex.split(arg))
+            launchpy.extractProperties(filter=args.filter, publishedVersion=args.published_version)
         except Exception as e:
             console.print(f"(!) Error: {str(e)}", style="red")
             return
@@ -1328,7 +1409,11 @@ class MainShell(cmd.Cmd):
     
     @login_required
     def do_delete_property(self, arg:Any) -> None:
-        """Delete a property by name."""
+        """
+        Delete a property by name.
+        Arguments:
+            name : REQUIRED : Name of the property to delete.
+        """
         parser = argparse.ArgumentParser(prog='delete_property', add_help=True)
         parser.add_argument("name", help="Name of the property to delete", type=str)
         try:

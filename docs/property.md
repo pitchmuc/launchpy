@@ -23,7 +23,7 @@ Here are shortlinks to the different methods explanation.
 
 ## Get methods
 
-When you have your property instance created, the methods that you may want to call first are the get methods. They never take any argument, they don't actually need any argument.
+When you have your property instance created, the methods that you may want to call first are the get methods. Listing methods can usually be called without arguments, with optional filters available for rules and data elements.
 The only thing important to know is that you must run the getRules() method before the getRuleComponents() method.
 
 The different get methods are the following :
@@ -49,6 +49,21 @@ Returns the information about a profile
 ### getRules
 Return the list of the rules data.\
   On top, it fills the ruleComponents attribute with a dictionnary based on rule id and their rule name and the ruleComponent of each.
+
+Arguments:
+* filter : OPTIONAL : Dictionary of filters to apply to the rules query. Default: None.
+* published : OPTIONAL : True selects rules with a published revision; False selects rules that have never been published. Default: None (all rules, without publication checks).
+* verbose : OPTIONAL : Print pagination progress. Default: False.
+
+The publication filter checks revision history, not just the current rule's `published` attribute. It returns the current definitions, not the published revisions. Checks run concurrently with up to five workers and preserve the original result order; unexpected lookup errors still raise.
+The `ruleComponents` attribute is populated before filtering, so it still includes all retrieved rules.
+
+```python
+published_rules = myProperty.getRules(published=True)
+unpublished_rules = myProperty.getRules(published=False, verbose=True)
+```
+
+Use `verbose=True` by keyword: the new `published` parameter precedes `verbose` in the signature.
 
 ### getRule
 Update the rule based on elements passed in attr_dict.\
@@ -77,6 +92,19 @@ Argument:
 
 ### getDataElements
 Retrieve data elements of that property. Returns a list.\
+
+Arguments:
+* published : OPTIONAL : True selects data elements with a published revision; False selects data elements that have never been published. Default: None (all data elements, without publication checks).
+* verbose : OPTIONAL : Print pagination progress. Default: False.
+
+As with [getRules](#getrules), the filter checks revision history and returns current definitions rather than published revisions. Checks use up to five workers, preserve result order and propagate unexpected lookup errors.
+
+```python
+published_data_elements = myProperty.getDataElements(published=True)
+unpublished_data_elements = myProperty.getDataElements(published=False, verbose=True)
+```
+
+Use `verbose=True` by keyword: the first positional argument is now `published`, not `verbose`.
 
 ### getDataElement
 Retrieve a specific data elements based on its ID.\

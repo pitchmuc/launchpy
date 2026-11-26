@@ -10,6 +10,7 @@ from launchpy.library import Library
 from launchpy.admin import Admin
 from launchpy.property import Property
 from launchpy.synchronizer import Synchronizer
+from concurrent.futures import ThreadPoolExecutor
 import re,json
 from pathlib import Path
 import httpx, asyncio
@@ -64,7 +65,10 @@ async def write_all_data_elements(data_elements_list, folder, header):
             json.dump(data_element, f, indent=4)
 
 
-def extractProperty(property: dict | Property, publishedVersion: bool = False,folder: str = None):
+def extractProperty(property: dict | Property, 
+                    publishedVersion: bool = False,
+                    folder: str = None,
+                    strictPublished: bool = False):
     """
     Extract the rules, Data Elements and Extensions configuration for a given property and save them in a folder named after the property.
     Arguments:
@@ -72,6 +76,7 @@ def extractProperty(property: dict | Property, publishedVersion: bool = False,fo
         publishedVersion: bool: If True, only the latest published version of each rule will be extracted. If False, all rules as latest state will be extracted.
             For rules that are not yet published, the latest state will be extracted regardless of the value of this parameter.
         folder : str: The folder where the property will be extracted. If None, a folder named after the property will be created in the current working directory.
+        strictPublished : bool: If True, the rule is ignored if no published version is available. If False, the latest state will be used for unpublihed rules and data elements.
     """
     if property is None:
         raise ValueError("Property is None")
@@ -92,6 +97,8 @@ def extractProperty(property: dict | Property, publishedVersion: bool = False,fo
                 publishedRule = property.getLatestPublishedVersion(revisions)
                 published_rules.append(publishedRule)
             except Exception as e:
+                if strictPublished:
+                    continue
                 published_rules.append(rule)
         rules = published_rules
     asyncio.run(process_all_rules(rules, folder, property.header, property.connector.proxy))
@@ -104,6 +111,8 @@ def extractProperty(property: dict | Property, publishedVersion: bool = False,fo
                 publishedDataElement = property.getLatestPublishedVersion(revisions)
                 published_data_elements.append(publishedDataElement)
             except Exception as e:
+                if strictPublished:
+                    continue
                 published_data_elements.append(data_element)
         dataElements = published_data_elements
     dataElements_folder = Path(folder) / "data_elements"
@@ -120,6 +129,8 @@ def extractProperty(property: dict | Property, publishedVersion: bool = False,fo
                 publishedExtension = property.getLatestPublishedVersion(revisions)
                 published_extensions.append(publishedExtension)
             except Exception as e:
+                if strictPublished:
+                    continue
                 published_extensions.append(extension)
         extensions = published_extensions
     for extension in extensions:
@@ -127,3 +138,31 @@ def extractProperty(property: dict | Property, publishedVersion: bool = False,fo
         file_path = extension_folder / f"{extension_name}.json"
         with open(file_path, "w") as f:
             json.dump(extension, f, indent=4)
+
+def extractProperties(
+    filter: str | None = None,
+    publishedVersion: bool = False,
+    strictPublished: bool = False,
+    max_workers: int = 5,
+) -> None:
+    """
+    Extract properties concurrently, waiting for all exports and propagating worker errors.
+    Arguments:
+        filter : OPTIONAL : If you want to filter by a specific property name. (regex compatible)
+        publishedVersion : OPTIONAL : If you want to extract the published version of the properties.
+        strictPublished : OPTIONAL : If set to True, skip rules, data elements and extensions for which a published revision cannot be selected. Default: False.
+        max_workers : OPTIONAL : Maximum simultaneous property exports. Defaults to 5.
+            Each export retains its own internal threading and asynchronous downloads;
+            this is not a global limit on threads or requests. Use 1 for sequential exports.
+    """
+    admin = Admin()
+    list_properties = admin.getProperties(admin.getCompanyId())
+    if filter:
+        list_properties = [prop for prop in list_properties if re.search(filter, prop['attributes']['name'])]
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        futures = [
+            executor.submit(extractProperty, prop, publishedVersion=publishedVersion, strictPublished=strictPublished)
+            for prop in list_properties
+        ]
+        for future in futures:
+            future.result()

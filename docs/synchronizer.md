@@ -172,17 +172,21 @@ This method allows you to take a library in your base property and sync all of t
 Arguments: 
 * library : REQUIRED : the name or the ID of the library to sync from.
 * state : OPTIONAL : the state of the library to sync from. Default: 'published', possible states: "development", "submitted", "approved", "rejected", "published"
-* create : OPTIONAL : If set to True, it will create the element sync if it does not exist in the target property. Set to `False`, it will prevent that behavior. Default: `False`.
+* forceCreation : OPTIONAL : If set to True, it will create the element sync if it does not exist in the target property. Set to `False`, it will prevent that behavior. Default: `False`.
 * libraryLinked : OPTIONAL : If set to True, it will use library linked components for comparison. Default: `True`.
 * publishedVersion : OPTIONAL : If set to True, it will compare the components to the published version in the target properties. Default: `False`.
 * dryRun : OPTIONAL : If set to True, will only check the sync status of the components without actually syncing them. Default `False`. Possible values: `True`, `False`
+* verbose : OPTIONAL : Keyword argument to print details of the synchronization. Default: False.
 
 **Note**: A library is not created automatically, so you will need to create a new one via the `createTargetsLibrary` method.
 
 ### Behaviors for syncFromLibrary
-By default, the method will sync the components present in the library as they are in the library.
+By default, the method will sync the rules and data elements present in the library as they are in the library.
 If the `publishedVersion` is set to True, it will try to sync the version that has been published in the base property to the targets.\
 If the `libraryLinked` is set to `False` and the `publishedVersion` is set to `False` (default), it will try to sync the latest version of the components present in the base property library to the targets.\
+
+Extensions included in the library are synchronized first through `syncComponent`, rather than only requesting an extension upgrade. They are matched by name and use the current base property's extension configuration, not a library-linked or published extension revision. Existing target extensions are updated, and missing extensions are created only with `forceCreation=True`. Target component filters still apply.
+The returned dictionary is keyed by component name and contains per-target status dictionaries, or an error message when a component fails to synchronize. Component failures are printed and do not prevent the remaining components from being processed.
 
 ## syncExtensions
 
@@ -200,6 +204,7 @@ Arguments:
 *  forceCreation : OPTIONAL : If set to True, it will sync the data elements even if they do not exist in the target properties. If set to False, it will only sync the data elements that already exist in the target properties. Default: False.
 *  publishedVersion : OPTIONAL : If set to True, it will sync the latest published version of the data elements. Default: False.
 *  ignoreDisabled : OPTIONAL : If set to True, skip data elements whose selected source revision has `enabled=False`. Default: False.
+*  warningHandler : OPTIONAL : Keyword-only callback receiving the full warning text instead of printing it. Default: None (plain `print`).
 
 ## SyncRules
 It will synchronize the rules in the base property to the target properties.
@@ -208,6 +213,11 @@ Arguments:
 *  forceCreation : OPTIONAL : If set to True, it will sync the rules even if they do not exist in the target properties. If set to False, it will only sync the rules that already exist in the target properties. Default: False.
 *  publishedVersion : OPTIONAL : If set to True, it will sync the latest published version of the rules. Default: False.
 *  ignoreDisabled : OPTIONAL : If set to True, skip rules whose selected source revision has `enabled=False`. Default: False.
+*  warningHandler : OPTIONAL : Keyword-only callback receiving the full warning text instead of printing it. Default: None (plain `print`).
+
+For both methods, `publishedVersion=True` skips components that have no published source revision. A warning identifies the base property, component type and name, and target properties. Skipped components retain an empty per-target dictionary (`{}`) in the returned results, and the remaining components continue synchronizing. Other synchronization errors still raise. Calling `syncComponent` directly with an unpublished component and `publishedVersion=True` still raises an `IndexError`.
+
+Warnings use plain `print` by default. The CLI passes a `warningHandler` that renders them in yellow with Rich, without changing library output or redirecting global stdout.
 
 For both methods, `ignoreDisabled=True` checks the source revision being synchronized, not the target's enabled state. With `publishedVersion=True`, it checks the latest published source revision rather than the current draft. Disabled components are not created or updated, even with `forceCreation=True`, and retain an empty per-target dictionary in the returned results.
 

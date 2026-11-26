@@ -129,6 +129,54 @@ One of my main use case would be to copy paste element from one property to anot
 
 ***Note*** : Think that you don’t need to recreate a Core Extension because it created by default.
 
+### extractProperty
+
+Extracts the rule components, data elements and extension configurations of one property to JSON files. Rule components are saved in a folder per rule, with separate `data_elements` and `extensions` folders.
+Arguments:
+* property : REQUIRED : A Property instance or a property definition dictionary returned by `Admin.getProperties`.
+* publishedVersion : OPTIONAL : If set to True, extract the latest published revision of each component where available. Default: False (current versions).
+* folder : OPTIONAL : Output folder. Default: None (a folder named after the sanitized property name in the current working directory).
+* strictPublished : OPTIONAL : With `publishedVersion=True`, skip rules, data elements and extensions for which a published revision cannot be selected. Default: False (fall back to the current version).
+
+```python
+import launchpy as lp
+
+lp.importConfigFile('myConfig.json')
+admin = lp.Admin()
+properties = admin.getProperties(admin.getCompanyId())
+lp.extractProperty(properties[0], publishedVersion=True, strictPublished=True, folder='exports')
+```
+
+`strictPublished` has no effect when `publishedVersion=False`. Errors selecting a published revision follow the same skip or fallback behavior; errors fetching revision lists still raise.
+The CLI [extract_property](./cli.md#extract_property) command exposes this option as `--strict_published`, with a default of `True` rather than the Python function's `False`.
+
+### extractProperties
+
+Exports properties from the default configured organization (the first entry in a multi-org configuration) using a separate thread pool
+for property-level concurrency. Each property is exported through `extractProperty`
+into a folder named after its sanitized property name.
+
+```python
+import launchpy as lp
+
+lp.extractProperties(filter=r"Production", publishedVersion=True, max_workers=5)
+```
+
+Arguments:
+* filter : OPTIONAL : Regular expression matching property names. Default: None (export all properties).
+* publishedVersion : OPTIONAL : Export published versions where available. Default: `False`.
+* strictPublished : OPTIONAL : If set to `True`, skip rules, data elements and extensions for which a published revision cannot be selected. Default: `False`.
+* max_workers : OPTIONAL : Maximum concurrent property exports. Default: 5; use 1 for sequential exports.
+
+Published exports retain the current version when no published revision can be selected. This helper does not expose the `folder` options; use `extractProperty` for it.
+
+Each export keeps its existing internal pagination threads and asynchronous
+rule-component downloads, with its own event loops and HTTP client. `max_workers`
+limits concurrent properties, not the total number of threads or HTTP requests.
+Start with a small value to avoid excessive API traffic.
+
+The CLI equivalent is [extract_properties](./cli.md#extract_properties).
+
 ### extractSettings
 
 This function let’s you extract the settings of your elements. It doesn’t work on rules because rules settings are actually set in the rule component elements.
